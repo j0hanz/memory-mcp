@@ -86,7 +86,18 @@ export interface HashRow {
 }
 
 export function parseTags(tagsJson: string): string[] {
-  return JSON.parse(tagsJson) as string[];
+  try {
+    const parsed: unknown = JSON.parse(tagsJson);
+    if (
+      Array.isArray(parsed) &&
+      parsed.every((tag) => typeof tag === 'string')
+    ) {
+      return parsed;
+    }
+    return [];
+  } catch {
+    return [];
+  }
 }
 
 export function parseMemoryRow(row: MemoryRow): Memory {

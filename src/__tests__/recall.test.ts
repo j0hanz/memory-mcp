@@ -26,11 +26,12 @@ interface StoreResult {
 
 describe('recall tool', () => {
   let server: McpServer;
+  let db: TypedDb;
   let hashA: string;
   let hashB: string;
 
   before(async () => {
-    const db: TypedDb = initTypedDatabase(':memory:');
+    db = initTypedDatabase(':memory:');
     server = createServer(db);
 
     // Store two memories and link them
@@ -86,5 +87,59 @@ describe('recall tool', () => {
     );
     assert.ok(edge !== undefined, 'Expected edge between hashA and hashB');
     assert.equal(edge.relation_type, 'related_to');
+  });
+
+  it('sets aborted when traversal exceeds edge budget', async () => {
+    const insertMemory = db.prepare(
+      `INSERT INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    );
+    const insertRelationship = db.prepare(
+      `INSERT INTO relationships (from_hash, to_hash, relation_type, created_at)
+       VALUES (?, ?, ?, ?)`
+    );
+
+    const now = new Date().toISOString();
+    const hubHash = `${'f'.repeat(63)}0`;
+    insertMemory.run(
+      hubHash,
+      'hub-memory-overflow-target',
+      '["hub"]',
+      'general',
+      0,
+      now,
+      now
+    );
+
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      for (let i = 1; i <= 5200; i++) {
+        const leafHash = i.toString(16).padStart(64, '0');
+        insertMemory.run(
+          leafHash,
+          `leaf-node-${i}`,
+          '["leaf"]',
+          'general',
+          0,
+          now,
+          now
+        );
+        insertRelationship.run(hubHash, leafHash, 'related_to', now);
+      }
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+
+    const result = await callTool(server, 'recall', {
+      query: 'hub-memory-overflow-target',
+      depth: 1,
+      limit: 1,
+    });
+    const data = result.structuredContent as RecallResult;
+    assert.equal(data.ok, true);
+    assert.equal(data.result.aborted, true);
+    assert.ok(data.result.graph.length > 0);
   });
 });

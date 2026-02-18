@@ -1,3 +1,6 @@
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+
+import type { TypedDb } from '../db/typed.js';
 import { registerCreateRelationship } from './create-relationship.js';
 import { registerDeleteMemories } from './delete-memories.js';
 import { registerDeleteMemory } from './delete-memory.js';
@@ -10,6 +13,8 @@ import { registerSearchMemories } from './search-memories.js';
 import { registerStoreMemories } from './store-memories.js';
 import { registerStoreMemory } from './store-memory.js';
 import { registerUpdateMemory } from './update-memory.js';
+
+export type ToolRegistrar = (server: McpServer, db: TypedDb) => void;
 
 export {
   registerCreateRelationship,
@@ -26,7 +31,7 @@ export {
   registerUpdateMemory,
 };
 
-export const TOOL_REGISTRARS = [
+export const TOOL_REGISTRARS: readonly ToolRegistrar[] = [
   registerStoreMemory,
   registerGetMemory,
   registerUpdateMemory,

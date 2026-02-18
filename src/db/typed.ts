@@ -1,18 +1,13 @@
-import type { DatabaseSync } from 'node:sqlite';
-
-type SQLInputValue = string | number | bigint | null | Uint8Array;
-
-function toSqlParams(params: unknown[]): SQLInputValue[] {
-  return params as SQLInputValue[];
-}
+import type {
+  DatabaseSync,
+  SQLInputValue,
+  StatementResultingChanges,
+} from 'node:sqlite';
 
 export interface TypedStatement<T> {
-  all(...params: unknown[]): T[];
-  get(...params: unknown[]): T | undefined;
-  run(...params: unknown[]): {
-    changes: number | bigint;
-    lastInsertRowid: number | bigint;
-  };
+  all(...params: SQLInputValue[]): T[];
+  get(...params: SQLInputValue[]): T | undefined;
+  run(...params: SQLInputValue[]): StatementResultingChanges;
 }
 
 export class TypedDb {
@@ -21,16 +16,9 @@ export class TypedDb {
   prepare<T>(sql: string): TypedStatement<T> {
     const stmt = this.db.prepare(sql);
     return {
-      all: (...params: unknown[]) => stmt.all(...toSqlParams(params)) as T[],
-      get: (...params: unknown[]) =>
-        stmt.get(...toSqlParams(params)) as T | undefined,
-      run: (...params: unknown[]) => {
-        const result = stmt.run(...toSqlParams(params));
-        return {
-          changes: result.changes,
-          lastInsertRowid: result.lastInsertRowid,
-        };
-      },
+      all: (...params: SQLInputValue[]) => stmt.all(...params) as T[],
+      get: (...params: SQLInputValue[]) => stmt.get(...params) as T | undefined,
+      run: (...params: SQLInputValue[]) => stmt.run(...params),
     };
   }
 

@@ -12,7 +12,13 @@ function isCursorPayload(value: unknown): value is CursorPayload {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
-  return typeof (value as Record<string, unknown>)['offset'] === 'number';
+  const { offset } = value as Record<string, unknown>;
+  return (
+    typeof offset === 'number' &&
+    Number.isInteger(offset) &&
+    Number.isFinite(offset) &&
+    offset >= 0
+  );
 }
 
 function parseCursorPayload(cursor: string): CursorPayload {

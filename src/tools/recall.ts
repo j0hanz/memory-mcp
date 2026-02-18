@@ -23,6 +23,8 @@ import { RecallResultSchema } from '../schemas/outputs.js';
 type RecallInput = z.infer<typeof RecallInputSchema>;
 
 const MAX_FRONTIER_SIZE = 1000;
+const MAX_EDGE_ROWS = 5000;
+const MAX_VISITED_NODES = 5000;
 
 function createPlaceholders(count: number): string {
   return new Array(count).fill('?').join(',');
@@ -68,6 +70,7 @@ function traverseGraph(
 } {
   const visited = new Set<string>(seeds.map((r) => r.hash));
   const edges: RelationshipEdge[] = [];
+  const seenEdges = new Set<string>();
   let frontier: string[] = seeds.map((r) => r.hash);
   let depthReached = 0;
   let aborted = false;
@@ -78,26 +81,61 @@ function traverseGraph(
       frontier = frontier.slice(0, MAX_FRONTIER_SIZE);
       aborted = true;
     }
+    const remainingEdgeBudget = MAX_EDGE_ROWS - edges.length;
+    const remainingNodeBudget = MAX_VISITED_NODES - visited.size;
+    if (remainingEdgeBudget <= 0 || remainingNodeBudget <= 0) {
+      aborted = true;
+      break;
+    }
+
     const placeholders = createPlaceholders(frontier.length);
     const edgeRows = db
       .prepare<EdgeRow>(
         `SELECT from_hash, to_hash, relation_type FROM relationships
-         WHERE from_hash IN (${placeholders}) OR to_hash IN (${placeholders})`
+         WHERE from_hash IN (${placeholders}) OR to_hash IN (${placeholders})
+         LIMIT ?`
       )
-      .all(...frontier, ...frontier);
+      .all(...frontier, ...frontier, remainingEdgeBudget + 1);
+
+    const rows =
+      edgeRows.length > remainingEdgeBudget
+        ? edgeRows.slice(0, remainingEdgeBudget)
+        : edgeRows;
+    if (edgeRows.length > remainingEdgeBudget) {
+      aborted = true;
+    }
 
     const nextHashes: string[] = [];
-    for (const edge of edgeRows) {
-      edges.push({
-        from_hash: edge.from_hash,
-        to_hash: edge.to_hash,
-        relation_type: edge.relation_type,
-      });
+    for (const edge of rows) {
+      const edgeKey = `${edge.from_hash}|${edge.to_hash}|${edge.relation_type}`;
+      if (!seenEdges.has(edgeKey)) {
+        seenEdges.add(edgeKey);
+        edges.push({
+          from_hash: edge.from_hash,
+          to_hash: edge.to_hash,
+          relation_type: edge.relation_type,
+        });
+      }
+
       for (const h of [edge.from_hash, edge.to_hash]) {
         if (!visited.has(h)) {
+          if (visited.size >= MAX_VISITED_NODES) {
+            aborted = true;
+            break;
+          }
           visited.add(h);
-          nextHashes.push(h);
+          if (nextHashes.length < MAX_FRONTIER_SIZE) {
+            nextHashes.push(h);
+          } else {
+            aborted = true;
+          }
         }
+      }
+      if (
+        aborted &&
+        (edges.length >= MAX_EDGE_ROWS || visited.size >= MAX_VISITED_NODES)
+      ) {
+        break;
       }
     }
     frontier = nextHashes;

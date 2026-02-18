@@ -80,10 +80,7 @@ export function createServer(db: TypedDb): McpServer {
     }
   );
 
-  for (const registerTool of TOOL_REGISTRARS as unknown as ((
-    server: McpServer,
-    db: TypedDb
-  ) => void)[]) {
+  for (const registerTool of TOOL_REGISTRARS) {
     registerTool(server, db);
   }
 
