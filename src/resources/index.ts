@@ -14,6 +14,7 @@ import type { MemoryRow } from '../lib/types.js';
 const baseDir = fileURLToPath(new URL('.', import.meta.url));
 const FALLBACK_INSTRUCTIONS =
   '# Memory instructions\n\nSee the README for usage details.';
+const HASH_REGEX = /^[a-f0-9]{64}$/;
 
 function loadInstructions(): string {
   const paths = [
@@ -40,6 +41,12 @@ function createJsonContent(
     mimeType: 'application/json',
     text: JSON.stringify(payload),
   };
+}
+
+function getSingleVariable(
+  value: string | string[] | undefined
+): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
 }
 
 function readMemoryByHash(db: TypedDb, hash: string): MemoryRow | undefined {
@@ -85,9 +92,8 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
     },
     (uri: URL, variables: Variables) => {
       const rawHash = variables['hash'];
-      const hash = Array.isArray(rawHash) ? rawHash[0] : rawHash;
+      const hash = getSingleVariable(rawHash);
 
-      const HASH_REGEX = /^[a-f0-9]{64}$/;
       if (!hash || !HASH_REGEX.test(hash)) {
         return {
           contents: [createJsonContent(uri.href, { error: 'Invalid hash' })],

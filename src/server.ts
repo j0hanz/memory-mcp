@@ -7,42 +7,17 @@ import { fileURLToPath } from 'node:url';
 import type { TypedDb } from './db/typed.js';
 import { registerAllPrompts } from './prompts/index.js';
 import { registerAllResources } from './resources/index.js';
-import {
-  registerCreateRelationship,
-  registerDeleteMemories,
-  registerDeleteMemory,
-  registerDeleteRelationship,
-  registerGetMemory,
-  registerGetRelationships,
-  registerMemoryStats,
-  registerRecall,
-  registerSearchMemories,
-  registerStoreMemories,
-  registerStoreMemory,
-  registerUpdateMemory,
-} from './tools/index.js';
-
-type RegisterToolFn = (server: McpServer, db: TypedDb) => void;
-
-const REGISTER_TOOL_FNS: RegisterToolFn[] = [
-  registerStoreMemory,
-  registerGetMemory,
-  registerUpdateMemory,
-  registerDeleteMemory,
-  registerMemoryStats,
-  registerStoreMemories,
-  registerDeleteMemories,
-  registerSearchMemories,
-  registerCreateRelationship,
-  registerDeleteRelationship,
-  registerGetRelationships,
-  registerRecall,
-];
+import { TOOL_REGISTRARS } from './tools/index.js';
 
 const ICON_ASSET = 'logo.svg';
 const ICON_MIME = 'image/svg+xml';
 const ICON_SIZES = ['any'];
 const MAX_ICON_BYTES = 2 * 1024 * 1024;
+interface IconDescriptor {
+  src: string;
+  mimeType: string;
+  sizes: string[];
+}
 
 function loadPackageVersion(): string {
   const pkgPath = findPackageJSON('.', import.meta.url);
@@ -80,17 +55,19 @@ function getLocalIconData(): string | undefined {
   return undefined;
 }
 
+function createIconDescriptors(): IconDescriptor[] | undefined {
+  const src = getLocalIconData();
+  if (!src) return undefined;
+  return [{ src, mimeType: ICON_MIME, sizes: ICON_SIZES }];
+}
+
 export function createServer(db: TypedDb): McpServer {
-  const localIcon = getLocalIconData();
+  const icons = createIconDescriptors();
   const server = new McpServer(
     {
       name: 'memory-mcp',
       version: loadPackageVersion(),
-      ...(localIcon
-        ? {
-            icons: [{ src: localIcon, mimeType: ICON_MIME, sizes: ICON_SIZES }],
-          }
-        : {}),
+      ...(icons ? { icons } : {}),
     },
     {
       capabilities: {
@@ -103,7 +80,10 @@ export function createServer(db: TypedDb): McpServer {
     }
   );
 
-  for (const registerTool of REGISTER_TOOL_FNS) {
+  for (const registerTool of TOOL_REGISTRARS as unknown as ((
+    server: McpServer,
+    db: TypedDb
+  ) => void)[]) {
     registerTool(server, db);
   }
 

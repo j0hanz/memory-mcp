@@ -8,9 +8,11 @@ import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
-import type { MemoryRow, RelationshipRow } from '../lib/types.js';
+import { parseTags } from '../lib/types.js';
+import type { RelationshipRow } from '../lib/types.js';
 import { GetRelationshipsInputSchema } from '../schemas/inputs.js';
 import { RelationshipResultSchema } from '../schemas/outputs.js';
+import { memoryExists } from './helpers.js';
 
 type GetRelInput = z.infer<typeof GetRelationshipsInputSchema>;
 
@@ -20,33 +22,23 @@ interface RelWithLinkedMemory extends RelationshipRow {
   linked_tags: string;
 }
 
-function loadOutgoingRelationships(
-  db: TypedDb,
-  hash: string
-): RelWithLinkedMemory[] {
-  return db
-    .prepare<RelWithLinkedMemory>(
-      `SELECT r.from_hash, r.to_hash, r.relation_type, r.created_at,
-              m.hash AS linked_hash, m.content AS linked_content, m.tags AS linked_tags
-       FROM relationships r
-       JOIN memories m ON r.to_hash = m.hash
-       WHERE r.from_hash = ?
-       ORDER BY r.created_at DESC`
-    )
-    .all(hash);
-}
+type RelationshipDirection = 'outgoing' | 'incoming';
 
-function loadIncomingRelationships(
+function loadRelationships(
   db: TypedDb,
-  hash: string
+  hash: string,
+  direction: RelationshipDirection
 ): RelWithLinkedMemory[] {
+  const joinCondition =
+    direction === 'outgoing' ? 'r.to_hash = m.hash' : 'r.from_hash = m.hash';
+  const whereColumn = direction === 'outgoing' ? 'r.from_hash' : 'r.to_hash';
   return db
     .prepare<RelWithLinkedMemory>(
       `SELECT r.from_hash, r.to_hash, r.relation_type, r.created_at,
               m.hash AS linked_hash, m.content AS linked_content, m.tags AS linked_tags
        FROM relationships r
-       JOIN memories m ON r.from_hash = m.hash
-       WHERE r.to_hash = ?
+       JOIN memories m ON ${joinCondition}
+       WHERE ${whereColumn} = ?
        ORDER BY r.created_at DESC`
     )
     .all(hash);
@@ -65,13 +57,7 @@ export function registerGetRelationships(server: McpServer, db: TypedDb): void {
     },
     (params: GetRelInput) => {
       try {
-        const exists = db
-          .prepare<
-            Pick<MemoryRow, 'hash'>
-          >('SELECT hash FROM memories WHERE hash = ?')
-          .get(params.hash);
-
-        if (!exists) {
+        if (!memoryExists(db, params.hash)) {
           return createErrorResponse(
             E_NOT_FOUND,
             `Memory not found: ${params.hash}`
@@ -82,12 +68,12 @@ export function registerGetRelationships(server: McpServer, db: TypedDb): void {
         let rows: RelWithLinkedMemory[] = [];
 
         if (direction === 'outgoing' || direction === 'both') {
-          const outgoing = loadOutgoingRelationships(db, params.hash);
+          const outgoing = loadRelationships(db, params.hash, 'outgoing');
           rows = rows.concat(outgoing);
         }
 
         if (direction === 'incoming' || direction === 'both') {
-          const incoming = loadIncomingRelationships(db, params.hash);
+          const incoming = loadRelationships(db, params.hash, 'incoming');
           rows = rows.concat(incoming);
         }
 
@@ -98,7 +84,7 @@ export function registerGetRelationships(server: McpServer, db: TypedDb): void {
           created_at: r.created_at,
           linked_hash: r.linked_hash,
           linked_content: r.linked_content,
-          linked_tags: JSON.parse(r.linked_tags) as string[],
+          linked_tags: parseTags(r.linked_tags),
         }));
 
         return createToolResponse({

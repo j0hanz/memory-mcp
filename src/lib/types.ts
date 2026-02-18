@@ -85,8 +85,8 @@ export interface HashRow {
   hash: string;
 }
 
-function parseTags(tags: string): string[] {
-  return JSON.parse(tags) as string[];
+export function parseTags(tagsJson: string): string[] {
+  return JSON.parse(tagsJson) as string[];
 }
 
 export function parseMemoryRow(row: MemoryRow): Memory {

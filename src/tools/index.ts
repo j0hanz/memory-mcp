@@ -1,15 +1,42 @@
-// Write tools
-export { registerStoreMemory } from './store-memory.js';
-export { registerUpdateMemory } from './update-memory.js';
-export { registerDeleteMemory } from './delete-memory.js';
-export { registerStoreMemories } from './store-memories.js';
-export { registerDeleteMemories } from './delete-memories.js';
-export { registerCreateRelationship } from './create-relationship.js';
-export { registerDeleteRelationship } from './delete-relationship.js';
+import { registerCreateRelationship } from './create-relationship.js';
+import { registerDeleteMemories } from './delete-memories.js';
+import { registerDeleteMemory } from './delete-memory.js';
+import { registerDeleteRelationship } from './delete-relationship.js';
+import { registerGetMemory } from './get-memory.js';
+import { registerGetRelationships } from './get-relationships.js';
+import { registerMemoryStats } from './memory-stats.js';
+import { registerRecall } from './recall.js';
+import { registerSearchMemories } from './search-memories.js';
+import { registerStoreMemories } from './store-memories.js';
+import { registerStoreMemory } from './store-memory.js';
+import { registerUpdateMemory } from './update-memory.js';
 
-// Read tools
-export { registerGetMemory } from './get-memory.js';
-export { registerGetRelationships } from './get-relationships.js';
-export { registerMemoryStats } from './memory-stats.js';
-export { registerRecall } from './recall.js';
-export { registerSearchMemories } from './search-memories.js';
+export {
+  registerCreateRelationship,
+  registerDeleteMemories,
+  registerDeleteMemory,
+  registerDeleteRelationship,
+  registerGetMemory,
+  registerGetRelationships,
+  registerMemoryStats,
+  registerRecall,
+  registerSearchMemories,
+  registerStoreMemories,
+  registerStoreMemory,
+  registerUpdateMemory,
+};
+
+export const TOOL_REGISTRARS = [
+  registerStoreMemory,
+  registerGetMemory,
+  registerUpdateMemory,
+  registerDeleteMemory,
+  registerMemoryStats,
+  registerStoreMemories,
+  registerDeleteMemories,
+  registerSearchMemories,
+  registerCreateRelationship,
+  registerDeleteRelationship,
+  registerGetRelationships,
+  registerRecall,
+] as const;

@@ -9,17 +9,11 @@ import {
   createToolResponse,
 } from '../lib/tool-response.js';
 import { parseMemoryRow } from '../lib/types.js';
-import type { MemoryRow } from '../lib/types.js';
 import { GetMemoryInputSchema } from '../schemas/inputs.js';
 import { MemoryResultSchema } from '../schemas/outputs.js';
+import { getMemoryRow } from './helpers.js';
 
 type GetInput = z.infer<typeof GetMemoryInputSchema>;
-
-function findMemoryByHash(db: TypedDb, hash: string): MemoryRow | undefined {
-  return db
-    .prepare<MemoryRow>('SELECT * FROM memories WHERE hash = ?')
-    .get(hash);
-}
 
 export function registerGetMemory(server: McpServer, db: TypedDb): void {
   server.registerTool(
@@ -33,7 +27,7 @@ export function registerGetMemory(server: McpServer, db: TypedDb): void {
     },
     (params: GetInput) => {
       try {
-        const row = findMemoryByHash(db, params.hash);
+        const row = getMemoryRow(db, params.hash);
 
         if (!row) {
           return createErrorResponse(

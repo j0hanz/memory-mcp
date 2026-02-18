@@ -9,10 +9,15 @@ import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
-import type { MemoryRow } from '../lib/types.js';
+import { parseTags } from '../lib/types.js';
 import { UpdateMemoryInputSchema } from '../schemas/inputs.js';
 import { UpdateResultSchema } from '../schemas/outputs.js';
-import { logToolEvent, withImmediateTransaction } from './helpers.js';
+import {
+  getMemoryRow,
+  logToolEvent,
+  nowIso,
+  withImmediateTransaction,
+} from './helpers.js';
 
 type UpdateInput = z.infer<typeof UpdateMemoryInputSchema>;
 
@@ -28,9 +33,7 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
     },
     async (params: UpdateInput) => {
       try {
-        const existing = db
-          .prepare<MemoryRow>('SELECT * FROM memories WHERE hash = ?')
-          .get(params.hash);
+        const existing = getMemoryRow(db, params.hash);
 
         if (!existing) {
           return createErrorResponse(
@@ -39,10 +42,10 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
           );
         }
 
-        const existingTags = JSON.parse(existing.tags) as string[];
+        const existingTags = parseTags(existing.tags);
         const newTags = params.tags ?? existingTags;
         const newHash = computeMemoryHash(params.content, newTags);
-        const now = new Date().toISOString();
+        const now = nowIso();
 
         withImmediateTransaction(db, () => {
           db.prepare(

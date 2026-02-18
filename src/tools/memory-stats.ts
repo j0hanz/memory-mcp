@@ -10,12 +10,20 @@ import type { NewestRow, OldestRow, TotalRow, TypeRow } from '../lib/types.js';
 import { MemoryStatsInputSchema } from '../schemas/inputs.js';
 import { StatsResultSchema } from '../schemas/outputs.js';
 
+interface AvgImportanceRow {
+  avg_importance: number | null;
+}
+
 function toTypeCounts(rows: TypeRow[]): Record<string, number> {
   const byType: Record<string, number> = {};
   for (const row of rows) {
     byType[row.memory_type] = row.count;
   }
   return byType;
+}
+
+function getTotalCount(db: TypedDb, sql: string): number {
+  return db.prepare<TotalRow>(sql).get()?.total ?? 0;
 }
 
 export function registerMemoryStats(server: McpServer, db: TypedDb): void {
@@ -31,13 +39,14 @@ export function registerMemoryStats(server: McpServer, db: TypedDb): void {
     },
     () => {
       try {
-        const totalRow = db
-          .prepare<TotalRow>('SELECT COUNT(*) AS total FROM memories')
-          .get();
-
-        const relationshipRow = db
-          .prepare<TotalRow>('SELECT COUNT(*) AS total FROM relationships')
-          .get();
+        const totalMemories = getTotalCount(
+          db,
+          'SELECT COUNT(*) AS total FROM memories'
+        );
+        const totalRelationships = getTotalCount(
+          db,
+          'SELECT COUNT(*) AS total FROM relationships'
+        );
 
         const typeRows = db
           .prepare<TypeRow>(
@@ -54,9 +63,9 @@ export function registerMemoryStats(server: McpServer, db: TypedDb): void {
           .get();
 
         const avgImportanceRow = db
-          .prepare<{
-            avg_importance: number | null;
-          }>('SELECT AVG(importance) AS avg_importance FROM memories')
+          .prepare<AvgImportanceRow>(
+            'SELECT AVG(importance) AS avg_importance FROM memories'
+          )
           .get();
 
         const byType = toTypeCounts(typeRows);
@@ -65,13 +74,13 @@ export function registerMemoryStats(server: McpServer, db: TypedDb): void {
           ok: true,
           result: {
             memories: {
-              total: totalRow?.total ?? 0,
+              total: totalMemories,
               oldest: oldestRow?.oldest ?? null,
               newest: newestRow?.newest ?? null,
               avg_importance: avgImportanceRow?.avg_importance ?? null,
             },
             relationships: {
-              total: relationshipRow?.total ?? 0,
+              total: totalRelationships,
             },
             by_type: byType,
           },

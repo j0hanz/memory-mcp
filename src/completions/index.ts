@@ -4,16 +4,13 @@ import type { HashRow } from '../lib/types.js';
 const HASH_MAX_LENGTH = 64;
 const HASH_COMPLETION_LIMIT = 101;
 
-/**
- * Returns a completion callback for the `hash` URI variable.
- * Used by ResourceTemplate to provide autocomplete on memory hash values.
- */
+// Returns a completion callback for the `hash` URI variable.
 export function createHashCompletionCallback(
   db: TypedDb
 ): (value: string) => string[] {
   return (value: string): string[] => {
     const prefix = value.slice(0, HASH_MAX_LENGTH);
-    const escaped = prefix.replace(/[%_\\]/g, '\\$&');
+    const escaped = escapeLikePattern(prefix);
     const rows = db
       .prepare<HashRow>(
         `SELECT hash FROM memories WHERE hash LIKE ? ESCAPE '\\' ORDER BY hash LIMIT ${HASH_COMPLETION_LIMIT}`
@@ -21,4 +18,8 @@ export function createHashCompletionCallback(
       .all(`${escaped}%`);
     return rows.map((r) => r.hash);
   };
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/[%_\\]/g, '\\$&');
 }

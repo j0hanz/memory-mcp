@@ -2,6 +2,8 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { E_INVALID_CURSOR } from './errors.js';
 
+const CURSOR_ENCODING = 'base64url';
+
 interface CursorPayload {
   offset: number;
 }
@@ -13,18 +15,22 @@ function isCursorPayload(value: unknown): value is CursorPayload {
   return typeof (value as Record<string, unknown>)['offset'] === 'number';
 }
 
+function parseCursorPayload(cursor: string): CursorPayload {
+  const json = Buffer.from(cursor, CURSOR_ENCODING).toString();
+  const parsed: unknown = JSON.parse(json);
+  if (!isCursorPayload(parsed)) {
+    throw new Error('Invalid cursor structure');
+  }
+  return parsed;
+}
+
 export function encodeCursor(offset: number): string {
-  return Buffer.from(JSON.stringify({ offset })).toString('base64url');
+  return Buffer.from(JSON.stringify({ offset })).toString(CURSOR_ENCODING);
 }
 
 export function decodeCursor(cursor: string): number {
   try {
-    const json = Buffer.from(cursor, 'base64url').toString();
-    const parsed: unknown = JSON.parse(json);
-    if (!isCursorPayload(parsed)) {
-      throw new Error('Invalid cursor structure');
-    }
-    return parsed.offset;
+    return parseCursorPayload(cursor).offset;
   } catch {
     throw new McpError(
       ErrorCode.InvalidParams,

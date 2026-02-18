@@ -7,6 +7,8 @@ export const ERROR_CODES = {
   UNKNOWN: 'E_UNKNOWN',
 } as const;
 
+export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
+
 export const E_NOT_FOUND = ERROR_CODES.NOT_FOUND;
 export const E_DUPLICATE = ERROR_CODES.DUPLICATE;
 export const E_CONSTRAINT = ERROR_CODES.CONSTRAINT;

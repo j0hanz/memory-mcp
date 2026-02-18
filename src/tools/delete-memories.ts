@@ -15,6 +15,8 @@ import { logToolEvent, withImmediateTransaction } from './helpers.js';
 
 type DeleteMemoriesInput = z.infer<typeof DeleteMemoriesInputSchema>;
 
+const DELETE_MEMORY_SQL = 'DELETE FROM memories WHERE hash = ?';
+
 export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'delete_memories',
@@ -29,9 +31,7 @@ export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
       try {
         const results = withImmediateTransaction(db, () => {
           const items: BatchItemResult[] = [];
-          const stmt = db.prepare<unknown>(
-            'DELETE FROM memories WHERE hash = ?'
-          );
+          const stmt = db.prepare<unknown>(DELETE_MEMORY_SQL);
           for (const hash of params.hashes) {
             const result = stmt.run(hash);
             items.push({

@@ -28,6 +28,97 @@ function createPlaceholders(count: number): string {
   return new Array(count).fill('?').join(',');
 }
 
+function loadSeedRows(
+  db: TypedDb,
+  query: string,
+  limit: number,
+  offset: number
+): MemoryRow[] {
+  const ftsQuery = sanitizeFtsQuery(query);
+  return db
+    .prepare<MemoryRow>(
+      `SELECT m.* FROM memories m
+       JOIN memories_fts ON memories_fts.rowid = m.rowid
+       WHERE memories_fts MATCH ?
+       ORDER BY memories_fts.rank
+       LIMIT ? OFFSET ?`
+    )
+    .all(ftsQuery, limit + 1, offset);
+}
+
+function splitPage<T>(
+  rows: T[],
+  limit: number
+): { page: T[]; hasMore: boolean } {
+  if (rows.length > limit) {
+    return { page: rows.slice(0, limit), hasMore: true };
+  }
+  return { page: rows, hasMore: false };
+}
+
+function traverseGraph(
+  db: TypedDb,
+  seeds: MemoryRow[],
+  depth: number
+): {
+  edges: RelationshipEdge[];
+  visited: Set<string>;
+  depthReached: number;
+  aborted: boolean;
+} {
+  const visited = new Set<string>(seeds.map((r) => r.hash));
+  const edges: RelationshipEdge[] = [];
+  let frontier: string[] = seeds.map((r) => r.hash);
+  let depthReached = 0;
+  let aborted = false;
+
+  for (let hop = 0; hop < depth && frontier.length > 0; hop++) {
+    depthReached = hop + 1;
+    if (frontier.length > MAX_FRONTIER_SIZE) {
+      frontier = frontier.slice(0, MAX_FRONTIER_SIZE);
+      aborted = true;
+    }
+    const placeholders = createPlaceholders(frontier.length);
+    const edgeRows = db
+      .prepare<EdgeRow>(
+        `SELECT from_hash, to_hash, relation_type FROM relationships
+         WHERE from_hash IN (${placeholders}) OR to_hash IN (${placeholders})`
+      )
+      .all(...frontier, ...frontier);
+
+    const nextHashes: string[] = [];
+    for (const edge of edgeRows) {
+      edges.push({
+        from_hash: edge.from_hash,
+        to_hash: edge.to_hash,
+        relation_type: edge.relation_type,
+      });
+      for (const h of [edge.from_hash, edge.to_hash]) {
+        if (!visited.has(h)) {
+          visited.add(h);
+          nextHashes.push(h);
+        }
+      }
+    }
+    frontier = nextHashes;
+  }
+
+  return { edges, visited, depthReached, aborted };
+}
+
+function loadMemoriesByHashes(db: TypedDb, hashes: string[]): Memory[] {
+  if (hashes.length === 0) {
+    return [];
+  }
+  const placeholders = createPlaceholders(hashes.length);
+  const memRows = db
+    .prepare<MemoryRow>(
+      `SELECT * FROM memories WHERE hash IN (${placeholders})`
+    )
+    .all(...hashes);
+  return memRows.map(parseMemoryRow);
+}
+
 export function registerRecall(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'recall',
@@ -45,72 +136,15 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
         const offset = cursor ? decodeCursor(cursor) : 0;
 
         // Step 1: FTS seed search
-        const ftsQuery = sanitizeFtsQuery(params.query);
-
-        const seedRows = db
-          .prepare<MemoryRow>(
-            `SELECT m.* FROM memories m
-             JOIN memories_fts ON memories_fts.rowid = m.rowid
-             WHERE memories_fts MATCH ?
-             ORDER BY memories_fts.rank
-             LIMIT ? OFFSET ?`
-          )
-          .all(ftsQuery, limit + 1, offset);
-
-        const hasMore = seedRows.length > limit;
-        const pageSeeds = hasMore ? seedRows.slice(0, limit) : seedRows;
+        const seedRows = loadSeedRows(db, params.query, limit, offset);
+        const { page: pageSeeds, hasMore } = splitPage(seedRows, limit);
 
         // Step 2: BFS traversal up to `depth` hops
-        const visitedHashes = new Set<string>(pageSeeds.map((r) => r.hash));
-        const allEdges: RelationshipEdge[] = [];
-        let frontier: string[] = pageSeeds.map((r) => r.hash);
-        let depthReached = 0;
-        let bfsAborted = false;
-
-        for (let hop = 0; hop < depth && frontier.length > 0; hop++) {
-          depthReached = hop + 1;
-          if (frontier.length > MAX_FRONTIER_SIZE) {
-            frontier = frontier.slice(0, MAX_FRONTIER_SIZE);
-            bfsAborted = true;
-          }
-          const placeholders = createPlaceholders(frontier.length);
-          const edgeRows = db
-            .prepare<EdgeRow>(
-              `SELECT from_hash, to_hash, relation_type FROM relationships
-               WHERE from_hash IN (${placeholders}) OR to_hash IN (${placeholders})`
-            )
-            .all(...frontier, ...frontier);
-
-          const nextHashes: string[] = [];
-          for (const edge of edgeRows) {
-            allEdges.push({
-              from_hash: edge.from_hash,
-              to_hash: edge.to_hash,
-              relation_type: edge.relation_type,
-            });
-            for (const h of [edge.from_hash, edge.to_hash]) {
-              if (!visitedHashes.has(h)) {
-                visitedHashes.add(h);
-                nextHashes.push(h);
-              }
-            }
-          }
-          frontier = nextHashes;
-        }
+        const traversal = traverseGraph(db, pageSeeds, depth);
 
         // Step 3: Load all discovered memory rows
-        const allHashes = Array.from(visitedHashes);
-        let memories: Memory[] = [];
-
-        if (allHashes.length > 0) {
-          const placeholders = createPlaceholders(allHashes.length);
-          const memRows = db
-            .prepare<MemoryRow>(
-              `SELECT * FROM memories WHERE hash IN (${placeholders})`
-            )
-            .all(...allHashes);
-          memories = memRows.map(parseMemoryRow);
-        }
+        const allHashes = Array.from(traversal.visited);
+        const memories = loadMemoriesByHashes(db, allHashes);
 
         const nextCursor = hasMore ? encodeCursor(offset + limit) : undefined;
 
@@ -118,9 +152,9 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
           ok: true,
           result: {
             memories,
-            graph: allEdges,
-            depth_reached: depthReached,
-            ...(bfsAborted ? { aborted: true } : {}),
+            graph: traversal.edges,
+            depth_reached: traversal.depthReached,
+            ...(traversal.aborted ? { aborted: true } : {}),
             ...(nextCursor ? { nextCursor } : {}),
           },
         });

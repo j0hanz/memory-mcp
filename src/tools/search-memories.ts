@@ -17,6 +17,34 @@ import { SearchResultSchema } from '../schemas/outputs.js';
 
 type SearchInput = z.infer<typeof SearchMemoriesInputSchema>;
 
+function loadSearchRows(
+  db: TypedDb,
+  query: string,
+  limit: number,
+  offset: number
+): MemoryRow[] {
+  const ftsQuery = sanitizeFtsQuery(query);
+  return db
+    .prepare<MemoryRow>(
+      `SELECT m.* FROM memories m
+       JOIN memories_fts ON memories_fts.rowid = m.rowid
+       WHERE memories_fts MATCH ?
+       ORDER BY memories_fts.rank
+       LIMIT ? OFFSET ?`
+    )
+    .all(ftsQuery, limit + 1, offset);
+}
+
+function splitPage<T>(
+  rows: T[],
+  limit: number
+): { page: T[]; hasMore: boolean } {
+  if (rows.length > limit) {
+    return { page: rows.slice(0, limit), hasMore: true };
+  }
+  return { page: rows, hasMore: false };
+}
+
 export function registerSearchMemories(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'search_memories',
@@ -32,21 +60,8 @@ export function registerSearchMemories(server: McpServer, db: TypedDb): void {
       try {
         const { limit, cursor } = params;
         const offset = cursor ? decodeCursor(cursor) : 0;
-
-        const ftsQuery = sanitizeFtsQuery(params.query);
-
-        const rows = db
-          .prepare<MemoryRow>(
-            `SELECT m.* FROM memories m
-             JOIN memories_fts ON memories_fts.rowid = m.rowid
-             WHERE memories_fts MATCH ?
-             ORDER BY memories_fts.rank
-             LIMIT ? OFFSET ?`
-          )
-          .all(ftsQuery, limit + 1, offset);
-
-        const hasMore = rows.length > limit;
-        const pageRows = hasMore ? rows.slice(0, limit) : rows;
+        const rows = loadSearchRows(db, params.query, limit, offset);
+        const { page: pageRows, hasMore } = splitPage(rows, limit);
 
         const memories: Memory[] = pageRows.map(parseMemoryRow);
         const nextCursor = hasMore ? encodeCursor(offset + limit) : undefined;

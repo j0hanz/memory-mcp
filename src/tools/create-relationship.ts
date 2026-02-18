@@ -8,22 +8,11 @@ import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
-import type { MemoryRow } from '../lib/types.js';
 import { CreateRelationshipInputSchema } from '../schemas/inputs.js';
 import { CreateRelationshipResultSchema } from '../schemas/outputs.js';
-import { logToolEvent } from './helpers.js';
+import { logToolEvent, memoryExists, nowIso } from './helpers.js';
 
 type CreateRelInput = z.infer<typeof CreateRelationshipInputSchema>;
-
-function memoryExists(db: TypedDb, hash: string): boolean {
-  return (
-    db
-      .prepare<
-        Pick<MemoryRow, 'hash'>
-      >('SELECT hash FROM memories WHERE hash = ?')
-      .get(hash) !== undefined
-  );
-}
 
 export function registerCreateRelationship(
   server: McpServer,
@@ -55,7 +44,7 @@ export function registerCreateRelationship(
           );
         }
 
-        const now = new Date().toISOString();
+        const now = nowIso();
         const result = db
           .prepare(
             `INSERT OR IGNORE INTO relationships (from_hash, to_hash, relation_type, created_at)

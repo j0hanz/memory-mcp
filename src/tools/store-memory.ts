@@ -11,7 +11,7 @@ import {
 } from '../lib/tool-response.js';
 import { StoreMemoryInputSchema } from '../schemas/inputs.js';
 import { StoreResultSchema } from '../schemas/outputs.js';
-import { logToolEvent } from './helpers.js';
+import { logToolEvent, normalizeMemoryType, nowIso } from './helpers.js';
 
 type StoreInput = z.infer<typeof StoreMemoryInputSchema>;
 
@@ -29,9 +29,9 @@ export function registerStoreMemory(server: McpServer, db: TypedDb): void {
     async (params: StoreInput) => {
       try {
         const { importance } = params;
-        const memoryType = params.memory_type ?? 'general';
+        const memoryType = normalizeMemoryType(params.memory_type);
         const hash = computeMemoryHash(params.content, params.tags);
-        const now = new Date().toISOString();
+        const now = nowIso();
         const tagsJson = JSON.stringify(params.tags);
 
         const insertResult = db

@@ -7,6 +7,8 @@ import { createTypedDb, type TypedDb } from './typed.js';
 const SQLITE_TIMEOUT_MS = 5000;
 const FTS5_CHECK_SQL =
   'CREATE VIRTUAL TABLE IF NOT EXISTS __fts5_check USING fts5(x); DROP TABLE __fts5_check;';
+const FTS5_REQUIRED_MESSAGE =
+  'SQLite FTS5 extension is not available. memory-mcp requires a SQLite build with FTS5 support.';
 
 const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS memories (
@@ -68,22 +70,18 @@ function assertFts5Available(db: DatabaseSync): void {
   try {
     db.exec(FTS5_CHECK_SQL);
   } catch {
-    throw new Error(
-      'SQLite FTS5 extension is not available. memory-mcp requires a SQLite build with FTS5 support.'
-    );
+    throw new Error(FTS5_REQUIRED_MESSAGE);
   }
 }
 
-export function initDatabase(path: string): DatabaseSync {
-  if (path !== ':memory:') {
-    mkdirSync(dirname(path), { recursive: true });
+function ensureParentDir(path: string): void {
+  if (path === ':memory:') {
+    return;
   }
+  mkdirSync(dirname(path), { recursive: true });
+}
 
-  const db = new DatabaseSync(path, {
-    enableForeignKeyConstraints: true,
-    timeout: SQLITE_TIMEOUT_MS,
-  });
-
+function configureDatabase(db: DatabaseSync): void {
   // Enable defensive mode (SQLite v3.39+ / Node 24.12+: prevents deliberate DB corruption)
   db.exec('PRAGMA defensive = ON');
 
@@ -91,6 +89,17 @@ export function initDatabase(path: string): DatabaseSync {
   assertFts5Available(db);
 
   db.exec(SCHEMA_SQL);
+}
+
+export function initDatabase(path: string): DatabaseSync {
+  ensureParentDir(path);
+
+  const db = new DatabaseSync(path, {
+    enableForeignKeyConstraints: true,
+    timeout: SQLITE_TIMEOUT_MS,
+  });
+
+  configureDatabase(db);
 
   return db;
 }

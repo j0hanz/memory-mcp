@@ -2,6 +2,10 @@ import type { DatabaseSync } from 'node:sqlite';
 
 type SQLInputValue = string | number | bigint | null | Uint8Array;
 
+function toSqlParams(params: unknown[]): SQLInputValue[] {
+  return params as SQLInputValue[];
+}
+
 export interface TypedStatement<T> {
   all(...params: unknown[]): T[];
   get(...params: unknown[]): T | undefined;
@@ -17,12 +21,11 @@ export class TypedDb {
   prepare<T>(sql: string): TypedStatement<T> {
     const stmt = this.db.prepare(sql);
     return {
-      all: (...params: unknown[]) =>
-        stmt.all(...(params as SQLInputValue[])) as T[],
+      all: (...params: unknown[]) => stmt.all(...toSqlParams(params)) as T[],
       get: (...params: unknown[]) =>
-        stmt.get(...(params as SQLInputValue[])) as T | undefined,
+        stmt.get(...toSqlParams(params)) as T | undefined,
       run: (...params: unknown[]) => {
-        const result = stmt.run(...(params as SQLInputValue[]));
+        const result = stmt.run(...toSqlParams(params));
         return {
           changes: result.changes,
           lastInsertRowid: result.lastInsertRowid,

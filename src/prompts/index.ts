@@ -22,24 +22,24 @@ const INSTRUCTIONS_CONTENT = `# Memory Instructions
 - \`memory://memories/{hash}\`: Single memory by SHA-256 hash.
 `;
 
-export function registerAllPrompts(server: McpServer): void {
-  const messages: PromptMessage[] = [
-    {
-      role: 'user',
-      content: {
-        type: 'text',
-        text: 'Show me the memory usage instructions.',
-      },
+const HELP_MESSAGES: PromptMessage[] = [
+  {
+    role: 'user',
+    content: {
+      type: 'text',
+      text: 'Show me the memory usage instructions.',
     },
-    {
-      role: 'assistant',
-      content: {
-        type: 'text',
-        text: INSTRUCTIONS_CONTENT,
-      },
+  },
+  {
+    role: 'assistant',
+    content: {
+      type: 'text',
+      text: INSTRUCTIONS_CONTENT,
     },
-  ];
+  },
+];
 
+export function registerAllPrompts(server: McpServer): void {
   server.registerPrompt(
     'get-help',
     {
@@ -48,7 +48,7 @@ export function registerAllPrompts(server: McpServer): void {
         'Return the full usage instructions for all memory tools and workflows.',
     },
     () => ({
-      messages,
+      messages: HELP_MESSAGES,
     })
   );
 }

@@ -57,18 +57,19 @@ const IMPORTANCE_SCHEMA = z
   .max(10)
   .describe('Priority level 0-10 (0=lowest, 10=critical)');
 
-export const StoreMemoryInputSchema = z.strictObject({
+const STORE_MEMORY_SHAPE = {
   content: CONTENT_SCHEMA,
   tags: TAGS_ARRAY_SCHEMA,
   memory_type: MEMORY_TYPE_SCHEMA.optional(),
   importance: IMPORTANCE_SCHEMA.optional().prefault(0),
+};
+
+export const StoreMemoryInputSchema = z.strictObject({
+  ...STORE_MEMORY_SHAPE,
 });
 
 export const StoreMemoryItemInputSchema = z.strictObject({
-  content: CONTENT_SCHEMA,
-  tags: TAGS_ARRAY_SCHEMA,
-  memory_type: MEMORY_TYPE_SCHEMA.optional(),
-  importance: IMPORTANCE_SCHEMA.optional().prefault(0),
+  ...STORE_MEMORY_SHAPE,
 });
 
 export const StoreMemoriesInputSchema = z.strictObject({

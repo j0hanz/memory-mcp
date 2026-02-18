@@ -5,17 +5,20 @@ export const ErrorResultSchema = z.strictObject({
   message: z.string(),
 });
 
+const OK_SCHEMA = z.boolean();
+const OPTIONAL_ERROR_SCHEMA = ErrorResultSchema.optional();
+
 function createOutputSchema<T extends z.ZodType>(
   result: T
 ): z.ZodObject<{
-  ok: z.ZodBoolean;
+  ok: typeof OK_SCHEMA;
   result: z.ZodOptional<T>;
-  error: z.ZodOptional<typeof ErrorResultSchema>;
+  error: typeof OPTIONAL_ERROR_SCHEMA;
 }> {
   return z.strictObject({
-    ok: z.boolean(),
+    ok: OK_SCHEMA,
     result: result.optional(),
-    error: ErrorResultSchema.optional(),
+    error: OPTIONAL_ERROR_SCHEMA,
   });
 }
 

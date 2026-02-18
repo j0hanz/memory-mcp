@@ -12,7 +12,12 @@ import {
 import type { BatchItemResult } from '../lib/types.js';
 import { StoreMemoriesInputSchema } from '../schemas/inputs.js';
 import { BatchResultSchema } from '../schemas/outputs.js';
-import { logToolEvent, withImmediateTransaction } from './helpers.js';
+import {
+  logToolEvent,
+  normalizeMemoryType,
+  nowIso,
+  withImmediateTransaction,
+} from './helpers.js';
 
 type StoreMemoriesInput = z.infer<typeof StoreMemoriesInputSchema>;
 
@@ -29,7 +34,7 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
     },
     async (params: StoreMemoriesInput) => {
       try {
-        const now = new Date().toISOString();
+        const now = nowIso();
         const results = withImmediateTransaction(db, () => {
           const items: BatchItemResult[] = [];
           const stmt = db.prepare<unknown>(
@@ -39,7 +44,7 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
 
           for (const item of params.items) {
             const { importance, memory_type: rawMemoryType } = item;
-            const memoryType = rawMemoryType ?? 'general';
+            const memoryType = normalizeMemoryType(rawMemoryType);
             const hash = computeMemoryHash(item.content, item.tags);
             const tagsJson = JSON.stringify(item.tags);
             const result = stmt.run(

@@ -14,6 +14,8 @@ import { logToolEvent } from './helpers.js';
 
 type DeleteInput = z.infer<typeof DeleteMemoryInputSchema>;
 
+const DELETE_MEMORY_SQL = 'DELETE FROM memories WHERE hash = ?';
+
 export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'delete_memory',
@@ -26,9 +28,7 @@ export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
     },
     async (params: DeleteInput) => {
       try {
-        const result = db
-          .prepare('DELETE FROM memories WHERE hash = ?')
-          .run(params.hash);
+        const result = db.prepare(DELETE_MEMORY_SQL).run(params.hash);
 
         if (result.changes === 0) {
           return createErrorResponse(

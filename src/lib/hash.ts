@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-function normalizeTags(tags: string[]): string[] {
+function normalizeTags(tags: readonly string[]): string[] {
   return [...tags].sort();
 }
 
