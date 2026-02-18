@@ -14,6 +14,8 @@ import { StoreResultSchema } from '../schemas/outputs.js';
 import { logToolEvent, normalizeMemoryType, nowIso } from './helpers.js';
 
 type StoreInput = z.infer<typeof StoreMemoryInputSchema>;
+const INSERT_MEMORY_SQL = `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?)`;
 
 export function registerStoreMemory(server: McpServer, db: TypedDb): void {
   server.registerTool(
@@ -35,10 +37,7 @@ export function registerStoreMemory(server: McpServer, db: TypedDb): void {
         const tagsJson = JSON.stringify(params.tags);
 
         const insertResult = db
-          .prepare(
-            `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`
-          )
+          .prepare(INSERT_MEMORY_SQL)
           .run(
             hash,
             params.content,

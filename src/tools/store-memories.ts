@@ -20,6 +20,16 @@ import {
 } from './helpers.js';
 
 type StoreMemoriesInput = z.infer<typeof StoreMemoriesInputSchema>;
+const INSERT_MEMORY_SQL = `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?)`;
+
+function summarizeBatch(items: readonly BatchItemResult[]): {
+  succeeded: number;
+  failed: number;
+} {
+  const succeeded = items.filter((item) => item.ok).length;
+  return { succeeded, failed: items.length - succeeded };
+}
 
 export function registerStoreMemories(server: McpServer, db: TypedDb): void {
   server.registerTool(
@@ -37,10 +47,7 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
         const now = nowIso();
         const results = withImmediateTransaction(db, () => {
           const items: BatchItemResult[] = [];
-          const stmt = db.prepare<unknown>(
-            `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`
-          );
+          const stmt = db.prepare<unknown>(INSERT_MEMORY_SQL);
 
           for (const item of params.items) {
             const { importance, memory_type: rawMemoryType } = item;
@@ -62,8 +69,7 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
         });
 
         const created = results.filter((r) => r.created).length;
-        const succeeded = results.filter((r) => r.ok).length;
-        const failed = results.length - succeeded;
+        const { succeeded, failed } = summarizeBatch(results);
         await logToolEvent(server, 'store_memories', {
           total: results.length,
           created,

@@ -33,7 +33,7 @@ export {
   registerUpdateMemory,
 };
 
-export const TOOL_REGISTRARS: readonly ToolRegistrar[] = [
+const TOOL_REGISTRAR_LIST = [
   registerStoreMemory,
   registerGetMemory,
   registerUpdateMemory,
@@ -48,3 +48,5 @@ export const TOOL_REGISTRARS: readonly ToolRegistrar[] = [
   registerRecall,
   registerRetrieveContext,
 ] as const;
+
+export const TOOL_REGISTRARS: readonly ToolRegistrar[] = TOOL_REGISTRAR_LIST;

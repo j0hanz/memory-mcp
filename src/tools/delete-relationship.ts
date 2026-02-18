@@ -15,6 +15,7 @@ type DeleteRelInput = z.infer<typeof DeleteRelationshipInputSchema>;
 
 const DELETE_RELATIONSHIP_SQL =
   'DELETE FROM relationships WHERE from_hash = ? AND to_hash = ? AND relation_type = ?';
+const DELETE_RELATIONSHIP_RESULT = { deleted: true };
 
 function formatRelationship(
   params: Pick<DeleteRelInput, 'from_hash' | 'to_hash' | 'relation_type'>
@@ -50,9 +51,7 @@ export function registerDeleteRelationship(
 
         return createToolResponse({
           ok: true,
-          result: {
-            deleted: true,
-          },
+          result: DELETE_RELATIONSHIP_RESULT,
         });
       } catch (err) {
         return createErrorResponse(E_UNKNOWN, getErrorMessage(err));

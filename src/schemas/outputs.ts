@@ -15,9 +15,10 @@ function createOutputSchema<T extends z.ZodType>(
   result: z.ZodOptional<T>;
   error: typeof OPTIONAL_ERROR_SCHEMA;
 }> {
+  const optionalResult = result.optional();
   return z.strictObject({
     ok: OK_SCHEMA,
-    result: result.optional(),
+    result: optionalResult,
     error: OPTIONAL_ERROR_SCHEMA,
   });
 }

@@ -5,6 +5,7 @@ import { DatabaseSync, type SQLTagStore } from 'node:sqlite';
 import { createTypedDb, type TypedDb } from './typed.js';
 
 const SQLITE_TIMEOUT_MS = 5000;
+const STATEMENT_CACHE_SIZE = 1000;
 const FTS5_CHECK_SQL =
   'CREATE VIRTUAL TABLE IF NOT EXISTS __fts5_check USING fts5(x); DROP TABLE __fts5_check;';
 const FTS5_REQUIRED_MESSAGE =
@@ -75,7 +76,8 @@ function assertFts5Available(db: DatabaseSync): void {
 }
 
 function ensureParentDir(path: string): void {
-  if (path === ':memory:') {
+  const isInMemoryPath = path === ':memory:';
+  if (isInMemoryPath) {
     return;
   }
   mkdirSync(dirname(path), { recursive: true });
@@ -110,5 +112,5 @@ export function initTypedDatabase(path: string): TypedDb {
 }
 
 export function createStatementCache(db: DatabaseSync): SQLTagStore {
-  return db.createTagStore(1000);
+  return db.createTagStore(STATEMENT_CACHE_SIZE);
 }

@@ -18,6 +18,7 @@ export const E_UNKNOWN = ERROR_CODES.UNKNOWN;
 
 export function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
-  if (typeof err === 'string') return err;
+  const errorAsString = typeof err === 'string' ? err : undefined;
+  if (errorAsString != null) return errorAsString;
   return 'Unknown error occurred';
 }

@@ -11,17 +11,22 @@ import type { TypedDb } from '../db/typed.js';
 import { parseMemoryRow } from '../lib/types.js';
 import type { MemoryRow } from '../lib/types.js';
 
-const baseDir = fileURLToPath(new URL('.', import.meta.url));
+const BASE_DIR = fileURLToPath(new URL('.', import.meta.url));
 const FALLBACK_INSTRUCTIONS =
   '# Memory instructions\n\nSee the README for usage details.';
 const HASH_REGEX = /^[a-f0-9]{64}$/;
+const INSTRUCTIONS_URI = 'internal://instructions';
+
+function getInstructionPaths(): string[] {
+  return [
+    join(BASE_DIR, 'instructions.md'),
+    join(BASE_DIR, '..', 'instructions.md'),
+    join(BASE_DIR, '..', '..', 'src', 'instructions.md'),
+  ];
+}
 
 function loadInstructions(): string {
-  const paths = [
-    join(baseDir, 'instructions.md'),
-    join(baseDir, '..', 'instructions.md'),
-    join(baseDir, '..', '..', 'src', 'instructions.md'),
-  ];
+  const paths = getInstructionPaths();
   for (const p of paths) {
     try {
       return readFileSync(p, 'utf8');
@@ -60,7 +65,7 @@ const INSTRUCTIONS_CONTENT = loadInstructions();
 export function registerAllResources(server: McpServer, db: TypedDb): void {
   server.registerResource(
     'instructions',
-    'internal://instructions',
+    INSTRUCTIONS_URI,
     {
       title: 'Memory Instructions',
       description: 'Usage guide for all memory tools and workflows.',
@@ -70,7 +75,7 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
     () => ({
       contents: [
         {
-          uri: 'internal://instructions',
+          uri: INSTRUCTIONS_URI,
           mimeType: 'text/markdown',
           text: INSTRUCTIONS_CONTENT,
         },

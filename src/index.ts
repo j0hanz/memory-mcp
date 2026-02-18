@@ -9,6 +9,8 @@ import { createServer } from './server.js';
 const MEMORY_DB_PATH = process.env['MEMORY_DB_PATH'] ?? 'memory.db';
 const SHUTDOWN_SIGNALS: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
 const SHUTDOWN_TIMEOUT_MS = 3000;
+const FORCED_EXIT_CODE = 1;
+const CLEAN_EXIT_CODE = 0;
 
 function formatFatalError(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -20,22 +22,28 @@ function registerShutdownHandlers(shutdown: () => void): void {
   }
 }
 
+function scheduleForcedShutdown(): NodeJS.Timeout {
+  const timer = setTimeout(() => {
+    process.stderr.write('Shutdown timed out, forcing exit.\n');
+    process.exit(FORCED_EXIT_CODE);
+  }, SHUTDOWN_TIMEOUT_MS);
+  timer.unref();
+  return timer;
+}
+
 async function runShutdown(
   server: ReturnType<typeof createServer>,
   db: ReturnType<typeof initTypedDatabase>
 ): Promise<void> {
-  const timer = setTimeout(() => {
-    process.stderr.write('Shutdown timed out, forcing exit.\n');
-    process.exit(1);
-  }, SHUTDOWN_TIMEOUT_MS);
-  timer.unref();
+  const timer = scheduleForcedShutdown();
   try {
     await server.close();
   } catch {
     // ignore close errors
   }
   db.close();
-  process.exit(0);
+  clearTimeout(timer);
+  process.exit(CLEAN_EXIT_CODE);
 }
 
 function createShutdownHandler(
@@ -62,5 +70,5 @@ async function main(): Promise<void> {
 
 main().catch((err: unknown) => {
   process.stderr.write(`Fatal error: ${formatFatalError(err)}\n`);
-  process.exit(1);
+  process.exit(FORCED_EXIT_CODE);
 });

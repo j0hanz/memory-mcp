@@ -23,6 +23,16 @@ interface RelWithLinkedMemory extends RelationshipRow {
 }
 
 type RelationshipDirection = 'outgoing' | 'incoming';
+type RelationshipDirectionMode = RelationshipDirection | 'both';
+
+const DIRECTIONS_BY_MODE: Record<
+  RelationshipDirectionMode,
+  readonly RelationshipDirection[]
+> = {
+  outgoing: ['outgoing'],
+  incoming: ['incoming'],
+  both: ['outgoing', 'incoming'],
+};
 
 function loadRelationships(
   db: TypedDb,
@@ -64,18 +74,10 @@ export function registerGetRelationships(server: McpServer, db: TypedDb): void {
           );
         }
 
-        const { direction } = params;
-        let rows: RelWithLinkedMemory[] = [];
-
-        if (direction === 'outgoing' || direction === 'both') {
-          const outgoing = loadRelationships(db, params.hash, 'outgoing');
-          rows = rows.concat(outgoing);
-        }
-
-        if (direction === 'incoming' || direction === 'both') {
-          const incoming = loadRelationships(db, params.hash, 'incoming');
-          rows = rows.concat(incoming);
-        }
+        const directions = DIRECTIONS_BY_MODE[params.direction];
+        const rows = directions.flatMap((direction) =>
+          loadRelationships(db, params.hash, direction)
+        );
 
         const relationships = rows.map((r) => ({
           from_hash: r.from_hash,

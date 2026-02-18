@@ -71,6 +71,7 @@ const IMPORTANCE_SCHEMA = z
   .min(0)
   .max(10)
   .describe('Priority level 0-10 (0=lowest, 10=critical)');
+const IMPORTANCE_FILTER_SCHEMA = z.int().min(0).max(10).optional();
 
 const STORE_MEMORY_SHAPE = {
   content: CONTENT_SCHEMA,
@@ -132,18 +133,12 @@ export const SearchMemoriesInputSchema = z.strictObject({
     .string()
     .optional()
     .describe('Pagination cursor from previous response'),
-  min_importance: z
-    .int()
-    .min(0)
-    .max(10)
-    .optional()
-    .describe('Filter: only return memories with importance >= this value'),
-  max_importance: z
-    .int()
-    .min(0)
-    .max(10)
-    .optional()
-    .describe('Filter: only return memories with importance <= this value'),
+  min_importance: IMPORTANCE_FILTER_SCHEMA.clone().describe(
+    'Filter: only return memories with importance >= this value'
+  ),
+  max_importance: IMPORTANCE_FILTER_SCHEMA.clone().describe(
+    'Filter: only return memories with importance <= this value'
+  ),
   memory_type: MEMORY_TYPE_SCHEMA.optional().describe(
     'Filter: only return memories of this type'
   ),
@@ -169,18 +164,12 @@ export const RecallInputSchema = z.strictObject({
     .string()
     .optional()
     .describe('Pagination cursor from previous response'),
-  min_importance: z
-    .int()
-    .min(0)
-    .max(10)
-    .optional()
-    .describe('Filter: only seed memories with importance >= this value'),
-  max_importance: z
-    .int()
-    .min(0)
-    .max(10)
-    .optional()
-    .describe('Filter: only seed memories with importance <= this value'),
+  min_importance: IMPORTANCE_FILTER_SCHEMA.clone().describe(
+    'Filter: only seed memories with importance >= this value'
+  ),
+  max_importance: IMPORTANCE_FILTER_SCHEMA.clone().describe(
+    'Filter: only seed memories with importance <= this value'
+  ),
   memory_type: MEMORY_TYPE_SCHEMA.optional().describe(
     'Filter: only seed memories of this type'
   ),

@@ -87,16 +87,18 @@ export interface HashRow {
   hash: string;
 }
 
+function asStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value.every((entry) => typeof entry === 'string') ? value : undefined;
+}
+
 export function parseTags(tagsJson: string): string[] {
   try {
     const parsed: unknown = JSON.parse(tagsJson);
-    if (
-      Array.isArray(parsed) &&
-      parsed.every((tag) => typeof tag === 'string')
-    ) {
-      return parsed;
-    }
-    return [];
+    return asStringArray(parsed) ?? [];
   } catch {
     return [];
   }
@@ -104,9 +106,11 @@ export function parseTags(tagsJson: string): string[] {
 
 export function parseMemoryRow(row: MemoryRow): Memory {
   const { rank, ...rest } = row;
+  const relevance = rank != null ? -rank : undefined;
+
   return {
     ...rest,
     tags: parseTags(row.tags),
-    ...(rank != null ? { relevance: -rank } : {}),
+    ...(relevance != null ? { relevance } : {}),
   };
 }

@@ -15,11 +15,18 @@ import { UpdateResultSchema } from '../schemas/outputs.js';
 import {
   getMemoryRow,
   logToolEvent,
+  notifyMemoryResourceUpdated,
   nowIso,
   withImmediateTransaction,
 } from './helpers.js';
 
 type UpdateInput = z.infer<typeof UpdateMemoryInputSchema>;
+const UPDATE_MEMORY_SQL = `UPDATE memories
+  SET hash = ?, content = ?, tags = ?, updated_at = ?
+  WHERE hash = ?`;
+function formatMemoryNotFound(hash: string): string {
+  return `Memory not found: ${hash}`;
+}
 
 export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
   server.registerTool(
@@ -39,7 +46,7 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
         if (!existing) {
           return createErrorResponse(
             E_NOT_FOUND,
-            `Memory not found: ${params.hash}`
+            formatMemoryNotFound(params.hash)
           );
         }
 
@@ -49,11 +56,7 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
         const now = nowIso();
 
         withImmediateTransaction(db, () => {
-          db.prepare(
-            `UPDATE memories
-             SET hash = ?, content = ?, tags = ?, updated_at = ?
-             WHERE hash = ?`
-          ).run(
+          db.prepare(UPDATE_MEMORY_SQL).run(
             newHash,
             params.content,
             JSON.stringify(newTags),
@@ -66,15 +69,7 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
           newHash,
         });
 
-        if (server.isConnected()) {
-          try {
-            await server.server.sendResourceUpdated({
-              uri: `memory://memories/${params.hash}`,
-            });
-          } catch {
-            // best-effort notification
-          }
-        }
+        await notifyMemoryResourceUpdated(server, params.hash);
 
         return createToolResponse({
           ok: true,

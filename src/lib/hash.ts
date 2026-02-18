@@ -4,7 +4,10 @@ function normalizeTags(tags: readonly string[]): string[] {
   return [...tags].sort();
 }
 
-export function computeMemoryHash(content: string, tags: string[]): string {
+export function computeMemoryHash(
+  content: string,
+  tags: readonly string[]
+): string {
   return createHash('sha256')
     .update(content)
     .update(JSON.stringify(normalizeTags(tags)))

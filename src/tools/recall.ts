@@ -6,8 +6,12 @@ import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
 import { E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
-import { decodeCursor, encodeCursor } from '../lib/pagination.js';
-import { buildFilterClauses, sanitizeFtsQuery } from '../lib/search.js';
+import { decodeCursor, encodeCursor, splitPage } from '../lib/pagination.js';
+import {
+  buildAndWhereClause,
+  buildFilterClauses,
+  sanitizeFtsQuery,
+} from '../lib/search.js';
 import type { MemoryFilters } from '../lib/search.js';
 import {
   createErrorResponse,
@@ -24,6 +28,11 @@ import { RecallInputSchema } from '../schemas/inputs.js';
 import { RecallResultSchema } from '../schemas/outputs.js';
 
 type RecallInput = z.infer<typeof RecallInputSchema>;
+type ProgressToken = string | number;
+type ProgressNotifier = (
+  hop: number,
+  total: number
+) => void | PromiseLike<void>;
 
 function parseEnvInt(
   name: string,
@@ -52,6 +61,20 @@ const MAX_VISITED_NODES = parseEnvInt(
   50000
 );
 
+function toMemoryFilters(params: RecallInput): MemoryFilters {
+  const filters: MemoryFilters = {};
+  if (params.min_importance != null) {
+    filters.min_importance = params.min_importance;
+  }
+  if (params.max_importance != null) {
+    filters.max_importance = params.max_importance;
+  }
+  if (params.memory_type != null) {
+    filters.memory_type = params.memory_type;
+  }
+  return filters;
+}
+
 function createPlaceholders(count: number): string {
   return new Array(count).fill('?').join(',');
 }
@@ -65,10 +88,7 @@ function loadSeedRows(
 ): MemoryRow[] {
   const ftsQuery = sanitizeFtsQuery(query);
   const filter = buildFilterClauses(filters);
-  const whereExtra =
-    filter.clauses.length > 0
-      ? ` ${filter.clauses.map((c) => `AND ${c}`).join(' ')}`
-      : '';
+  const whereExtra = buildAndWhereClause(filter.clauses);
   return db
     .prepare<MemoryRow>(
       `SELECT m.*, memories_fts.rank AS rank FROM memories m
@@ -80,22 +100,12 @@ function loadSeedRows(
     .all(ftsQuery, ...filter.params, limit + 1, offset);
 }
 
-function splitPage<T>(
-  rows: T[],
-  limit: number
-): { page: T[]; hasMore: boolean } {
-  if (rows.length > limit) {
-    return { page: rows.slice(0, limit), hasMore: true };
-  }
-  return { page: rows, hasMore: false };
-}
-
 function traverseGraph(
   db: TypedDb,
   seeds: MemoryRow[],
   depth: number,
   signal?: AbortSignal,
-  onHop?: (hop: number, total: number) => void
+  onHop?: ProgressNotifier
 ): {
   edges: RelationshipEdge[];
   visited: Set<string>;
@@ -196,6 +206,33 @@ function loadMemoriesByHashes(db: TypedDb, hashes: string[]): Memory[] {
   return memRows.map(parseMemoryRow);
 }
 
+function createHopNotifier(
+  progressToken: ProgressToken | undefined,
+  sendNotification: (notification: {
+    method: 'notifications/progress';
+    params: { progressToken: ProgressToken; progress: number; total: number };
+  }) => Promise<void>
+): ProgressNotifier | undefined {
+  if (progressToken == null) {
+    return undefined;
+  }
+
+  return (hop: number, total: number) => {
+    void sendNotification({
+      method: 'notifications/progress',
+      params: { progressToken, progress: hop + 1, total },
+    }).catch(() => {});
+  };
+}
+
+function toProgressToken(value: unknown): ProgressToken | undefined {
+  if (typeof value === 'string' || typeof value === 'number') {
+    return value;
+  }
+
+  return undefined;
+}
+
 export function registerRecall(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'recall',
@@ -209,33 +246,22 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
     },
     (params: RecallInput, { signal, _meta, sendNotification }) => {
       try {
-        const {
-          depth,
-          limit,
-          cursor,
-          min_importance: minImportance,
-          max_importance: maxImportance,
-          memory_type: memoryType,
-        } = params;
+        const { depth, limit, cursor } = params;
         const offset = cursor ? decodeCursor(cursor) : 0;
 
-        const progressToken = _meta?.progressToken;
-        const onHop =
-          progressToken != null
-            ? (hop: number, total: number) => {
-                void sendNotification({
-                  method: 'notifications/progress',
-                  params: { progressToken, progress: hop + 1, total },
-                }).catch(() => {});
-              }
-            : undefined;
+        const onHop = createHopNotifier(
+          toProgressToken(_meta?.progressToken),
+          sendNotification
+        );
 
         // Step 1: FTS seed search
-        const seedRows = loadSeedRows(db, params.query, limit, offset, {
-          min_importance: minImportance,
-          max_importance: maxImportance,
-          memory_type: memoryType,
-        });
+        const seedRows = loadSeedRows(
+          db,
+          params.query,
+          limit,
+          offset,
+          toMemoryFilters(params)
+        );
         const { page: pageSeeds, hasMore } = splitPage(seedRows, limit);
 
         // Step 2: BFS traversal up to `depth` hops

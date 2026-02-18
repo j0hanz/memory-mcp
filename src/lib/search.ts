@@ -17,9 +17,9 @@ export function sanitizeFtsQuery(query: string): string {
 }
 
 export interface MemoryFilters {
-  min_importance?: number | undefined;
-  max_importance?: number | undefined;
-  memory_type?: string | undefined;
+  min_importance?: number;
+  max_importance?: number;
+  memory_type?: string;
 }
 
 export interface FilterClauses {
@@ -43,4 +43,12 @@ export function buildFilterClauses(filters: MemoryFilters): FilterClauses {
     params.push(filters.memory_type);
   }
   return { clauses, params };
+}
+
+export function buildAndWhereClause(clauses: readonly string[]): string {
+  if (clauses.length === 0) {
+    return '';
+  }
+
+  return ` ${clauses.map((clause) => `AND ${clause}`).join(' ')}`;
 }

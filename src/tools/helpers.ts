@@ -6,6 +6,9 @@ import type { MemoryRow } from '../lib/types.js';
 type LogLevel = 'debug' | 'info' | 'notice' | 'warning' | 'error';
 
 const DEFAULT_MEMORY_TYPE = 'general';
+const MEMORY_RESOURCE_PREFIX = 'memory://memories/';
+const SELECT_MEMORY_BY_HASH_SQL = 'SELECT * FROM memories WHERE hash = ?';
+const SELECT_MEMORY_HASH_SQL = 'SELECT hash FROM memories WHERE hash = ?';
 
 export async function logToolEvent(
   server: McpServer,
@@ -29,18 +32,13 @@ export function normalizeMemoryType(memoryType?: string): string {
 }
 
 export function getMemoryRow(db: TypedDb, hash: string): MemoryRow | undefined {
-  return db
-    .prepare<MemoryRow>('SELECT * FROM memories WHERE hash = ?')
-    .get(hash);
+  return db.prepare<MemoryRow>(SELECT_MEMORY_BY_HASH_SQL).get(hash);
 }
 
 export function memoryExists(db: TypedDb, hash: string): boolean {
   return (
-    db
-      .prepare<
-        Pick<MemoryRow, 'hash'>
-      >('SELECT hash FROM memories WHERE hash = ?')
-      .get(hash) !== undefined
+    db.prepare<Pick<MemoryRow, 'hash'>>(SELECT_MEMORY_HASH_SQL).get(hash) !==
+    undefined
   );
 }
 
@@ -53,5 +51,22 @@ export function withImmediateTransaction<T>(db: TypedDb, action: () => T): T {
   } catch (err) {
     db.exec('ROLLBACK');
     throw err;
+  }
+}
+
+export async function notifyMemoryResourceUpdated(
+  server: McpServer,
+  hash: string
+): Promise<void> {
+  if (!server.isConnected()) {
+    return;
+  }
+
+  try {
+    await server.server.sendResourceUpdated({
+      uri: `${MEMORY_RESOURCE_PREFIX}${hash}`,
+    });
+  } catch {
+    // best-effort notification
   }
 }

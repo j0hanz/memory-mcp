@@ -10,11 +10,14 @@ import {
 } from '../lib/tool-response.js';
 import { DeleteMemoryInputSchema } from '../schemas/inputs.js';
 import { DeleteResultSchema } from '../schemas/outputs.js';
-import { logToolEvent } from './helpers.js';
+import { logToolEvent, notifyMemoryResourceUpdated } from './helpers.js';
 
 type DeleteInput = z.infer<typeof DeleteMemoryInputSchema>;
 
 const DELETE_MEMORY_SQL = 'DELETE FROM memories WHERE hash = ?';
+function formatMemoryNotFound(hash: string): string {
+  return `Memory not found: ${hash}`;
+}
 
 export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
   server.registerTool(
@@ -34,21 +37,12 @@ export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
         if (result.changes === 0) {
           return createErrorResponse(
             E_NOT_FOUND,
-            `Memory not found: ${params.hash}`
+            formatMemoryNotFound(params.hash)
           );
         }
 
         await logToolEvent(server, 'delete', { hash: params.hash });
-
-        if (server.isConnected()) {
-          try {
-            await server.server.sendResourceUpdated({
-              uri: `memory://memories/${params.hash}`,
-            });
-          } catch {
-            // best-effort notification
-          }
-        }
+        await notifyMemoryResourceUpdated(server, params.hash);
 
         return createToolResponse({
           ok: true,

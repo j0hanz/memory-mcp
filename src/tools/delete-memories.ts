@@ -11,11 +11,23 @@ import {
 import type { BatchItemResult } from '../lib/types.js';
 import { DeleteMemoriesInputSchema } from '../schemas/inputs.js';
 import { BatchResultSchema } from '../schemas/outputs.js';
-import { logToolEvent, withImmediateTransaction } from './helpers.js';
+import {
+  logToolEvent,
+  notifyMemoryResourceUpdated,
+  withImmediateTransaction,
+} from './helpers.js';
 
 type DeleteMemoriesInput = z.infer<typeof DeleteMemoriesInputSchema>;
 
 const DELETE_MEMORY_SQL = 'DELETE FROM memories WHERE hash = ?';
+
+function summarizeBatch(items: readonly BatchItemResult[]): {
+  succeeded: number;
+  failed: number;
+} {
+  const succeeded = items.filter((item) => item.ok).length;
+  return { succeeded, failed: items.length - succeeded };
+}
 
 export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
   server.registerTool(
@@ -46,24 +58,15 @@ export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
         });
 
         const deleted = results.filter((r) => r.deleted).length;
-        const succeeded = results.filter((r) => r.ok).length;
-        const failed = results.length - succeeded;
+        const { succeeded, failed } = summarizeBatch(results);
         await logToolEvent(server, 'delete_memories', {
           total: params.hashes.length,
           deleted,
         });
 
-        if (server.isConnected()) {
-          for (const item of results) {
-            if (item.deleted) {
-              try {
-                await server.server.sendResourceUpdated({
-                  uri: `memory://memories/${item.hash}`,
-                });
-              } catch {
-                // best-effort notification
-              }
-            }
+        for (const item of results) {
+          if (item.deleted) {
+            await notifyMemoryResourceUpdated(server, item.hash);
           }
         }
 

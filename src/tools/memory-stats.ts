@@ -14,6 +14,15 @@ interface AvgImportanceRow {
   avg_importance: number | null;
 }
 
+const TOTAL_MEMORIES_SQL = 'SELECT COUNT(*) AS total FROM memories';
+const TOTAL_RELATIONSHIPS_SQL = 'SELECT COUNT(*) AS total FROM relationships';
+const TYPE_COUNTS_SQL =
+  'SELECT memory_type, COUNT(*) AS count FROM memories GROUP BY memory_type ORDER BY count DESC';
+const OLDEST_MEMORY_SQL = 'SELECT MIN(created_at) AS oldest FROM memories';
+const NEWEST_MEMORY_SQL = 'SELECT MAX(created_at) AS newest FROM memories';
+const AVG_IMPORTANCE_SQL =
+  'SELECT AVG(importance) AS avg_importance FROM memories';
+
 function toTypeCounts(rows: TypeRow[]): Record<string, number> {
   const byType: Record<string, number> = {};
   for (const row of rows) {
@@ -39,33 +48,17 @@ export function registerMemoryStats(server: McpServer, db: TypedDb): void {
     },
     () => {
       try {
-        const totalMemories = getTotalCount(
-          db,
-          'SELECT COUNT(*) AS total FROM memories'
-        );
-        const totalRelationships = getTotalCount(
-          db,
-          'SELECT COUNT(*) AS total FROM relationships'
-        );
+        const totalMemories = getTotalCount(db, TOTAL_MEMORIES_SQL);
+        const totalRelationships = getTotalCount(db, TOTAL_RELATIONSHIPS_SQL);
 
-        const typeRows = db
-          .prepare<TypeRow>(
-            'SELECT memory_type, COUNT(*) AS count FROM memories GROUP BY memory_type ORDER BY count DESC'
-          )
-          .all();
+        const typeRows = db.prepare<TypeRow>(TYPE_COUNTS_SQL).all();
 
-        const oldestRow = db
-          .prepare<OldestRow>('SELECT MIN(created_at) AS oldest FROM memories')
-          .get();
+        const oldestRow = db.prepare<OldestRow>(OLDEST_MEMORY_SQL).get();
 
-        const newestRow = db
-          .prepare<NewestRow>('SELECT MAX(created_at) AS newest FROM memories')
-          .get();
+        const newestRow = db.prepare<NewestRow>(NEWEST_MEMORY_SQL).get();
 
         const avgImportanceRow = db
-          .prepare<AvgImportanceRow>(
-            'SELECT AVG(importance) AS avg_importance FROM memories'
-          )
+          .prepare<AvgImportanceRow>(AVG_IMPORTANCE_SQL)
           .get();
 
         const byType = toTypeCounts(typeRows);

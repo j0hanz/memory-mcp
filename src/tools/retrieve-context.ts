@@ -15,10 +15,12 @@ import { RetrieveContextInputSchema } from '../schemas/inputs.js';
 import { RetrieveContextResultSchema } from '../schemas/outputs.js';
 
 type RetrieveContextInput = z.infer<typeof RetrieveContextInputSchema>;
+type ContextStrategy = RetrieveContextInput['strategy'];
 
 const RETRIEVE_CONTEXT_LIMIT = 200;
+const ESTIMATED_CHARS_PER_TOKEN = 4;
 
-function getOrderBy(strategy: string): string {
+function getOrderBy(strategy: ContextStrategy): string {
   if (strategy === 'importance') {
     return 'm.importance DESC, memories_fts.rank';
   }
@@ -26,6 +28,10 @@ function getOrderBy(strategy: string): string {
     return 'm.created_at DESC, memories_fts.rank';
   }
   return 'memories_fts.rank';
+}
+
+function estimateTokens(content: string): number {
+  return Math.ceil(content.length / ESTIMATED_CHARS_PER_TOKEN);
 }
 
 function loadContextRows(
@@ -73,7 +79,7 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
 
         for (const row of candidateRows) {
           const mem = parseMemoryRow(row);
-          const tokens = Math.ceil(mem.content.length / 4);
+          const tokens = estimateTokens(mem.content);
           if (estimatedTokens + tokens > tokenBudget) {
             truncated = true;
             break;

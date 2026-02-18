@@ -13,6 +13,12 @@ import { CreateRelationshipResultSchema } from '../schemas/outputs.js';
 import { logToolEvent, memoryExists, nowIso } from './helpers.js';
 
 type CreateRelInput = z.infer<typeof CreateRelationshipInputSchema>;
+const INSERT_RELATIONSHIP_SQL = `INSERT OR IGNORE INTO relationships (from_hash, to_hash, relation_type, created_at)
+  VALUES (?, ?, ?, ?)`;
+
+function formatMemoryNotFound(kind: 'Source' | 'Target', hash: string): string {
+  return `${kind} memory not found: ${hash}`;
+}
 
 export function registerCreateRelationship(
   server: McpServer,
@@ -33,23 +39,20 @@ export function registerCreateRelationship(
         if (!memoryExists(db, params.from_hash)) {
           return createErrorResponse(
             E_NOT_FOUND,
-            `Source memory not found: ${params.from_hash}`
+            formatMemoryNotFound('Source', params.from_hash)
           );
         }
 
         if (!memoryExists(db, params.to_hash)) {
           return createErrorResponse(
             E_NOT_FOUND,
-            `Target memory not found: ${params.to_hash}`
+            formatMemoryNotFound('Target', params.to_hash)
           );
         }
 
         const now = nowIso();
         const result = db
-          .prepare(
-            `INSERT OR IGNORE INTO relationships (from_hash, to_hash, relation_type, created_at)
-             VALUES (?, ?, ?, ?)`
-          )
+          .prepare(INSERT_RELATIONSHIP_SQL)
           .run(params.from_hash, params.to_hash, params.relation_type, now);
 
         const created = result.changes > 0;

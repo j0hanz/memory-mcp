@@ -4,8 +4,12 @@ import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
 import { E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
-import { decodeCursor, encodeCursor } from '../lib/pagination.js';
-import { buildFilterClauses, sanitizeFtsQuery } from '../lib/search.js';
+import { decodeCursor, encodeCursor, splitPage } from '../lib/pagination.js';
+import {
+  buildAndWhereClause,
+  buildFilterClauses,
+  sanitizeFtsQuery,
+} from '../lib/search.js';
 import type { MemoryFilters } from '../lib/search.js';
 import {
   createErrorResponse,
@@ -18,6 +22,20 @@ import { SearchResultSchema } from '../schemas/outputs.js';
 
 type SearchInput = z.infer<typeof SearchMemoriesInputSchema>;
 
+function toMemoryFilters(params: SearchInput): MemoryFilters {
+  const filters: MemoryFilters = {};
+  if (params.min_importance != null) {
+    filters.min_importance = params.min_importance;
+  }
+  if (params.max_importance != null) {
+    filters.max_importance = params.max_importance;
+  }
+  if (params.memory_type != null) {
+    filters.memory_type = params.memory_type;
+  }
+  return filters;
+}
+
 function loadSearchRows(
   db: TypedDb,
   query: string,
@@ -27,10 +45,7 @@ function loadSearchRows(
 ): MemoryRow[] {
   const ftsQuery = sanitizeFtsQuery(query);
   const filter = buildFilterClauses(filters);
-  const whereExtra =
-    filter.clauses.length > 0
-      ? ` ${filter.clauses.map((c) => `AND ${c}`).join(' ')}`
-      : '';
+  const whereExtra = buildAndWhereClause(filter.clauses);
   return db
     .prepare<MemoryRow>(
       `SELECT m.*, memories_fts.rank AS rank FROM memories m
@@ -40,16 +55,6 @@ function loadSearchRows(
        LIMIT ? OFFSET ?`
     )
     .all(ftsQuery, ...filter.params, limit + 1, offset);
-}
-
-function splitPage<T>(
-  rows: T[],
-  limit: number
-): { page: T[]; hasMore: boolean } {
-  if (rows.length > limit) {
-    return { page: rows.slice(0, limit), hasMore: true };
-  }
-  return { page: rows, hasMore: false };
 }
 
 export function registerSearchMemories(server: McpServer, db: TypedDb): void {
@@ -65,19 +70,15 @@ export function registerSearchMemories(server: McpServer, db: TypedDb): void {
     },
     (params: SearchInput) => {
       try {
-        const {
-          limit,
-          cursor,
-          min_importance: minImportance,
-          max_importance: maxImportance,
-          memory_type: memoryType,
-        } = params;
+        const { limit, cursor } = params;
         const offset = cursor ? decodeCursor(cursor) : 0;
-        const rows = loadSearchRows(db, params.query, limit, offset, {
-          min_importance: minImportance,
-          max_importance: maxImportance,
-          memory_type: memoryType,
-        });
+        const rows = loadSearchRows(
+          db,
+          params.query,
+          limit,
+          offset,
+          toMemoryFilters(params)
+        );
         const { page: pageRows, hasMore } = splitPage(rows, limit);
 
         const memories: Memory[] = pageRows.map(parseMemoryRow);

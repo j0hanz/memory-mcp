@@ -11,7 +11,7 @@ export interface TypedStatement<T> {
 }
 
 export class TypedDb {
-  constructor(private db: DatabaseSync) {}
+  constructor(private readonly db: DatabaseSync) {}
 
   prepare<T>(sql: string): TypedStatement<T> {
     const stmt = this.db.prepare(sql);

@@ -14,6 +14,9 @@ import { MemoryResultSchema } from '../schemas/outputs.js';
 import { getMemoryRow } from './helpers.js';
 
 type GetInput = z.infer<typeof GetMemoryInputSchema>;
+function formatMemoryNotFound(hash: string): string {
+  return `Memory not found: ${hash}`;
+}
 
 export function registerGetMemory(server: McpServer, db: TypedDb): void {
   server.registerTool(
@@ -32,7 +35,7 @@ export function registerGetMemory(server: McpServer, db: TypedDb): void {
         if (!row) {
           return createErrorResponse(
             E_NOT_FOUND,
-            `Memory not found: ${params.hash}`
+            formatMemoryNotFound(params.hash)
           );
         }
 

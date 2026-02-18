@@ -8,6 +8,11 @@ interface CursorPayload {
   offset: number;
 }
 
+export interface PageSlice<T> {
+  page: T[];
+  hasMore: boolean;
+}
+
 function isCursorPayload(value: unknown): value is CursorPayload {
   if (typeof value !== 'object' || value === null) {
     return false;
@@ -31,7 +36,8 @@ function parseCursorPayload(cursor: string): CursorPayload {
 }
 
 export function encodeCursor(offset: number): string {
-  return Buffer.from(JSON.stringify({ offset })).toString(CURSOR_ENCODING);
+  const payload: CursorPayload = { offset };
+  return Buffer.from(JSON.stringify(payload)).toString(CURSOR_ENCODING);
 }
 
 export function decodeCursor(cursor: string): number {
@@ -43,4 +49,12 @@ export function decodeCursor(cursor: string): number {
       `${E_INVALID_CURSOR}: malformed cursor`
     );
   }
+}
+
+export function splitPage<T>(rows: readonly T[], limit: number): PageSlice<T> {
+  if (rows.length > limit) {
+    return { page: rows.slice(0, limit), hasMore: true };
+  }
+
+  return { page: [...rows], hasMore: false };
 }

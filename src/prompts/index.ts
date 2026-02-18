@@ -39,16 +39,14 @@ const HELP_MESSAGES: PromptMessage[] = [
   },
 ];
 
+const GET_HELP_PROMPT_CONFIG = {
+  title: 'Get Help',
+  description:
+    'Return the full usage instructions for all memory tools and workflows.',
+} as const;
+
 export function registerAllPrompts(server: McpServer): void {
-  server.registerPrompt(
-    'get-help',
-    {
-      title: 'Get Help',
-      description:
-        'Return the full usage instructions for all memory tools and workflows.',
-    },
-    () => ({
-      messages: HELP_MESSAGES,
-    })
-  );
+  server.registerPrompt('get-help', GET_HELP_PROMPT_CONFIG, () => ({
+    messages: HELP_MESSAGES,
+  }));
 }
