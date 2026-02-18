@@ -253,6 +253,12 @@ Purpose: Search memories, then traverse connected graph edges up to `depth` hops
 
 Returns: `{ ok, result: { memories, graph, depth_reached, nextCursor? } }`.
 
+Each item in the `graph` array uses this shape:
+
+```json
+{ "from_hash": "...", "to_hash": "...", "relation_type": "..." }
+```
+
 ### `memory_stats`
 
 Purpose: Return aggregate memory and relationship stats.
@@ -284,6 +290,9 @@ Returns: `{ ok, result: { memories, relationships, by_type } }`.
 | ---------------- | ------------------------- | ----------- | -------- |
 | `MEMORY_DB_PATH` | SQLite database file path | `memory.db` | No       |
 
+> [!IMPORTANT]
+> If `MEMORY_DB_PATH` is relative (including the default `memory.db`), it resolves from the process working directory.
+
 ### Limits and Constraints
 
 | Item                    | Value                                            |
@@ -309,7 +318,7 @@ Returns: `{ ok, result: { memories, relationships, by_type } }`.
 - Fatal process errors are written to `stderr` in the entrypoint.
 - Inputs are validated with strict Zod schemas and bounded field constraints.
 - Hashes are validated against lowercase SHA-256 hex format.
-- FTS queries are sanitized to safe alphanumeric tokens before execution.
+- Search input is tokenized to alphanumeric terms before FTS `MATCH` execution (non-alphanumeric characters act as delimiters).
 - SQLite foreign keys are enabled; relationship rows cascade on memory delete.
 
 ## Development

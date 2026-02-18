@@ -1,5 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
+import { readFileSync } from 'node:fs';
+import { findPackageJSON } from 'node:module';
+
 import type { TypedDb } from './db/typed.js';
 import { registerAllPrompts } from './prompts/index.js';
 import { registerAllResources } from './resources/index.js';
@@ -35,11 +38,20 @@ const REGISTER_TOOL_FNS: RegisterToolFn[] = [
   registerRecall,
 ];
 
+function loadPackageVersion(): string {
+  const pkgPath = findPackageJSON('.', import.meta.url);
+  if (!pkgPath) throw new Error('Could not find package.json');
+  const { version } = JSON.parse(readFileSync(pkgPath, 'utf-8')) as {
+    version: string;
+  };
+  return version;
+}
+
 export function createServer(db: TypedDb): McpServer {
   const server = new McpServer(
     {
       name: 'memory-mcp',
-      version: '1.0.0',
+      version: loadPackageVersion(),
     },
     {
       capabilities: {
