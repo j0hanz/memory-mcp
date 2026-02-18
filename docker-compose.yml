@@ -1,0 +1,11 @@
+services:
+  memory-mcp:
+    build: .
+    stdin_open: true
+    environment:
+      - MEMORY_DB_PATH=/data/memory.db
+    volumes:
+      - memory-data:/data
+
+volumes:
+  memory-data:

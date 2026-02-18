@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.j0hanz/memory-mcp",
+  "title": "Memory MCP Server",
+  "description": "A memory-based implementation of the Model Context Protocol (MCP) for storing and retrieving contextual information.",
+  "repository": {
+    "url": "https://github.com/j0hanz/memory-mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/j0hanz/memory-mcp#readme",
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@j0hanz/memory-mcp",
+      "version": "0.1.0",
+      "transport": { "type": "stdio" },
+      "packageArguments": []
+    }
+  ]
+}
