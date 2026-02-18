@@ -9,6 +9,7 @@ import { registerGetMemory } from './get-memory.js';
 import { registerGetRelationships } from './get-relationships.js';
 import { registerMemoryStats } from './memory-stats.js';
 import { registerRecall } from './recall.js';
+import { registerRetrieveContext } from './retrieve-context.js';
 import { registerSearchMemories } from './search-memories.js';
 import { registerStoreMemories } from './store-memories.js';
 import { registerStoreMemory } from './store-memory.js';
@@ -25,6 +26,7 @@ export {
   registerGetRelationships,
   registerMemoryStats,
   registerRecall,
+  registerRetrieveContext,
   registerSearchMemories,
   registerStoreMemories,
   registerStoreMemory,
@@ -44,4 +46,5 @@ export const TOOL_REGISTRARS: readonly ToolRegistrar[] = [
   registerDeleteRelationship,
   registerGetRelationships,
   registerRecall,
+  registerRetrieveContext,
 ] as const;

@@ -141,3 +141,11 @@ export const RecallResultSchema = createOutputSchema(
     nextCursor: z.string().optional(),
   })
 );
+
+export const RetrieveContextResultSchema = createOutputSchema(
+  z.strictObject({
+    memories: z.array(MemorySchema),
+    estimated_tokens: z.number(),
+    truncated: z.boolean(),
+  })
+);

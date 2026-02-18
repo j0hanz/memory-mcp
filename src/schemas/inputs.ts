@@ -132,6 +132,21 @@ export const SearchMemoriesInputSchema = z.strictObject({
     .string()
     .optional()
     .describe('Pagination cursor from previous response'),
+  min_importance: z
+    .int()
+    .min(0)
+    .max(10)
+    .optional()
+    .describe('Filter: only return memories with importance >= this value'),
+  max_importance: z
+    .int()
+    .min(0)
+    .max(10)
+    .optional()
+    .describe('Filter: only return memories with importance <= this value'),
+  memory_type: MEMORY_TYPE_SCHEMA.optional().describe(
+    'Filter: only return memories of this type'
+  ),
 });
 
 export const RecallInputSchema = z.strictObject({
@@ -154,6 +169,39 @@ export const RecallInputSchema = z.strictObject({
     .string()
     .optional()
     .describe('Pagination cursor from previous response'),
+  min_importance: z
+    .int()
+    .min(0)
+    .max(10)
+    .optional()
+    .describe('Filter: only seed memories with importance >= this value'),
+  max_importance: z
+    .int()
+    .min(0)
+    .max(10)
+    .optional()
+    .describe('Filter: only seed memories with importance <= this value'),
+  memory_type: MEMORY_TYPE_SCHEMA.optional().describe(
+    'Filter: only seed memories of this type'
+  ),
+});
+
+export const RetrieveContextInputSchema = z.strictObject({
+  query: SEARCH_QUERY_SCHEMA.describe('Search query to find relevant memories'),
+  token_budget: z
+    .int()
+    .min(100)
+    .max(200000)
+    .optional()
+    .prefault(4000)
+    .describe('Maximum estimated tokens to return (default 4000)'),
+  strategy: z
+    .enum(['importance', 'recency', 'relevance'])
+    .optional()
+    .prefault('relevance')
+    .describe(
+      'Sort strategy: relevance (FTS rank, default), importance (highest first), recency (newest first)'
+    ),
 });
 
 export const GetRelationshipsInputSchema = z.strictObject({

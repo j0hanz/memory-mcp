@@ -11,7 +11,13 @@ import { callTool } from './helpers.js';
 interface RecallResult {
   ok: boolean;
   result: {
-    memories: Array<{ hash: string; content: string; relevance?: number }>;
+    memories: Array<{
+      hash: string;
+      content: string;
+      memory_type: string;
+      importance: number;
+      relevance?: number;
+    }>;
     graph: Array<{ from_hash: string; to_hash: string; relation_type: string }>;
     depth_reached: number;
     aborted?: boolean;
@@ -156,5 +162,69 @@ describe('recall tool', () => {
     assert.equal(data.ok, true);
     assert.equal(data.result.aborted, true);
     assert.ok(data.result.graph.length > 0);
+  });
+
+  describe('with filters', () => {
+    before(() => {
+      const now = new Date().toISOString();
+      db.prepare(
+        `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        'b'.repeat(63) + '1',
+        'Fact about deep learning and neural networks',
+        '["deeplearning","fact"]',
+        'fact',
+        9,
+        now,
+        now
+      );
+      db.prepare(
+        `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        'b'.repeat(63) + '2',
+        'General note about deep learning and neural networks',
+        '["deeplearning","general"]',
+        'general',
+        1,
+        now,
+        now
+      );
+    });
+
+    it('memory_type filter applied to seed results', async () => {
+      const result = await callTool(server, 'recall', {
+        query: 'deep learning',
+        depth: 0,
+        memory_type: 'fact',
+      });
+      const data = result.structuredContent as RecallResult;
+      assert.ok(data.ok);
+      assert.ok(data.result.memories.length > 0);
+      for (const mem of data.result.memories) {
+        assert.equal(
+          mem.memory_type,
+          'fact',
+          `Expected memory_type 'fact', got '${mem.memory_type}'`
+        );
+      }
+    });
+
+    it('min_importance filter applied to seed results', async () => {
+      const result = await callTool(server, 'recall', {
+        query: 'deep learning',
+        depth: 0,
+        min_importance: 5,
+      });
+      const data = result.structuredContent as RecallResult;
+      assert.ok(data.ok);
+      for (const mem of data.result.memories) {
+        assert.ok(
+          mem.importance >= 5,
+          `Expected importance >= 5, got ${mem.importance}`
+        );
+      }
+    });
   });
 });

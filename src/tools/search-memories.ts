@@ -5,7 +5,8 @@ import type { z } from 'zod/v4';
 import type { TypedDb } from '../db/typed.js';
 import { E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
 import { decodeCursor, encodeCursor } from '../lib/pagination.js';
-import { sanitizeFtsQuery } from '../lib/search.js';
+import { buildFilterClauses, sanitizeFtsQuery } from '../lib/search.js';
+import type { MemoryFilters } from '../lib/search.js';
 import {
   createErrorResponse,
   createToolResponse,
@@ -21,18 +22,24 @@ function loadSearchRows(
   db: TypedDb,
   query: string,
   limit: number,
-  offset: number
+  offset: number,
+  filters: MemoryFilters
 ): MemoryRow[] {
   const ftsQuery = sanitizeFtsQuery(query);
+  const filter = buildFilterClauses(filters);
+  const whereExtra =
+    filter.clauses.length > 0
+      ? ` ${filter.clauses.map((c) => `AND ${c}`).join(' ')}`
+      : '';
   return db
     .prepare<MemoryRow>(
       `SELECT m.*, memories_fts.rank AS rank FROM memories m
        JOIN memories_fts ON memories_fts.rowid = m.rowid
-       WHERE memories_fts MATCH ?
+       WHERE memories_fts MATCH ?${whereExtra}
        ORDER BY memories_fts.rank
        LIMIT ? OFFSET ?`
     )
-    .all(ftsQuery, limit + 1, offset);
+    .all(ftsQuery, ...filter.params, limit + 1, offset);
 }
 
 function splitPage<T>(
@@ -58,9 +65,19 @@ export function registerSearchMemories(server: McpServer, db: TypedDb): void {
     },
     (params: SearchInput) => {
       try {
-        const { limit, cursor } = params;
+        const {
+          limit,
+          cursor,
+          min_importance: minImportance,
+          max_importance: maxImportance,
+          memory_type: memoryType,
+        } = params;
         const offset = cursor ? decodeCursor(cursor) : 0;
-        const rows = loadSearchRows(db, params.query, limit, offset);
+        const rows = loadSearchRows(db, params.query, limit, offset, {
+          min_importance: minImportance,
+          max_importance: maxImportance,
+          memory_type: memoryType,
+        });
         const { page: pageRows, hasMore } = splitPage(rows, limit);
 
         const memories: Memory[] = pageRows.map(parseMemoryRow);

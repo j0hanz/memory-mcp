@@ -15,6 +15,8 @@ interface SearchResult {
       hash: string;
       content: string;
       tags: string[];
+      memory_type: string;
+      importance: number;
       relevance?: number;
     }>;
     total_returned: number;
@@ -110,5 +112,76 @@ describe('search_memories tool', () => {
         `Expected positive relevance, got ${mem.relevance}`
       );
     }
+  });
+
+  describe('with filters', () => {
+    before(() => {
+      const now = new Date().toISOString();
+      db.prepare(
+        `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        'a'.repeat(63) + '1',
+        'Fact about sorting algorithms and data structures',
+        '["algorithms","fact"]',
+        'fact',
+        8,
+        now,
+        now
+      );
+      db.prepare(
+        `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        'a'.repeat(63) + '2',
+        'General note about sorting algorithms and complexity',
+        '["algorithms","general"]',
+        'general',
+        2,
+        now,
+        now
+      );
+    });
+
+    it('filter by memory_type returns only matching type', async () => {
+      const result = await callTool(server, 'search_memories', {
+        query: 'algorithms',
+        memory_type: 'fact',
+      });
+      const data = result.structuredContent as SearchResult;
+      assert.ok(data.ok);
+      assert.ok(data.result.memories.length > 0);
+      for (const mem of data.result.memories) {
+        assert.equal(
+          mem.memory_type,
+          'fact',
+          `Expected memory_type 'fact', got '${mem.memory_type}'`
+        );
+      }
+    });
+
+    it('min_importance: 5 excludes low-importance memories', async () => {
+      const result = await callTool(server, 'search_memories', {
+        query: 'algorithms',
+        min_importance: 5,
+      });
+      const data = result.structuredContent as SearchResult;
+      assert.ok(data.ok);
+      for (const mem of data.result.memories) {
+        assert.ok(
+          mem.importance >= 5,
+          `Expected importance >= 5, got ${mem.importance}`
+        );
+      }
+    });
+
+    it('no filters returns results (original behavior unchanged)', async () => {
+      const result = await callTool(server, 'search_memories', {
+        query: 'TypeScript',
+      });
+      const data = result.structuredContent as SearchResult;
+      assert.ok(data.ok);
+      assert.ok(data.result.memories.length > 0);
+    });
   });
 });
