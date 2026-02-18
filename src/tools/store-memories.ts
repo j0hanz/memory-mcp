@@ -1,0 +1,83 @@
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+
+import type { DatabaseSync } from 'node:sqlite';
+
+import type { z } from 'zod/v4';
+
+import { E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
+import { computeMemoryHash } from '../lib/hash.js';
+import {
+  createErrorResponse,
+  createToolResponse,
+} from '../lib/tool-response.js';
+import type { BatchItemResult } from '../lib/types.js';
+import { StoreMemoriesInputSchema } from '../schemas/inputs.js';
+import { BatchResultSchema } from '../schemas/outputs.js';
+
+type StoreMemoriesInput = z.infer<typeof StoreMemoriesInputSchema>;
+
+export function registerStoreMemories(
+  server: McpServer,
+  db: DatabaseSync
+): void {
+  server.registerTool(
+    'store_memories',
+    {
+      title: 'Store Memories (Batch)',
+      description:
+        'Store up to 50 memories in a single atomic transaction. Returns per-item results so callers can detect partial failures. All items succeed or the transaction rolls back.',
+      inputSchema: StoreMemoriesInputSchema,
+      outputSchema: BatchResultSchema,
+      annotations: { idempotentHint: true },
+    },
+    async (params: StoreMemoriesInput) => {
+      try {
+        const now = new Date().toISOString();
+        const results: BatchItemResult[] = [];
+
+        db.exec('BEGIN IMMEDIATE');
+        try {
+          const stmt = db.prepare(
+            `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`
+          );
+
+          for (const item of params.items) {
+            const { importance, memory_type: rawMemoryType } = item;
+            const memoryType = rawMemoryType ?? 'general';
+            const hash = computeMemoryHash(item.content, item.tags);
+            const tagsJson = JSON.stringify(item.tags);
+            const result = stmt.run(
+              hash,
+              item.content,
+              tagsJson,
+              memoryType,
+              importance,
+              now,
+              now
+            );
+            results.push({ hash, ok: true, created: result.changes > 0 });
+          }
+
+          db.exec('COMMIT');
+        } catch (txErr) {
+          db.exec('ROLLBACK');
+          throw txErr;
+        }
+
+        const created = results.filter((r) => r.created).length;
+        if (server.isConnected()) {
+          await server.sendLoggingMessage({
+            level: 'info',
+            logger: 'store_memories',
+            data: { total: results.length, created },
+          });
+        }
+
+        return createToolResponse({ ok: true, result: { items: results } });
+      } catch (err) {
+        return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+      }
+    }
+  );
+}
