@@ -11,7 +11,7 @@ import { callTool } from './helpers.js';
 interface RecallResult {
   ok: boolean;
   result: {
-    memories: Array<{ hash: string; content: string }>;
+    memories: Array<{ hash: string; content: string; relevance?: number }>;
     graph: Array<{ from_hash: string; to_hash: string; relation_type: string }>;
     depth_reached: number;
     aborted?: boolean;
@@ -62,6 +62,21 @@ describe('recall tool', () => {
     const data = result.structuredContent as RecallResult;
     assert.equal(data.ok, true);
     assert.ok(data.result.memories.some((m) => m.hash === hashA));
+  });
+
+  it('includes positive relevance on seed memories', async () => {
+    const result = await callTool(server, 'recall', {
+      query: 'machine learning',
+      depth: 0,
+    });
+    const data = result.structuredContent as RecallResult;
+    const seedMem = data.result.memories.find((m) => m.hash === hashA);
+    assert.ok(seedMem, 'Expected seed memory');
+    assert.equal(typeof seedMem.relevance, 'number');
+    assert.ok(
+      seedMem.relevance! > 0,
+      `Expected positive relevance, got ${seedMem.relevance}`
+    );
   });
 
   it('traverses relationships at depth 1', async () => {

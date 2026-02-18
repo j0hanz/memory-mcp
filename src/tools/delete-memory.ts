@@ -25,6 +25,7 @@ export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
         'Delete a single memory by its SHA-256 hash. Also removes any relationships involving it.',
       inputSchema: DeleteMemoryInputSchema,
       outputSchema: DeleteResultSchema,
+      annotations: { destructiveHint: true },
     },
     async (params: DeleteInput) => {
       try {

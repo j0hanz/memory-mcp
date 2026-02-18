@@ -30,6 +30,7 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
         'Replace the content of an existing memory identified by its hash. Tags may optionally be replaced. Returns the new hash.',
       inputSchema: UpdateMemoryInputSchema,
       outputSchema: UpdateResultSchema,
+      annotations: { destructiveHint: true },
     },
     async (params: UpdateInput) => {
       try {

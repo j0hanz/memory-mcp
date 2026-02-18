@@ -45,11 +45,26 @@ const SEARCH_QUERY_SCHEMA = z
   .min(1, { error: 'Query must not be empty' })
   .max(1000, { error: 'Query must be at most 1000 characters' });
 
+export const SUGGESTED_RELATION_TYPES = [
+  'related_to',
+  'causes',
+  'depends_on',
+  'parent_of',
+  'child_of',
+  'supersedes',
+  'contradicts',
+  'supports',
+  'references',
+] as const;
+
 const RELATION_TYPE_SCHEMA = z
   .string()
   .min(1, { error: 'Relation type must not be empty' })
   .max(50, { error: 'Relation type must be at most 50 characters' })
-  .regex(/^\S+$/, { error: 'Relation type must not contain whitespace' });
+  .regex(/^\S+$/, { error: 'Relation type must not contain whitespace' })
+  .describe(
+    `Relationship type (free-form string). Suggested: ${SUGGESTED_RELATION_TYPES.join(', ')}`
+  );
 
 const IMPORTANCE_SCHEMA = z
   .int()

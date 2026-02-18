@@ -1,5 +1,6 @@
 import type { TypedDb } from '../db/typed.js';
 import type { HashRow } from '../lib/types.js';
+import { SUGGESTED_RELATION_TYPES } from '../schemas/inputs.js';
 
 const HASH_MAX_LENGTH = 64;
 const HASH_COMPLETION_LIMIT = 101;
@@ -22,4 +23,14 @@ export function createHashCompletionCallback(
 
 function escapeLikePattern(value: string): string {
   return value.replace(/[%_\\]/g, '\\$&');
+}
+
+// Returns a completion callback for the `relation_type` parameter.
+export function createRelationTypeCompletionCallback(): (
+  value: string
+) => string[] {
+  return (value: string): string[] => {
+    const lower = value.toLowerCase();
+    return SUGGESTED_RELATION_TYPES.filter((t) => t.startsWith(lower));
+  };
 }

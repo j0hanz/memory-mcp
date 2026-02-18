@@ -32,6 +32,7 @@ export const MemorySchema = z.strictObject({
   importance: z.number(),
   created_at: z.string(),
   updated_at: z.string(),
+  relevance: z.number().optional(),
 });
 
 export const MemoryResultSchema = createOutputSchema(MemorySchema);

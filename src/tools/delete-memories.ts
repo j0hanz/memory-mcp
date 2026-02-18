@@ -26,6 +26,7 @@ export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
         'Delete multiple memories by hash in a single atomic transaction. Returns per-item results indicating which hashes were deleted.',
       inputSchema: DeleteMemoriesInputSchema,
       outputSchema: BatchResultSchema,
+      annotations: { destructiveHint: true },
     },
     async (params: DeleteMemoriesInput) => {
       try {

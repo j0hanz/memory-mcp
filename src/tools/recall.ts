@@ -1,5 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
+import process from 'node:process';
+
 import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
@@ -22,9 +24,32 @@ import { RecallResultSchema } from '../schemas/outputs.js';
 
 type RecallInput = z.infer<typeof RecallInputSchema>;
 
-const MAX_FRONTIER_SIZE = 1000;
-const MAX_EDGE_ROWS = 5000;
-const MAX_VISITED_NODES = 5000;
+function parseEnvInt(
+  name: string,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  const raw = process.env[name];
+  if (raw == null) return fallback;
+  const parsed = parseInt(raw, 10);
+  if (Number.isNaN(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
+
+const MAX_FRONTIER_SIZE = parseEnvInt(
+  'RECALL_MAX_FRONTIER_SIZE',
+  1000,
+  100,
+  50000
+);
+const MAX_EDGE_ROWS = parseEnvInt('RECALL_MAX_EDGE_ROWS', 5000, 100, 50000);
+const MAX_VISITED_NODES = parseEnvInt(
+  'RECALL_MAX_VISITED_NODES',
+  5000,
+  100,
+  50000
+);
 
 function createPlaceholders(count: number): string {
   return new Array(count).fill('?').join(',');
@@ -39,7 +64,7 @@ function loadSeedRows(
   const ftsQuery = sanitizeFtsQuery(query);
   return db
     .prepare<MemoryRow>(
-      `SELECT m.* FROM memories m
+      `SELECT m.*, memories_fts.rank AS rank FROM memories m
        JOIN memories_fts ON memories_fts.rowid = m.rowid
        WHERE memories_fts MATCH ?
        ORDER BY memories_fts.rank
@@ -61,7 +86,8 @@ function splitPage<T>(
 function traverseGraph(
   db: TypedDb,
   seeds: MemoryRow[],
-  depth: number
+  depth: number,
+  signal?: AbortSignal
 ): {
   edges: RelationshipEdge[];
   visited: Set<string>;
@@ -76,6 +102,10 @@ function traverseGraph(
   let aborted = false;
 
   for (let hop = 0; hop < depth && frontier.length > 0; hop++) {
+    if (signal?.aborted) {
+      aborted = true;
+      break;
+    }
     depthReached = hop + 1;
     if (frontier.length > MAX_FRONTIER_SIZE) {
       frontier = frontier.slice(0, MAX_FRONTIER_SIZE);
@@ -168,7 +198,7 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
       outputSchema: RecallResultSchema,
       annotations: { readOnlyHint: true },
     },
-    (params: RecallInput) => {
+    (params: RecallInput, { signal }: { signal?: AbortSignal }) => {
       try {
         const { depth, limit, cursor } = params;
         const offset = cursor ? decodeCursor(cursor) : 0;
@@ -178,11 +208,18 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
         const { page: pageSeeds, hasMore } = splitPage(seedRows, limit);
 
         // Step 2: BFS traversal up to `depth` hops
-        const traversal = traverseGraph(db, pageSeeds, depth);
+        const traversal = traverseGraph(db, pageSeeds, depth, signal);
 
         // Step 3: Load all discovered memory rows
         const allHashes = Array.from(traversal.visited);
-        const memories = loadMemoriesByHashes(db, allHashes);
+        const seedRelevance = new Map<string, number>();
+        for (const seed of pageSeeds) {
+          if (seed.rank != null) seedRelevance.set(seed.hash, -seed.rank);
+        }
+        const memories = loadMemoriesByHashes(db, allHashes).map((m) => {
+          const rel = seedRelevance.get(m.hash);
+          return rel != null ? { ...m, relevance: rel } : m;
+        });
 
         const nextCursor = hasMore ? encodeCursor(offset + limit) : undefined;
 

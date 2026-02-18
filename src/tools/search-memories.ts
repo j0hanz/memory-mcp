@@ -26,7 +26,7 @@ function loadSearchRows(
   const ftsQuery = sanitizeFtsQuery(query);
   return db
     .prepare<MemoryRow>(
-      `SELECT m.* FROM memories m
+      `SELECT m.*, memories_fts.rank AS rank FROM memories m
        JOIN memories_fts ON memories_fts.rowid = m.rowid
        WHERE memories_fts MATCH ?
        ORDER BY memories_fts.rank

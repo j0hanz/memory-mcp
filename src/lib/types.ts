@@ -6,6 +6,7 @@ export interface Memory {
   importance: number;
   created_at: string;
   updated_at: string;
+  relevance?: number;
 }
 
 export interface Relationship {
@@ -42,6 +43,7 @@ export interface MemoryRow {
   importance: number;
   created_at: string;
   updated_at: string;
+  rank?: number;
 }
 
 export interface RelationshipRow {
@@ -101,8 +103,10 @@ export function parseTags(tagsJson: string): string[] {
 }
 
 export function parseMemoryRow(row: MemoryRow): Memory {
+  const { rank, ...rest } = row;
   return {
-    ...row,
+    ...rest,
     tags: parseTags(row.tags),
+    ...(rank != null ? { relevance: -rank } : {}),
   };
 }

@@ -11,7 +11,12 @@ import { callTool } from './helpers.js';
 interface SearchResult {
   ok: boolean;
   result: {
-    memories: Array<{ hash: string; content: string; tags: string[] }>;
+    memories: Array<{
+      hash: string;
+      content: string;
+      tags: string[];
+      relevance?: number;
+    }>;
     total_returned: number;
     nextCursor?: string;
   };
@@ -90,5 +95,20 @@ describe('search_memories tool', () => {
     });
     const data = result.structuredContent as SearchResult;
     assert.ok(data.result.memories.length <= 2);
+  });
+
+  it('includes positive relevance scores', async () => {
+    const result = await callTool(server, 'search_memories', {
+      query: 'TypeScript',
+    });
+    const data = result.structuredContent as SearchResult;
+    assert.ok(data.result.memories.length > 0);
+    for (const mem of data.result.memories) {
+      assert.equal(typeof mem.relevance, 'number');
+      assert.ok(
+        mem.relevance! > 0,
+        `Expected positive relevance, got ${mem.relevance}`
+      );
+    }
   });
 });
