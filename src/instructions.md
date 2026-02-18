@@ -1,14 +1,14 @@
-# Memory INSTRUCTIONS
+# MEMORY-MCP INSTRUCTIONS
 
-> Available as resource `internal://instructions`. Load when unsure about tool usage.
+These instructions are available as a resource `internal://instructions` or prompt `get-help`. Load them when unsure about tool usage.
 
 ---
 
 ## CORE CAPABILITY
 
 - Domain: SQLite-backed memory store with FTS5 search and knowledge graph for AI assistants.
-- Primary Resources: Memory (content+tags+hash), Relationship (directed edges).
-- Tools: `search_memories` `get_memory` `recall` `get_relationships` `memory_stats` (READ); `store_memory` `store_memories` `update_memory` `delete_memory` `delete_memories` `create_relationship` `delete_relationship` (WRITE).
+- Primary Resources: Memories (content+tags+hash), Relationships (directed edges).
+- Tools: `search_memories`, `get_memory`, `recall`, `get_relationships`, `memory_stats`, `retrieve_context` (READ); `store_memory`, `store_memories`, `update_memory`, `delete_memory`, `delete_memories`, `create_relationship`, `delete_relationship` (WRITE).
 
 ---
 
@@ -21,37 +21,39 @@
 ## RESOURCES & RESOURCE LINKS
 
 - `internal://instructions`: This document.
-- `memory://memories/{hash}`: Retrieve a single memory by SHA-256 hash (JSON). Supports hash autocompletion.
+- `memory://memories/{hash}`: Retrieve a single memory by its SHA-256 hash.
+- If a tool response includes a `resourceUri` or `resource_link`, call `resources/read` with the URI to fetch the full payload.
 
 ---
 
 ## THE "GOLDEN PATH" WORKFLOWS (CRITICAL)
 
-### WORKFLOW A: Recall & Exploration
+### WORKFLOW A: RECALL & EXPLORATION
 
-1. Call `search_memories` with `{ query }` to find memories by content/tags.
-2. Call `recall` with `{ query, depth }` to traverse graph connections from search hits.
-3. Call `get_memory` with `{ hash }` for exact retrieval using a hash from previous results.
-   NOTE: Never guess hashes. Always search first.
+- Call `search_memories` with `{ query }` to find memories by content/tags.
+- Call `recall` with `{ query, depth }` to traverse graph connections from hits.
+- Call `get_memory` with `{ hash }` for exact retrieval using hash from results.
+  NOTE: Never guess hashes. Always search first.
 
-### WORKFLOW B: Knowledge Storage
+### WORKFLOW B: KNOWLEDGE MANAGEMENT (STORAGE)
 
-1. Call `store_memory` to persist a single memory with content, tags, and optional type/importance.
-2. Call `store_memories` for batch storage (up to 50 items, atomic transaction).
-3. Call `create_relationship` to link memories via `{ from_hash, to_hash, relation_type }`.
-   NOTE: Both hashes must exist before creating a relationship.
+- Call `store_memory` or `store_memories` (batch ≤50) to persist content with tags.
+- Call `create_relationship` to link memories via `{ from_hash, to_hash, relation_type }`.
+- Call `update_memory` with `{ hash, content }` to revise — returns new hash.
+  NOTE: `update_memory` changes the hash because hash depends on content.
 
-### WORKFLOW C: Knowledge Management
+### WORKFLOW C: CONTEXT RETRIEVAL (RAG)
 
-1. Call `update_memory` with `{ hash, content }` to revise — returns a **new hash** (hash changes on content/tag update).
-2. Call `delete_memory` or `delete_memories` to remove items. Deleting a memory cascades to its relationships.
-3. Call `delete_relationship` to remove a specific edge.
-   NOTE: Confirm destructive actions with the user first.
+- Call `retrieve_context` with `{ query, token_budget }` to get relevant memories fitting a token limit.
+- Use `strategy='importance'` for high-priority items or `strategy='recency'` for latest updates.
+  NOTE: Output is truncated to fit `token_budget`.
 
-### WORKFLOW D: Diagnostics & Graph Inspection
+### WORKFLOW D: CLEANUP & MAINTENANCE
 
-1. Call `memory_stats` (no input) to get counts, timestamps, and type breakdown.
-2. Call `get_relationships` with `{ hash, direction }` to inspect a memory's connections.
+- Call `delete_memory` or `delete_memories` to remove obsolete items.
+- Call `delete_relationship` to remove specific edges.
+- Call `memory_stats` to monitor database size and health.
+  NOTE: Always confirm destructive actions (delete) with the user first.
 
 ---
 
@@ -59,86 +61,63 @@
 
 `store_memory` / `store_memories`
 
-- Idempotent: storing the same content+tags returns the existing hash with `created: false`.
-- Hash is computed from `SHA-256(content + sorted_tags)` — changing tags produces a different hash.
-- `importance`: integer 0–10 (default 0). `memory_type`: one of `general`, `fact`, `plan`, `decision`, `reflection`, `lesson`, `error`, `gradient` (default `general`).
-- Batch: `store_memories` accepts 1–50 items. All succeed or the transaction rolls back.
-
-`search_memories`
-
-- Uses FTS5 full-text search over content and tags. Results ranked by relevance.
-- `limit`: 1–100 (default 20). Returns `nextCursor` for pagination.
-- Query is sanitized to alphanumeric tokens — special characters are stripped.
-
-`recall`
-
-- Seeds from FTS5 search, then performs BFS traversal up to `depth` hops (0–3, default 1).
-- `depth: 0` returns only search results with no graph traversal.
-- `limit`: 1–50 (default 10) controls the seed count, not the total.
-- Returns all discovered `memories` and the `graph` edges connecting them.
-- BFS frontier capped at 1,000 nodes per hop to prevent unbounded memory usage.
+- Purpose: Persist memory content.
+- Input: `tags` (array, no whitespace, max 50 chars each), `importance` (0-10).
+- Output: Returns `hash` and `created` boolean.
+- Gotcha: Idempotent. Storing identical content+tags returns existing hash with `created: false`.
 
 `update_memory`
 
-- `hash` must exist (`E_NOT_FOUND` otherwise). New `content` required; `tags` optional (kept if omitted).
-- Returns `{ old_hash, new_hash }`. **The hash changes** — update references accordingly.
-- Emits a `resources/updated` notification for the old hash URI.
+- Purpose: Modify memory content.
+- Input: Requires `hash` and new `content`. `tags` optional.
+- Output: Returns `old_hash` and `new_hash`.
+- Nuance: Changing content changes the hash. The old memory is effectively replaced.
 
-`get_relationships`
+`search_memories`
 
-- `direction`: `outgoing` | `incoming` | `both` (default `both`).
-- Each relationship includes the linked memory's content and tags inline.
-- Returns `E_NOT_FOUND` if the source hash does not exist.
+- Purpose: FTS5 full-text search over content and tags.
+- Input: `query`, `limit` (default 20), `cursor` for pagination.
+- Limits: Max 100 results per call.
 
-`delete_memory` / `delete_memories`
+`recall`
 
-- Deleting a memory cascades to all its relationships (foreign key ON DELETE CASCADE).
-- Batch: `delete_memories` accepts 1–50 hashes. Atomic transaction.
-- Items not found are returned with `deleted: false` (not an error in batch mode).
+- Purpose: Graph traversal starting from search hits.
+- Input: `depth` (0-3, default 1). 0 = search only. Higher depth = more hops.
+- Gotcha: High depth may return large graphs. Use cautiously.
 
-`create_relationship` / `delete_relationship`
+`retrieve_context`
 
-- `create_relationship`: Idempotent — re-creating returns `created: false`.
-- `relation_type`: no whitespace, max 50 chars (e.g., `related_to`, `causes`, `depends_on`).
-- `delete_relationship`: Returns `E_NOT_FOUND` if the exact edge does not exist.
+- Purpose: Get memories optimized for LLM context window.
+- Input: `token_budget` (default 4000).
+- Output: `memories` array and `truncated` boolean.
 
-`memory_stats`
+`create_relationship`
 
-- No input. Returns total memories, total relationships, oldest/newest timestamps, average importance, and per-type breakdown.
+- Purpose: Link two memories.
+- Input: `from_hash`, `to_hash`, `relation_type` (e.g., related_to, causes).
+- Gotcha: Both hashes must exist.
 
 ---
 
 ## CROSS-FEATURE RELATIONSHIPS
 
-- Use `search_memories` results to obtain hashes for `get_memory`, `update_memory`, `delete_memory`, and `create_relationship`.
-- Use `recall` to discover connected memories and graph edges in a single call — combines FTS5 search with BFS traversal.
-- `update_memory` changes the hash — any relationships referencing the old hash are updated via CASCADE.
-- `memory://memories/{hash}` resource provides the same data as `get_memory` but through the MCP resource protocol.
+- Use `store_memory` to get hashes, then `create_relationship` to link them.
+- Use `search_memories` to find entry points for `recall` traversals.
+- `retrieve_context` uses the same ranking as `search_memories` but limits by token count.
 
 ---
 
 ## CONSTRAINTS & LIMITATIONS
 
-- Transport: stdio only.
-- Requires Node.js ≥ 24 with built-in `node:sqlite` and FTS5 support.
-- Database path: set via `MEMORY_DB_PATH` env var (default: `memory.db`).
-- SQLite busy timeout: 5,000 ms.
-- Content: max 100,000 characters per memory.
-- Tags: 1–100 per memory, each max 50 chars, no whitespace.
-- Hash: 64 lowercase hex characters (SHA-256).
-- Search query: 1–1,000 characters.
-- Batch operations: max 50 items per call.
-- Pagination cursors are base64url-encoded offsets — do not construct manually.
+- Content size: Max 100,000 characters per memory.
+- Batch size: Max 50 items for `store_memories` and `delete_memories`.
+- Tags: Max 100 tags per memory, no whitespace.
+- Relationships: Directed edges only.
 
 ---
 
 ## ERROR HANDLING STRATEGY
 
-- `E_NOT_FOUND`: Hash or relationship missing. → Call `search_memories` or `recall` to find valid hashes.
-- `E_DUPLICATE`: Entry already exists. → Safe to ignore for idempotent operations.
-- `E_CONSTRAINT`: Foreign key or uniqueness violation. → Verify both hashes exist before creating relationships.
-- `E_INVALID_CURSOR`: Malformed pagination cursor. → Drop the cursor and restart from the first page.
-- `E_TIMEOUT`: SQLite busy timeout exceeded (5s). → Retry after a brief delay; reduce batch size if persistent.
-- `E_UNKNOWN`: Unexpected error. → Check the error message for details; retry once.
-
----
+- `E_NOT_FOUND`: Memory hash or relationship not found. → Search/recall to find valid hashes.
+- `E_INVALID_CURSOR`: Pagination cursor invalid or expired. → Restart search without cursor.
+- `E_UNKNOWN`: Unexpected internal error. → Check input format and retry.
