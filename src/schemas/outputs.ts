@@ -23,8 +23,6 @@ function createOutputSchema<T extends z.ZodType>(
   });
 }
 
-export const DefaultOutputSchema = createOutputSchema(z.unknown());
-
 export const MemorySchema = z.strictObject({
   hash: z.string(),
   content: z.string(),
