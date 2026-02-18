@@ -30,7 +30,7 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
         'Store up to 50 memories in a single atomic transaction. Returns per-item results so callers can detect partial failures. All items succeed or the transaction rolls back.',
       inputSchema: StoreMemoriesInputSchema,
       outputSchema: BatchResultSchema,
-      annotations: { idempotentHint: true },
+      annotations: { idempotentHint: true, openWorldHint: false },
     },
     async (params: StoreMemoriesInput) => {
       try {

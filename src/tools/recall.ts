@@ -94,7 +94,8 @@ function traverseGraph(
   db: TypedDb,
   seeds: MemoryRow[],
   depth: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onHop?: (hop: number, total: number) => void
 ): {
   edges: RelationshipEdge[];
   visited: Set<string>;
@@ -114,6 +115,7 @@ function traverseGraph(
       break;
     }
     depthReached = hop + 1;
+    onHop?.(hop, depth);
     if (frontier.length > MAX_FRONTIER_SIZE) {
       frontier = frontier.slice(0, MAX_FRONTIER_SIZE);
       aborted = true;
@@ -203,9 +205,9 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
         'Search memories by full-text query, then traverse the relationship graph up to `depth` hops via BFS. Returns all discovered memories and the edges connecting them.',
       inputSchema: RecallInputSchema,
       outputSchema: RecallResultSchema,
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    (params: RecallInput, { signal }: { signal?: AbortSignal }) => {
+    (params: RecallInput, { signal, _meta, sendNotification }) => {
       try {
         const {
           depth,
@@ -217,6 +219,17 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
         } = params;
         const offset = cursor ? decodeCursor(cursor) : 0;
 
+        const progressToken = _meta?.progressToken;
+        const onHop =
+          progressToken != null
+            ? (hop: number, total: number) => {
+                void sendNotification({
+                  method: 'notifications/progress',
+                  params: { progressToken, progress: hop + 1, total },
+                }).catch(() => {});
+              }
+            : undefined;
+
         // Step 1: FTS seed search
         const seedRows = loadSeedRows(db, params.query, limit, offset, {
           min_importance: minImportance,
@@ -226,7 +239,7 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
         const { page: pageSeeds, hasMore } = splitPage(seedRows, limit);
 
         // Step 2: BFS traversal up to `depth` hops
-        const traversal = traverseGraph(db, pageSeeds, depth, signal);
+        const traversal = traverseGraph(db, pageSeeds, depth, signal, onHop);
 
         // Step 3: Load all discovered memory rows
         const allHashes = Array.from(traversal.visited);

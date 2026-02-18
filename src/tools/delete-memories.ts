@@ -26,7 +26,7 @@ export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
         'Delete multiple memories by hash in a single atomic transaction. Returns per-item results indicating which hashes were deleted.',
       inputSchema: DeleteMemoriesInputSchema,
       outputSchema: BatchResultSchema,
-      annotations: { destructiveHint: true },
+      annotations: { destructiveHint: true, openWorldHint: false },
     },
     async (params: DeleteMemoriesInput) => {
       try {
@@ -52,6 +52,20 @@ export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
           total: params.hashes.length,
           deleted,
         });
+
+        if (server.isConnected()) {
+          for (const item of results) {
+            if (item.deleted) {
+              try {
+                await server.server.sendResourceUpdated({
+                  uri: `memory://memories/${item.hash}`,
+                });
+              } catch {
+                // best-effort notification
+              }
+            }
+          }
+        }
 
         return createToolResponse({
           ok: true,

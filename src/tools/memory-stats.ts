@@ -35,7 +35,7 @@ export function registerMemoryStats(server: McpServer, db: TypedDb): void {
         'Return aggregate statistics about the memory store (counts, oldest/newest timestamps, breakdown by type).',
       inputSchema: MemoryStatsInputSchema,
       outputSchema: StatsResultSchema,
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, openWorldHint: false },
     },
     () => {
       try {

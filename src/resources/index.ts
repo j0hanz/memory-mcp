@@ -65,6 +65,7 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
       title: 'Memory Instructions',
       description: 'Usage guide for all memory tools and workflows.',
       mimeType: 'text/markdown',
+      annotations: { audience: ['assistant'], priority: 0.9 },
     },
     () => ({
       contents: [
@@ -89,6 +90,7 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
       title: 'Memory',
       description: 'Retrieve a memory by its SHA-256 hash.',
       mimeType: 'application/json',
+      annotations: { audience: ['assistant'], priority: 0.7 },
     },
     (uri: URL, variables: Variables) => {
       const rawHash = variables['hash'];

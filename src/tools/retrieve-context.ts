@@ -54,7 +54,7 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
         'Search memories and return relevance-ranked results that fit within a caller-specified token budget. Eliminates manual pagination and token counting for context window management.',
       inputSchema: RetrieveContextInputSchema,
       outputSchema: RetrieveContextResultSchema,
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, openWorldHint: false },
     },
     (params: RetrieveContextInput) => {
       try {

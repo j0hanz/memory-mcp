@@ -33,7 +33,7 @@ export function registerDeleteRelationship(
       description: 'Remove a directed relationship between two memories.',
       inputSchema: DeleteRelationshipInputSchema,
       outputSchema: DeleteRelationshipResultSchema,
-      annotations: { destructiveHint: true },
+      annotations: { destructiveHint: true, openWorldHint: false },
     },
     (params: DeleteRelInput) => {
       try {

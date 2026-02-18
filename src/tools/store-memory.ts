@@ -24,7 +24,7 @@ export function registerStoreMemory(server: McpServer, db: TypedDb): void {
         'Store a new memory with content, tags, and optional type/importance. Returns the SHA-256 hash. Idempotent — storing the same content+tags returns the existing hash with created:false.',
       inputSchema: StoreMemoryInputSchema,
       outputSchema: StoreResultSchema,
-      annotations: { idempotentHint: true },
+      annotations: { idempotentHint: true, openWorldHint: false },
     },
     async (params: StoreInput) => {
       try {

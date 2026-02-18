@@ -25,7 +25,7 @@ export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
         'Delete a single memory by its SHA-256 hash. Also removes any relationships involving it.',
       inputSchema: DeleteMemoryInputSchema,
       outputSchema: DeleteResultSchema,
-      annotations: { destructiveHint: true },
+      annotations: { destructiveHint: true, openWorldHint: false },
     },
     async (params: DeleteInput) => {
       try {
@@ -39,6 +39,16 @@ export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
         }
 
         await logToolEvent(server, 'delete', { hash: params.hash });
+
+        if (server.isConnected()) {
+          try {
+            await server.server.sendResourceUpdated({
+              uri: `memory://memories/${params.hash}`,
+            });
+          } catch {
+            // best-effort notification
+          }
+        }
 
         return createToolResponse({
           ok: true,

@@ -23,7 +23,7 @@ export function registerGetMemory(server: McpServer, db: TypedDb): void {
       description: 'Retrieve a single memory by its SHA-256 hash.',
       inputSchema: GetMemoryInputSchema,
       outputSchema: MemoryResultSchema,
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, openWorldHint: false },
     },
     (params: GetInput) => {
       try {

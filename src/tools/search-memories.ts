@@ -61,7 +61,7 @@ export function registerSearchMemories(server: McpServer, db: TypedDb): void {
         'Full-text search over memory content and tags using FTS5. Returns ranked results with pagination support via cursor.',
       inputSchema: SearchMemoriesInputSchema,
       outputSchema: SearchResultSchema,
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, openWorldHint: false },
     },
     (params: SearchInput) => {
       try {

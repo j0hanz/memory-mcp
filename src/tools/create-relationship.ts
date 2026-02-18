@@ -26,7 +26,7 @@ export function registerCreateRelationship(
         'Create a directed labeled edge between two memories. Idempotent — re-creating an existing relationship is a no-op.',
       inputSchema: CreateRelationshipInputSchema,
       outputSchema: CreateRelationshipResultSchema,
-      annotations: { idempotentHint: true },
+      annotations: { idempotentHint: true, openWorldHint: false },
     },
     async (params: CreateRelInput) => {
       try {

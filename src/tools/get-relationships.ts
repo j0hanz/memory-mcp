@@ -53,7 +53,7 @@ export function registerGetRelationships(server: McpServer, db: TypedDb): void {
         'Retrieve all relationships for a memory, with the related memory inlined. Filter by direction (outgoing | incoming | both).',
       inputSchema: GetRelationshipsInputSchema,
       outputSchema: RelationshipResultSchema,
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, openWorldHint: false },
     },
     (params: GetRelInput) => {
       try {
