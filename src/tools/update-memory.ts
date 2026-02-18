@@ -62,9 +62,15 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
           newHash,
         });
 
-        await server.server.sendResourceUpdated({
-          uri: `memory://memories/${params.hash}`,
-        });
+        if (server.isConnected()) {
+          try {
+            await server.server.sendResourceUpdated({
+              uri: `memory://memories/${params.hash}`,
+            });
+          } catch {
+            // best-effort notification
+          }
+        }
 
         return createToolResponse({
           ok: true,

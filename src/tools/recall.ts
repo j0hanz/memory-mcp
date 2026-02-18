@@ -65,11 +65,13 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
         const allEdges: RelationshipEdge[] = [];
         let frontier: string[] = pageSeeds.map((r) => r.hash);
         let depthReached = 0;
+        let bfsAborted = false;
 
         for (let hop = 0; hop < depth && frontier.length > 0; hop++) {
           depthReached = hop + 1;
           if (frontier.length > MAX_FRONTIER_SIZE) {
             frontier = frontier.slice(0, MAX_FRONTIER_SIZE);
+            bfsAborted = true;
           }
           const placeholders = createPlaceholders(frontier.length);
           const edgeRows = db
@@ -118,6 +120,7 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
             memories,
             graph: allEdges,
             depth_reached: depthReached,
+            ...(bfsAborted ? { aborted: true } : {}),
             ...(nextCursor ? { nextCursor } : {}),
           },
         });

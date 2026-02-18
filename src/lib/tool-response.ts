@@ -4,10 +4,12 @@ function createTextContent(value: unknown): { type: 'text'; text: string } {
   return { type: 'text', text: JSON.stringify(value) };
 }
 
-export function createToolResponse(structured: unknown): CallToolResult {
+export function createToolResponse(
+  structured: Record<string, unknown>
+): CallToolResult {
   return {
     content: [createTextContent(structured)],
-    structuredContent: structured as Record<string, unknown>,
+    structuredContent: structured,
   };
 }
 

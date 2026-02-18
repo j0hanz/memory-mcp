@@ -24,9 +24,24 @@ async function main(): Promise<void> {
   const server = createServer(db);
   const transport = new StdioServerTransport();
 
+  let isShuttingDown = false;
   const shutdown = (): void => {
-    db.close();
-    process.exit(0);
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    void (async () => {
+      const timer = setTimeout(() => {
+        process.stderr.write('Shutdown timed out, forcing exit.\n');
+        process.exit(1);
+      }, 3000);
+      timer.unref();
+      try {
+        await server.close();
+      } catch {
+        // ignore close errors
+      }
+      db.close();
+      process.exit(0);
+    })();
   };
 
   registerShutdownHandlers(shutdown);

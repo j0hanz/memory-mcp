@@ -14,6 +14,7 @@ interface RecallResult {
     memories: Array<{ hash: string; content: string }>;
     graph: Array<{ from_hash: string; to_hash: string; relation_type: string }>;
     depth_reached: number;
+    aborted?: boolean;
     nextCursor?: string;
   };
 }
@@ -71,6 +72,7 @@ describe('recall tool', () => {
     const hashes = data.result.memories.map((m) => m.hash);
     assert.ok(hashes.includes(hashA));
     assert.ok(hashes.includes(hashB));
+    assert.equal(data.result.aborted, undefined);
   });
 
   it('includes relationship edges in the result', async () => {

@@ -87,9 +87,10 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
       const rawHash = variables['hash'];
       const hash = Array.isArray(rawHash) ? rawHash[0] : rawHash;
 
-      if (!hash) {
+      const HASH_REGEX = /^[a-f0-9]{64}$/;
+      if (!hash || !HASH_REGEX.test(hash)) {
         return {
-          contents: [createJsonContent(uri.href, { error: 'Missing hash' })],
+          contents: [createJsonContent(uri.href, { error: 'Invalid hash' })],
         };
       }
 

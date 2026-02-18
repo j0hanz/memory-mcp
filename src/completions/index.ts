@@ -13,11 +13,12 @@ export function createHashCompletionCallback(
 ): (value: string) => string[] {
   return (value: string): string[] => {
     const prefix = value.slice(0, HASH_MAX_LENGTH);
+    const escaped = prefix.replace(/[%_\\]/g, '\\$&');
     const rows = db
       .prepare<HashRow>(
-        `SELECT hash FROM memories WHERE hash LIKE ? ORDER BY hash LIMIT ${HASH_COMPLETION_LIMIT}`
+        `SELECT hash FROM memories WHERE hash LIKE ? ESCAPE '\\' ORDER BY hash LIMIT ${HASH_COMPLETION_LIMIT}`
       )
-      .all(`${prefix}%`);
+      .all(`${escaped}%`);
     return rows.map((r) => r.hash);
   };
 }
