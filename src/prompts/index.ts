@@ -1,4 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { PromptMessage } from '@modelcontextprotocol/sdk/types.js';
 
 const INSTRUCTIONS_CONTENT = `# Memory Instructions
 
@@ -22,6 +23,23 @@ const INSTRUCTIONS_CONTENT = `# Memory Instructions
 `;
 
 export function registerAllPrompts(server: McpServer): void {
+  const messages: PromptMessage[] = [
+    {
+      role: 'user',
+      content: {
+        type: 'text',
+        text: 'Show me the memory usage instructions.',
+      },
+    },
+    {
+      role: 'assistant',
+      content: {
+        type: 'text',
+        text: INSTRUCTIONS_CONTENT,
+      },
+    },
+  ];
+
   server.registerPrompt(
     'get-help',
     {
@@ -30,22 +48,7 @@ export function registerAllPrompts(server: McpServer): void {
         'Return the full usage instructions for all memory tools and workflows.',
     },
     () => ({
-      messages: [
-        {
-          role: 'user',
-          content: {
-            type: 'text',
-            text: 'Show me the memory usage instructions.',
-          },
-        },
-        {
-          role: 'assistant',
-          content: {
-            type: 'text',
-            text: INSTRUCTIONS_CONTENT,
-          },
-        },
-      ],
+      messages,
     })
   );
 }

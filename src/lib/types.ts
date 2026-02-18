@@ -54,9 +54,13 @@ export interface RelationshipRow {
   linked_tags?: string;
 }
 
+function parseTags(tags: string): string[] {
+  return JSON.parse(tags) as string[];
+}
+
 export function parseMemoryRow(row: MemoryRow): Memory {
   return {
     ...row,
-    tags: JSON.parse(row.tags) as string[],
+    tags: parseTags(row.tags),
   };
 }

@@ -12,6 +12,8 @@ import { parseMemoryRow } from '../lib/types.js';
 import type { MemoryRow } from '../lib/types.js';
 
 const baseDir = fileURLToPath(new URL('.', import.meta.url));
+const FALLBACK_INSTRUCTIONS =
+  '# Memory instructions\n\nSee the README for usage details.';
 
 function loadInstructions(): string {
   const paths = [
@@ -26,7 +28,27 @@ function loadInstructions(): string {
       // try next path
     }
   }
-  return '# Memory instructions\n\nSee the README for usage details.';
+  return FALLBACK_INSTRUCTIONS;
+}
+
+function createJsonContent(
+  uri: string,
+  payload: unknown
+): { uri: string; mimeType: 'application/json'; text: string } {
+  return {
+    uri,
+    mimeType: 'application/json',
+    text: JSON.stringify(payload),
+  };
+}
+
+function readMemoryByHash(
+  db: DatabaseSync,
+  hash: string
+): MemoryRow | undefined {
+  return db.prepare('SELECT * FROM memories WHERE hash = ?').get(hash) as
+    | MemoryRow
+    | undefined;
 }
 
 const INSTRUCTIONS_CONTENT = loadInstructions();
@@ -73,40 +95,20 @@ export function registerAllResources(
 
       if (!hash) {
         return {
-          contents: [
-            {
-              uri: uri.href,
-              mimeType: 'application/json',
-              text: JSON.stringify({ error: 'Missing hash' }),
-            },
-          ],
+          contents: [createJsonContent(uri.href, { error: 'Missing hash' })],
         };
       }
 
-      const row = db
-        .prepare('SELECT * FROM memories WHERE hash = ?')
-        .get(hash) as unknown as MemoryRow | undefined;
+      const row = readMemoryByHash(db, hash);
 
       if (!row) {
         return {
-          contents: [
-            {
-              uri: uri.href,
-              mimeType: 'application/json',
-              text: JSON.stringify({ error: 'Not found', hash }),
-            },
-          ],
+          contents: [createJsonContent(uri.href, { error: 'Not found', hash })],
         };
       }
 
       return {
-        contents: [
-          {
-            uri: uri.href,
-            mimeType: 'application/json',
-            text: JSON.stringify(parseMemoryRow(row)),
-          },
-        ],
+        contents: [createJsonContent(uri.href, parseMemoryRow(row))],
       };
     }
   );

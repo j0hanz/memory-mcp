@@ -24,6 +24,14 @@ interface NewestRow {
   newest: string | null;
 }
 
+function toTypeCounts(rows: TypeRow[]): Record<string, number> {
+  const byType: Record<string, number> = {};
+  for (const row of rows) {
+    byType[row.memory_type] = row.count;
+  }
+  return byType;
+}
+
 export function registerMemoryStats(server: McpServer, db: DatabaseSync): void {
   server.registerTool(
     'memory_stats',
@@ -59,10 +67,7 @@ export function registerMemoryStats(server: McpServer, db: DatabaseSync): void {
           .prepare('SELECT MAX(created_at) AS newest FROM memories')
           .get() as unknown as NewestRow;
 
-        const byType: Record<string, number> = {};
-        for (const row of typeRows) {
-          byType[row.memory_type] = row.count;
-        }
+        const byType = toTypeCounts(typeRows);
 
         return createToolResponse({
           ok: true,

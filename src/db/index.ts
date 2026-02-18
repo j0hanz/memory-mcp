@@ -2,6 +2,10 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync, type SQLTagStore } from 'node:sqlite';
 
+const SQLITE_TIMEOUT_MS = 5000;
+const FTS5_CHECK_SQL =
+  'CREATE VIRTUAL TABLE IF NOT EXISTS __fts5_check USING fts5(x); DROP TABLE __fts5_check;';
+
 const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS memories (
     hash TEXT PRIMARY KEY NOT NULL,
@@ -58,6 +62,16 @@ const SCHEMA_SQL = `
     ON relationships(to_hash);
 `;
 
+function assertFts5Available(db: DatabaseSync): void {
+  try {
+    db.exec(FTS5_CHECK_SQL);
+  } catch {
+    throw new Error(
+      'SQLite FTS5 extension is not available. memory-mcp requires a SQLite build with FTS5 support.'
+    );
+  }
+}
+
 export function initDatabase(path: string): DatabaseSync {
   if (path !== ':memory:') {
     mkdirSync(dirname(path), { recursive: true });
@@ -65,22 +79,14 @@ export function initDatabase(path: string): DatabaseSync {
 
   const db = new DatabaseSync(path, {
     enableForeignKeyConstraints: true,
-    timeout: 5000,
+    timeout: SQLITE_TIMEOUT_MS,
   });
 
   // Enable defensive mode (SQLite v3.39+ / Node 24.12+: prevents deliberate DB corruption)
   db.exec('PRAGMA defensive = ON');
 
   // Verify FTS5 support
-  try {
-    db.exec(
-      `CREATE VIRTUAL TABLE IF NOT EXISTS __fts5_check USING fts5(x); DROP TABLE __fts5_check;`
-    );
-  } catch {
-    throw new Error(
-      'SQLite FTS5 extension is not available. memory-mcp requires a SQLite build with FTS5 support.'
-    );
-  }
+  assertFts5Available(db);
 
   db.exec(SCHEMA_SQL);
 

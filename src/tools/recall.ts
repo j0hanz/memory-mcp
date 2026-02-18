@@ -6,6 +6,7 @@ import type { z } from 'zod/v4';
 
 import { E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
 import { decodeCursor, encodeCursor } from '../lib/pagination.js';
+import { sanitizeFtsQuery } from '../lib/search.js';
 import {
   createErrorResponse,
   createToolResponse,
@@ -27,6 +28,10 @@ interface TotalRow {
   total: number;
 }
 
+function createPlaceholders(count: number): string {
+  return new Array(count).fill('?').join(',');
+}
+
 export function registerRecall(server: McpServer, db: DatabaseSync): void {
   server.registerTool(
     'recall',
@@ -44,7 +49,7 @@ export function registerRecall(server: McpServer, db: DatabaseSync): void {
         const offset = cursor ? decodeCursor(cursor) : 0;
 
         // Step 1: FTS seed search
-        const ftsQuery = params.query.replace(/['"*]/g, ' ').trim();
+        const ftsQuery = sanitizeFtsQuery(params.query);
 
         const seedRows = db
           .prepare(
@@ -73,9 +78,7 @@ export function registerRecall(server: McpServer, db: DatabaseSync): void {
         let frontier: string[] = pageSeeds.map((r) => r.hash);
 
         for (let hop = 0; hop < depth && frontier.length > 0; hop++) {
-          if (frontier.length === 0) break;
-
-          const placeholders = frontier.map(() => '?').join(',');
+          const placeholders = createPlaceholders(frontier.length);
           const edgeRows = db
             .prepare(
               `SELECT from_hash, to_hash, relation_type FROM relationships
@@ -105,7 +108,7 @@ export function registerRecall(server: McpServer, db: DatabaseSync): void {
         let memories: Memory[] = [];
 
         if (allHashes.length > 0) {
-          const placeholders = allHashes.map(() => '?').join(',');
+          const placeholders = createPlaceholders(allHashes.length);
           const memRows = db
             .prepare(`SELECT * FROM memories WHERE hash IN (${placeholders})`)
             .all(...allHashes) as unknown as MemoryRow[];

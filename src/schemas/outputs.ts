@@ -5,11 +5,21 @@ export const ErrorResultSchema = z.strictObject({
   message: z.string(),
 });
 
-export const DefaultOutputSchema = z.strictObject({
-  ok: z.boolean(),
-  result: z.unknown().optional(),
-  error: ErrorResultSchema.optional(),
-});
+function createOutputSchema<T extends z.ZodType>(
+  result: T
+): z.ZodObject<{
+  ok: z.ZodBoolean;
+  result: z.ZodOptional<T>;
+  error: z.ZodOptional<typeof ErrorResultSchema>;
+}> {
+  return z.strictObject({
+    ok: z.boolean(),
+    result: result.optional(),
+    error: ErrorResultSchema.optional(),
+  });
+}
+
+export const DefaultOutputSchema = createOutputSchema(z.unknown());
 
 export const MemorySchema = z.strictObject({
   hash: z.string(),
@@ -21,44 +31,28 @@ export const MemorySchema = z.strictObject({
   updated_at: z.string(),
 });
 
-export const MemoryResultSchema = z.strictObject({
-  ok: z.boolean(),
-  result: MemorySchema.optional(),
-  error: ErrorResultSchema.optional(),
-});
+export const MemoryResultSchema = createOutputSchema(MemorySchema);
 
-export const StoreResultSchema = z.strictObject({
-  ok: z.boolean(),
-  result: z
-    .strictObject({
-      hash: z.string(),
-      created: z.boolean(),
-    })
-    .optional(),
-  error: ErrorResultSchema.optional(),
-});
+export const StoreResultSchema = createOutputSchema(
+  z.strictObject({
+    hash: z.string(),
+    created: z.boolean(),
+  })
+);
 
-export const UpdateResultSchema = z.strictObject({
-  ok: z.boolean(),
-  result: z
-    .strictObject({
-      old_hash: z.string(),
-      new_hash: z.string(),
-    })
-    .optional(),
-  error: ErrorResultSchema.optional(),
-});
+export const UpdateResultSchema = createOutputSchema(
+  z.strictObject({
+    old_hash: z.string(),
+    new_hash: z.string(),
+  })
+);
 
-export const DeleteResultSchema = z.strictObject({
-  ok: z.boolean(),
-  result: z
-    .strictObject({
-      hash: z.string(),
-      deleted: z.boolean(),
-    })
-    .optional(),
-  error: ErrorResultSchema.optional(),
-});
+export const DeleteResultSchema = createOutputSchema(
+  z.strictObject({
+    hash: z.string(),
+    deleted: z.boolean(),
+  })
+);
 
 export const BatchItemResultSchema = z.strictObject({
   hash: z.string(),
@@ -68,29 +62,21 @@ export const BatchItemResultSchema = z.strictObject({
   error: z.string().optional(),
 });
 
-export const BatchResultSchema = z.strictObject({
-  ok: z.boolean(),
-  result: z
-    .strictObject({
-      items: z.array(BatchItemResultSchema),
-      succeeded: z.number(),
-      failed: z.number(),
-    })
-    .optional(),
-  error: ErrorResultSchema.optional(),
-});
+export const BatchResultSchema = createOutputSchema(
+  z.strictObject({
+    items: z.array(BatchItemResultSchema),
+    succeeded: z.number(),
+    failed: z.number(),
+  })
+);
 
-export const SearchResultSchema = z.strictObject({
-  ok: z.boolean(),
-  result: z
-    .strictObject({
-      memories: z.array(MemorySchema),
-      nextCursor: z.string().optional(),
-      total_returned: z.number(),
-    })
-    .optional(),
-  error: ErrorResultSchema.optional(),
-});
+export const SearchResultSchema = createOutputSchema(
+  z.strictObject({
+    memories: z.array(MemorySchema),
+    nextCursor: z.string().optional(),
+    total_returned: z.number(),
+  })
+);
 
 export const RelationshipEdgeSchema = z.strictObject({
   from_hash: z.string(),
@@ -108,66 +94,46 @@ export const RelationshipWithMemorySchema = z.strictObject({
   linked_tags: z.array(z.string()),
 });
 
-export const RelationshipResultSchema = z.strictObject({
-  ok: z.boolean(),
-  result: z
-    .strictObject({
-      relationships: z.array(RelationshipWithMemorySchema),
-      count: z.number(),
-    })
-    .optional(),
-  error: ErrorResultSchema.optional(),
-});
+export const RelationshipResultSchema = createOutputSchema(
+  z.strictObject({
+    relationships: z.array(RelationshipWithMemorySchema),
+    count: z.number(),
+  })
+);
 
-export const CreateRelationshipResultSchema = z.strictObject({
-  ok: z.boolean(),
-  result: z
-    .strictObject({
-      created: z.boolean(),
-    })
-    .optional(),
-  error: ErrorResultSchema.optional(),
-});
+export const CreateRelationshipResultSchema = createOutputSchema(
+  z.strictObject({
+    created: z.boolean(),
+  })
+);
 
-export const DeleteRelationshipResultSchema = z.strictObject({
-  ok: z.boolean(),
-  result: z
-    .strictObject({
-      deleted: z.boolean(),
-    })
-    .optional(),
-  error: ErrorResultSchema.optional(),
-});
+export const DeleteRelationshipResultSchema = createOutputSchema(
+  z.strictObject({
+    deleted: z.boolean(),
+  })
+);
 
-export const StatsResultSchema = z.strictObject({
-  ok: z.boolean(),
-  result: z
-    .strictObject({
-      memories: z.strictObject({
-        total: z.number(),
-        oldest: z.string().nullable(),
-        newest: z.string().nullable(),
-        avg_importance: z.number().nullable(),
-      }),
-      relationships: z.strictObject({
-        total: z.number(),
-      }),
-      by_type: z.record(z.string(), z.number()),
-    })
-    .optional(),
-  error: ErrorResultSchema.optional(),
-});
+export const StatsResultSchema = createOutputSchema(
+  z.strictObject({
+    memories: z.strictObject({
+      total: z.number(),
+      oldest: z.string().nullable(),
+      newest: z.string().nullable(),
+      avg_importance: z.number().nullable(),
+    }),
+    relationships: z.strictObject({
+      total: z.number(),
+    }),
+    by_type: z.record(z.string(), z.number()),
+  })
+);
 
-export const RecallResultSchema = z.strictObject({
-  ok: z.boolean(),
-  result: z
-    .strictObject({
-      memories: z.array(MemorySchema),
-      graph: z.array(RelationshipEdgeSchema),
-      depth_reached: z.number(),
-      aborted: z.boolean().optional(),
-      nextCursor: z.string().optional(),
-    })
-    .optional(),
-  error: ErrorResultSchema.optional(),
-});
+export const RecallResultSchema = createOutputSchema(
+  z.strictObject({
+    memories: z.array(MemorySchema),
+    graph: z.array(RelationshipEdgeSchema),
+    depth_reached: z.number(),
+    aborted: z.boolean().optional(),
+    nextCursor: z.string().optional(),
+  })
+);

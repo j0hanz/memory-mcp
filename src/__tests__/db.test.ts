@@ -4,6 +4,17 @@ import { before, describe, it } from 'node:test';
 
 import { initDatabase } from '../db/index.js';
 
+const MEMORIES_TABLE_QUERY =
+  "SELECT name FROM sqlite_master WHERE type='table' AND name='memories'";
+const RELATIONSHIPS_TABLE_QUERY =
+  "SELECT name FROM sqlite_master WHERE type='table' AND name='relationships'";
+const MEMORIES_FTS_TABLE_QUERY =
+  "SELECT name FROM sqlite_master WHERE type='table' AND name='memories_fts'";
+
+function queryTableName(db: DatabaseSync, sql: string): string | undefined {
+  return (db.prepare(sql).get() as { name: string } | undefined)?.name;
+}
+
 describe('initDatabase', () => {
   let db: DatabaseSync;
 
@@ -12,30 +23,18 @@ describe('initDatabase', () => {
   });
 
   it('creates the memories table', () => {
-    const row = db
-      .prepare(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='memories'"
-      )
-      .get() as { name: string } | undefined;
-    assert.equal(row?.name, 'memories');
+    assert.equal(queryTableName(db, MEMORIES_TABLE_QUERY), 'memories');
   });
 
   it('creates the relationships table', () => {
-    const row = db
-      .prepare(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='relationships'"
-      )
-      .get() as { name: string } | undefined;
-    assert.equal(row?.name, 'relationships');
+    assert.equal(
+      queryTableName(db, RELATIONSHIPS_TABLE_QUERY),
+      'relationships'
+    );
   });
 
   it('creates the memories_fts virtual table', () => {
-    const row = db
-      .prepare(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='memories_fts'"
-      )
-      .get() as { name: string } | undefined;
-    assert.equal(row?.name, 'memories_fts');
+    assert.equal(queryTableName(db, MEMORIES_FTS_TABLE_QUERY), 'memories_fts');
   });
 
   it('can insert and retrieve a memory row', () => {

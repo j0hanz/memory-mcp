@@ -6,6 +6,7 @@ import { before, describe, it } from 'node:test';
 
 import { initDatabase } from '../db/index.js';
 import { createServer } from '../server.js';
+import { callTool } from './helpers.js';
 
 interface RecallResult {
   ok: boolean;
@@ -20,25 +21,6 @@ interface RecallResult {
 interface StoreResult {
   ok: boolean;
   result: { hash: string; created: boolean };
-}
-
-function callTool(
-  server: McpServer,
-  toolName: string,
-  args: Record<string, unknown>
-): Promise<{ structuredContent: unknown }> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const tools = (server as any)._registeredTools as Record<
-    string,
-    {
-      inputSchema?: { parse(v: unknown): unknown };
-      handler: (args: unknown, extra: unknown) => Promise<unknown>;
-    }
-  >;
-  const tool = tools[toolName];
-  if (!tool) throw new Error(`Tool not registered: ${toolName}`);
-  const parsed = tool.inputSchema ? tool.inputSchema.parse(args) : args;
-  return tool.handler(parsed, {}) as Promise<{ structuredContent: unknown }>;
 }
 
 describe('recall tool', () => {

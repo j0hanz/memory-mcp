@@ -12,8 +12,17 @@ import {
 import type { MemoryRow } from '../lib/types.js';
 import { CreateRelationshipInputSchema } from '../schemas/inputs.js';
 import { CreateRelationshipResultSchema } from '../schemas/outputs.js';
+import { logToolEvent } from './helpers.js';
 
 type CreateRelInput = z.infer<typeof CreateRelationshipInputSchema>;
+
+function memoryExists(db: DatabaseSync, hash: string): boolean {
+  return (
+    (db.prepare('SELECT hash FROM memories WHERE hash = ?').get(hash) as
+      | Pick<MemoryRow, 'hash'>
+      | undefined) !== undefined
+  );
+}
 
 export function registerCreateRelationship(
   server: McpServer,
@@ -31,23 +40,14 @@ export function registerCreateRelationship(
     },
     async (params: CreateRelInput) => {
       try {
-        // Verify both memories exist
-        const from = db
-          .prepare('SELECT hash FROM memories WHERE hash = ?')
-          .get(params.from_hash) as Pick<MemoryRow, 'hash'> | undefined;
-
-        if (!from) {
+        if (!memoryExists(db, params.from_hash)) {
           return createErrorResponse(
             E_NOT_FOUND,
             `Source memory not found: ${params.from_hash}`
           );
         }
 
-        const to = db
-          .prepare('SELECT hash FROM memories WHERE hash = ?')
-          .get(params.to_hash) as Pick<MemoryRow, 'hash'> | undefined;
-
-        if (!to) {
+        if (!memoryExists(db, params.to_hash)) {
           return createErrorResponse(
             E_NOT_FOUND,
             `Target memory not found: ${params.to_hash}`
@@ -64,18 +64,12 @@ export function registerCreateRelationship(
 
         const created = result.changes > 0;
 
-        if (server.isConnected()) {
-          await server.sendLoggingMessage({
-            level: 'info',
-            logger: 'create_relationship',
-            data: {
-              fromHash: params.from_hash,
-              toHash: params.to_hash,
-              relationType: params.relation_type,
-              created,
-            },
-          });
-        }
+        await logToolEvent(server, 'create_relationship', {
+          fromHash: params.from_hash,
+          toHash: params.to_hash,
+          relationType: params.relation_type,
+          created,
+        });
 
         return createToolResponse({
           ok: true,

@@ -1,8 +1,12 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
+function createTextContent(value: unknown): { type: 'text'; text: string } {
+  return { type: 'text', text: JSON.stringify(value) };
+}
+
 export function createToolResponse(structured: unknown): CallToolResult {
   return {
-    content: [{ type: 'text', text: JSON.stringify(structured) }],
+    content: [createTextContent(structured)],
     structuredContent: structured as Record<string, unknown>,
   };
 }
@@ -13,7 +17,7 @@ export function createErrorResponse(
 ): CallToolResult {
   const structured = { ok: false, error: { code, message } };
   return {
-    content: [{ type: 'text', text: JSON.stringify(structured) }],
+    content: [createTextContent(structured)],
     structuredContent: structured,
     isError: true,
   };

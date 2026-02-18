@@ -14,6 +14,12 @@ import { DeleteRelationshipResultSchema } from '../schemas/outputs.js';
 
 type DeleteRelInput = z.infer<typeof DeleteRelationshipInputSchema>;
 
+function formatRelationship(
+  params: Pick<DeleteRelInput, 'from_hash' | 'to_hash' | 'relation_type'>
+): string {
+  return `${params.from_hash} -[${params.relation_type}]-> ${params.to_hash}`;
+}
+
 export function registerDeleteRelationship(
   server: McpServer,
   db: DatabaseSync
@@ -37,7 +43,7 @@ export function registerDeleteRelationship(
         if (result.changes === 0) {
           return createErrorResponse(
             E_NOT_FOUND,
-            `Relationship not found: ${params.from_hash} -[${params.relation_type}]-> ${params.to_hash}`
+            `Relationship not found: ${formatRelationship(params)}`
           );
         }
 

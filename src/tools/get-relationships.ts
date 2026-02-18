@@ -24,6 +24,40 @@ interface RelWithMemory extends RelationshipRow {
   updated_at: string;
 }
 
+function loadOutgoingRelationships(
+  db: DatabaseSync,
+  hash: string
+): RelWithMemory[] {
+  return db
+    .prepare(
+      `SELECT r.from_hash, r.to_hash, r.relation_type, r.created_at,
+              m.content, m.tags, m.memory_type, m.importance,
+              m.created_at AS created_at_mem, m.updated_at
+       FROM relationships r
+       JOIN memories m ON r.to_hash = m.hash
+       WHERE r.from_hash = ?
+       ORDER BY r.created_at DESC`
+    )
+    .all(hash) as unknown as RelWithMemory[];
+}
+
+function loadIncomingRelationships(
+  db: DatabaseSync,
+  hash: string
+): RelWithMemory[] {
+  return db
+    .prepare(
+      `SELECT r.from_hash, r.to_hash, r.relation_type, r.created_at,
+              m.content, m.tags, m.memory_type, m.importance,
+              m.created_at AS created_at_mem, m.updated_at
+       FROM relationships r
+       JOIN memories m ON r.from_hash = m.hash
+       WHERE r.to_hash = ?
+       ORDER BY r.created_at DESC`
+    )
+    .all(hash) as unknown as RelWithMemory[];
+}
+
 export function registerGetRelationships(
   server: McpServer,
   db: DatabaseSync
@@ -55,32 +89,12 @@ export function registerGetRelationships(
         let rows: RelWithMemory[] = [];
 
         if (direction === 'outgoing' || direction === 'both') {
-          const outgoing = db
-            .prepare(
-              `SELECT r.from_hash, r.to_hash, r.relation_type, r.created_at,
-                      m.content, m.tags, m.memory_type, m.importance,
-                      m.created_at AS created_at_mem, m.updated_at
-               FROM relationships r
-               JOIN memories m ON r.to_hash = m.hash
-               WHERE r.from_hash = ?
-               ORDER BY r.created_at DESC`
-            )
-            .all(params.hash) as unknown as RelWithMemory[];
+          const outgoing = loadOutgoingRelationships(db, params.hash);
           rows = rows.concat(outgoing);
         }
 
         if (direction === 'incoming' || direction === 'both') {
-          const incoming = db
-            .prepare(
-              `SELECT r.from_hash, r.to_hash, r.relation_type, r.created_at,
-                      m.content, m.tags, m.memory_type, m.importance,
-                      m.created_at AS created_at_mem, m.updated_at
-               FROM relationships r
-               JOIN memories m ON r.from_hash = m.hash
-               WHERE r.to_hash = ?
-               ORDER BY r.created_at DESC`
-            )
-            .all(params.hash) as unknown as RelWithMemory[];
+          const incoming = loadIncomingRelationships(db, params.hash);
           rows = rows.concat(incoming);
         }
 

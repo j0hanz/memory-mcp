@@ -16,6 +16,15 @@ import { MemoryResultSchema } from '../schemas/outputs.js';
 
 type GetInput = z.infer<typeof GetMemoryInputSchema>;
 
+function findMemoryByHash(
+  db: DatabaseSync,
+  hash: string
+): MemoryRow | undefined {
+  return db.prepare('SELECT * FROM memories WHERE hash = ?').get(hash) as
+    | MemoryRow
+    | undefined;
+}
+
 export function registerGetMemory(server: McpServer, db: DatabaseSync): void {
   server.registerTool(
     'get_memory',
@@ -28,9 +37,7 @@ export function registerGetMemory(server: McpServer, db: DatabaseSync): void {
     },
     (params: GetInput) => {
       try {
-        const row = db
-          .prepare('SELECT * FROM memories WHERE hash = ?')
-          .get(params.hash) as MemoryRow | undefined;
+        const row = findMemoryByHash(db, params.hash);
 
         if (!row) {
           return createErrorResponse(

@@ -13,6 +13,7 @@ import {
 import type { MemoryRow } from '../lib/types.js';
 import { UpdateMemoryInputSchema } from '../schemas/inputs.js';
 import { UpdateResultSchema } from '../schemas/outputs.js';
+import { logToolEvent, withImmediateTransaction } from './helpers.js';
 
 type UpdateInput = z.infer<typeof UpdateMemoryInputSchema>;
 
@@ -47,8 +48,7 @@ export function registerUpdateMemory(
         const newHash = computeMemoryHash(params.content, newTags);
         const now = new Date().toISOString();
 
-        db.exec('BEGIN IMMEDIATE');
-        try {
+        withImmediateTransaction(db, () => {
           db.prepare(
             `UPDATE memories
              SET hash = ?, content = ?, tags = ?, updated_at = ?
@@ -60,20 +60,11 @@ export function registerUpdateMemory(
             now,
             params.hash
           );
-
-          db.exec('COMMIT');
-        } catch (txErr) {
-          db.exec('ROLLBACK');
-          throw txErr;
-        }
-
-        if (server.isConnected()) {
-          await server.sendLoggingMessage({
-            level: 'info',
-            logger: 'update',
-            data: { oldHash: params.hash, newHash },
-          });
-        }
+        });
+        await logToolEvent(server, 'update', {
+          oldHash: params.hash,
+          newHash,
+        });
 
         await server.server.sendResourceUpdated({
           uri: `memory://memories/${params.hash}`,

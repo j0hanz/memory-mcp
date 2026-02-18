@@ -11,6 +11,7 @@ import {
 } from '../lib/tool-response.js';
 import { DeleteMemoryInputSchema } from '../schemas/inputs.js';
 import { DeleteResultSchema } from '../schemas/outputs.js';
+import { logToolEvent } from './helpers.js';
 
 type DeleteInput = z.infer<typeof DeleteMemoryInputSchema>;
 
@@ -40,13 +41,7 @@ export function registerDeleteMemory(
           );
         }
 
-        if (server.isConnected()) {
-          await server.sendLoggingMessage({
-            level: 'info',
-            logger: 'delete',
-            data: { hash: params.hash },
-          });
-        }
+        await logToolEvent(server, 'delete', { hash: params.hash });
 
         return createToolResponse({
           ok: true,

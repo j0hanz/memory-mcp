@@ -12,6 +12,7 @@ import {
 import type { BatchItemResult } from '../lib/types.js';
 import { DeleteMemoriesInputSchema } from '../schemas/inputs.js';
 import { BatchResultSchema } from '../schemas/outputs.js';
+import { logToolEvent, withImmediateTransaction } from './helpers.js';
 
 type DeleteMemoriesInput = z.infer<typeof DeleteMemoriesInputSchema>;
 
@@ -30,34 +31,26 @@ export function registerDeleteMemories(
     },
     async (params: DeleteMemoriesInput) => {
       try {
-        const results: BatchItemResult[] = [];
-
-        db.exec('BEGIN IMMEDIATE');
-        try {
+        const results = withImmediateTransaction(db, () => {
+          const items: BatchItemResult[] = [];
           const stmt = db.prepare('DELETE FROM memories WHERE hash = ?');
           for (const hash of params.hashes) {
             const result = stmt.run(hash);
-            results.push({
+            items.push({
               hash,
               ok: true,
               created: false,
               deleted: result.changes > 0,
             });
           }
-          db.exec('COMMIT');
-        } catch (txErr) {
-          db.exec('ROLLBACK');
-          throw txErr;
-        }
+          return items;
+        });
 
         const deleted = results.filter((r) => r.deleted).length;
-        if (server.isConnected()) {
-          await server.sendLoggingMessage({
-            level: 'info',
-            logger: 'delete_memories',
-            data: { total: params.hashes.length, deleted },
-          });
-        }
+        await logToolEvent(server, 'delete_memories', {
+          total: params.hashes.length,
+          deleted,
+        });
 
         return createToolResponse({ ok: true, result: { items: results } });
       } catch (err) {

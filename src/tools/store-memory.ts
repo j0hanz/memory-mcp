@@ -12,6 +12,7 @@ import {
 } from '../lib/tool-response.js';
 import { StoreMemoryInputSchema } from '../schemas/inputs.js';
 import { StoreResultSchema } from '../schemas/outputs.js';
+import { logToolEvent } from './helpers.js';
 
 type StoreInput = z.infer<typeof StoreMemoryInputSchema>;
 
@@ -34,7 +35,7 @@ export function registerStoreMemory(server: McpServer, db: DatabaseSync): void {
         const now = new Date().toISOString();
         const tagsJson = JSON.stringify(params.tags);
 
-        const result = db
+        const insertResult = db
           .prepare(
             `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
              VALUES (?, ?, ?, ?, ?, ?, ?)`
@@ -49,15 +50,8 @@ export function registerStoreMemory(server: McpServer, db: DatabaseSync): void {
             now
           );
 
-        const created = result.changes > 0;
-
-        if (server.isConnected()) {
-          await server.sendLoggingMessage({
-            level: 'info',
-            logger: 'store',
-            data: { hash, created },
-          });
-        }
+        const created = insertResult.changes > 0;
+        await logToolEvent(server, 'store', { hash, created });
 
         return createToolResponse({ ok: true, result: { hash, created } });
       } catch (err) {

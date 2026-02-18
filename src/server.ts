@@ -19,6 +19,23 @@ import {
   registerUpdateMemory,
 } from './tools/index.js';
 
+type RegisterToolFn = (server: McpServer, db: DatabaseSync) => void;
+
+const REGISTER_TOOL_FNS: RegisterToolFn[] = [
+  registerStoreMemory,
+  registerGetMemory,
+  registerUpdateMemory,
+  registerDeleteMemory,
+  registerMemoryStats,
+  registerStoreMemories,
+  registerDeleteMemories,
+  registerSearchMemories,
+  registerCreateRelationship,
+  registerDeleteRelationship,
+  registerGetRelationships,
+  registerRecall,
+];
+
 export function createServer(db: DatabaseSync): McpServer {
   const server = new McpServer(
     {
@@ -36,18 +53,9 @@ export function createServer(db: DatabaseSync): McpServer {
     }
   );
 
-  registerStoreMemory(server, db);
-  registerGetMemory(server, db);
-  registerUpdateMemory(server, db);
-  registerDeleteMemory(server, db);
-  registerMemoryStats(server, db);
-  registerStoreMemories(server, db);
-  registerDeleteMemories(server, db);
-  registerSearchMemories(server, db);
-  registerCreateRelationship(server, db);
-  registerDeleteRelationship(server, db);
-  registerGetRelationships(server, db);
-  registerRecall(server, db);
+  for (const registerTool of REGISTER_TOOL_FNS) {
+    registerTool(server, db);
+  }
 
   registerAllResources(server, db);
   registerAllPrompts(server);

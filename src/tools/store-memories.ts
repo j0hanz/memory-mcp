@@ -13,6 +13,7 @@ import {
 import type { BatchItemResult } from '../lib/types.js';
 import { StoreMemoriesInputSchema } from '../schemas/inputs.js';
 import { BatchResultSchema } from '../schemas/outputs.js';
+import { logToolEvent, withImmediateTransaction } from './helpers.js';
 
 type StoreMemoriesInput = z.infer<typeof StoreMemoriesInputSchema>;
 
@@ -33,10 +34,8 @@ export function registerStoreMemories(
     async (params: StoreMemoriesInput) => {
       try {
         const now = new Date().toISOString();
-        const results: BatchItemResult[] = [];
-
-        db.exec('BEGIN IMMEDIATE');
-        try {
+        const results = withImmediateTransaction(db, () => {
+          const items: BatchItemResult[] = [];
           const stmt = db.prepare(
             `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
              VALUES (?, ?, ?, ?, ?, ?, ?)`
@@ -56,23 +55,16 @@ export function registerStoreMemories(
               now,
               now
             );
-            results.push({ hash, ok: true, created: result.changes > 0 });
+            items.push({ hash, ok: true, created: result.changes > 0 });
           }
-
-          db.exec('COMMIT');
-        } catch (txErr) {
-          db.exec('ROLLBACK');
-          throw txErr;
-        }
+          return items;
+        });
 
         const created = results.filter((r) => r.created).length;
-        if (server.isConnected()) {
-          await server.sendLoggingMessage({
-            level: 'info',
-            logger: 'store_memories',
-            data: { total: results.length, created },
-          });
-        }
+        await logToolEvent(server, 'store_memories', {
+          total: results.length,
+          created,
+        });
 
         return createToolResponse({ ok: true, result: { items: results } });
       } catch (err) {

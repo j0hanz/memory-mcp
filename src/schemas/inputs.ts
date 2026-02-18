@@ -40,6 +40,17 @@ const CONTENT_SCHEMA = z
   .max(100000, { error: 'Content must be at most 100000 characters' })
   .describe('The content of the memory');
 
+const SEARCH_QUERY_SCHEMA = z
+  .string()
+  .min(1, { error: 'Query must not be empty' })
+  .max(1000, { error: 'Query must be at most 1000 characters' });
+
+const RELATION_TYPE_SCHEMA = z
+  .string()
+  .min(1, { error: 'Relation type must not be empty' })
+  .max(50, { error: 'Relation type must be at most 50 characters' })
+  .regex(/^\S+$/, { error: 'Relation type must not contain whitespace' });
+
 const IMPORTANCE_SCHEMA = z
   .int()
   .min(0)
@@ -91,11 +102,9 @@ export const DeleteMemoriesInputSchema = z.strictObject({
 });
 
 export const SearchMemoriesInputSchema = z.strictObject({
-  query: z
-    .string()
-    .min(1, { error: 'Query must not be empty' })
-    .max(1000, { error: 'Query must be at most 1000 characters' })
-    .describe('Search query (searches content and tags)'),
+  query: SEARCH_QUERY_SCHEMA.describe(
+    'Search query (searches content and tags)'
+  ),
   limit: z
     .int()
     .min(1)
@@ -110,11 +119,7 @@ export const SearchMemoriesInputSchema = z.strictObject({
 });
 
 export const RecallInputSchema = z.strictObject({
-  query: z
-    .string()
-    .min(1, { error: 'Query must not be empty' })
-    .max(1000, { error: 'Query must be at most 1000 characters' })
-    .describe('Search query to find initial memories'),
+  query: SEARCH_QUERY_SCHEMA.describe('Search query to find initial memories'),
   depth: z
     .int()
     .min(0)
@@ -147,22 +152,17 @@ export const GetRelationshipsInputSchema = z.strictObject({
 export const CreateRelationshipInputSchema = z.strictObject({
   from_hash: HASH_SCHEMA.describe('Source memory hash'),
   to_hash: HASH_SCHEMA.describe('Target memory hash'),
-  relation_type: z
-    .string()
-    .min(1, { error: 'Relation type must not be empty' })
-    .max(50, { error: 'Relation type must be at most 50 characters' })
-    .regex(/^\S+$/, { error: 'Relation type must not contain whitespace' })
-    .describe('Type of relationship (e.g. related_to, causes, depends_on)'),
+  relation_type: RELATION_TYPE_SCHEMA.describe(
+    'Type of relationship (e.g. related_to, causes, depends_on)'
+  ),
 });
 
 export const DeleteRelationshipInputSchema = z.strictObject({
   from_hash: HASH_SCHEMA.describe('Source memory hash'),
   to_hash: HASH_SCHEMA.describe('Target memory hash'),
-  relation_type: z
-    .string()
-    .min(1, { error: 'Relation type must not be empty' })
-    .max(50, { error: 'Relation type must be at most 50 characters' })
-    .describe('Type of relationship to delete'),
+  relation_type: RELATION_TYPE_SCHEMA.describe(
+    'Type of relationship to delete'
+  ),
 });
 
 export const MemoryStatsInputSchema = z.strictObject({});

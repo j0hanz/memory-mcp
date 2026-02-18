@@ -6,6 +6,7 @@ import type { z } from 'zod/v4';
 
 import { E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
 import { decodeCursor, encodeCursor } from '../lib/pagination.js';
+import { sanitizeFtsQuery } from '../lib/search.js';
 import {
   createErrorResponse,
   createToolResponse,
@@ -40,8 +41,7 @@ export function registerSearchMemories(
         const { limit, cursor } = params;
         const offset = cursor ? decodeCursor(cursor) : 0;
 
-        // FTS5 match query — escape the user query to avoid FTS5 syntax errors
-        const ftsQuery = params.query.replace(/['"*]/g, ' ').trim();
+        const ftsQuery = sanitizeFtsQuery(params.query);
 
         const rows = db
           .prepare(
