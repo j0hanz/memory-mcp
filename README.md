@@ -448,6 +448,9 @@ Returns:
 > [!IMPORTANT]
 > If `MEMORY_DB_PATH` is relative (including the default `memory.db`), it resolves from the process working directory.
 
+> [!TIP]
+> Add `memory.db` to your `.gitignore` to keep the database out of version control — it contains local session data and should not be shared or committed.
+
 ### Limits and Constraints
 
 | Item                            | Value                                             |
