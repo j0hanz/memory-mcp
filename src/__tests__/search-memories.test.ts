@@ -12,8 +12,8 @@ interface SearchResult {
   ok: boolean;
   result: {
     memories: Array<{ hash: string; content: string; tags: string[] }>;
-    total: number;
-    nextCursor: string | null;
+    total_returned: number;
+    nextCursor?: string;
   };
 }
 
@@ -63,7 +63,7 @@ describe('search_memories tool', () => {
     });
     const data = result.structuredContent as SearchResult;
     assert.equal(data.result.memories.length, 0);
-    assert.equal(data.result.total, 0);
+    assert.equal(data.result.total_returned, 0);
   });
 
   it('respects the limit parameter', async () => {

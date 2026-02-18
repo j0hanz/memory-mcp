@@ -50,9 +50,6 @@ export function registerDeleteRelationship(
           ok: true,
           result: {
             deleted: true,
-            fromHash: params.from_hash,
-            toHash: params.to_hash,
-            relationType: params.relation_type,
           },
         });
       } catch (err) {

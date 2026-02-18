@@ -16,7 +16,6 @@ import type {
   Memory,
   MemoryRow,
   RelationshipEdge,
-  TotalRow,
 } from '../lib/types.js';
 import { RecallInputSchema } from '../schemas/inputs.js';
 import { RecallResultSchema } from '../schemas/outputs.js';
@@ -61,20 +60,14 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
         const hasMore = seedRows.length > limit;
         const pageSeeds = hasMore ? seedRows.slice(0, limit) : seedRows;
 
-        const totalRow = db
-          .prepare<TotalRow>(
-            `SELECT COUNT(*) AS total FROM memories m
-             JOIN memories_fts ON memories_fts.rowid = m.rowid
-             WHERE memories_fts MATCH ?`
-          )
-          .get(ftsQuery);
-
         // Step 2: BFS traversal up to `depth` hops
         const visitedHashes = new Set<string>(pageSeeds.map((r) => r.hash));
         const allEdges: RelationshipEdge[] = [];
         let frontier: string[] = pageSeeds.map((r) => r.hash);
+        let depthReached = 0;
 
         for (let hop = 0; hop < depth && frontier.length > 0; hop++) {
+          depthReached = hop + 1;
           if (frontier.length > MAX_FRONTIER_SIZE) {
             frontier = frontier.slice(0, MAX_FRONTIER_SIZE);
           }
@@ -117,15 +110,15 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
           memories = memRows.map(parseMemoryRow);
         }
 
-        const nextCursor = hasMore ? encodeCursor(offset + limit) : null;
+        const nextCursor = hasMore ? encodeCursor(offset + limit) : undefined;
 
         return createToolResponse({
           ok: true,
           result: {
             memories,
-            edges: allEdges,
-            total: totalRow?.total ?? 0,
-            nextCursor,
+            graph: allEdges,
+            depth_reached: depthReached,
+            ...(nextCursor ? { nextCursor } : {}),
           },
         });
       } catch (err) {

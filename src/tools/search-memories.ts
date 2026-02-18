@@ -11,7 +11,7 @@ import {
   createToolResponse,
 } from '../lib/tool-response.js';
 import { parseMemoryRow } from '../lib/types.js';
-import type { Memory, MemoryRow, TotalRow } from '../lib/types.js';
+import type { Memory, MemoryRow } from '../lib/types.js';
 import { SearchMemoriesInputSchema } from '../schemas/inputs.js';
 import { SearchResultSchema } from '../schemas/outputs.js';
 
@@ -48,23 +48,15 @@ export function registerSearchMemories(server: McpServer, db: TypedDb): void {
         const hasMore = rows.length > limit;
         const pageRows = hasMore ? rows.slice(0, limit) : rows;
 
-        const totalRow = db
-          .prepare<TotalRow>(
-            `SELECT COUNT(*) AS total FROM memories m
-             JOIN memories_fts ON memories_fts.rowid = m.rowid
-             WHERE memories_fts MATCH ?`
-          )
-          .get(ftsQuery);
-
         const memories: Memory[] = pageRows.map(parseMemoryRow);
-        const nextCursor = hasMore ? encodeCursor(offset + limit) : null;
+        const nextCursor = hasMore ? encodeCursor(offset + limit) : undefined;
 
         return createToolResponse({
           ok: true,
           result: {
             memories,
-            total: totalRow?.total ?? 0,
-            nextCursor,
+            total_returned: memories.length,
+            ...(nextCursor ? { nextCursor } : {}),
           },
         });
       } catch (err) {

@@ -12,9 +12,9 @@ interface RecallResult {
   ok: boolean;
   result: {
     memories: Array<{ hash: string; content: string }>;
-    edges: Array<{ from_hash: string; to_hash: string; relation_type: string }>;
-    total: number;
-    nextCursor: string | null;
+    graph: Array<{ from_hash: string; to_hash: string; relation_type: string }>;
+    depth_reached: number;
+    nextCursor?: string;
   };
 }
 
@@ -79,7 +79,7 @@ describe('recall tool', () => {
       depth: 1,
     });
     const data = result.structuredContent as RecallResult;
-    const edge = data.result.edges.find(
+    const edge = data.result.graph.find(
       (e) => e.from_hash === hashA && e.to_hash === hashB
     );
     assert.ok(edge !== undefined, 'Expected edge between hashA and hashB');

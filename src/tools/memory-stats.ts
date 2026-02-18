@@ -53,16 +53,27 @@ export function registerMemoryStats(server: McpServer, db: TypedDb): void {
           .prepare<NewestRow>('SELECT MAX(created_at) AS newest FROM memories')
           .get();
 
+        const avgImportanceRow = db
+          .prepare<{
+            avg_importance: number | null;
+          }>('SELECT AVG(importance) AS avg_importance FROM memories')
+          .get();
+
         const byType = toTypeCounts(typeRows);
 
         return createToolResponse({
           ok: true,
           result: {
-            totalMemories: totalRow?.total ?? 0,
-            totalRelationships: relationshipRow?.total ?? 0,
-            byType,
-            oldestCreatedAt: oldestRow?.oldest ?? null,
-            newestCreatedAt: newestRow?.newest ?? null,
+            memories: {
+              total: totalRow?.total ?? 0,
+              oldest: oldestRow?.oldest ?? null,
+              newest: newestRow?.newest ?? null,
+              avg_importance: avgImportanceRow?.avg_importance ?? null,
+            },
+            relationships: {
+              total: relationshipRow?.total ?? 0,
+            },
+            by_type: byType,
           },
         });
       } catch (err) {

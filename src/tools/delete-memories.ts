@@ -45,12 +45,17 @@ export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
         });
 
         const deleted = results.filter((r) => r.deleted).length;
+        const succeeded = results.filter((r) => r.ok).length;
+        const failed = results.length - succeeded;
         await logToolEvent(server, 'delete_memories', {
           total: params.hashes.length,
           deleted,
         });
 
-        return createToolResponse({ ok: true, result: { items: results } });
+        return createToolResponse({
+          ok: true,
+          result: { items: results, succeeded, failed },
+        });
       } catch (err) {
         return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
       }

@@ -57,12 +57,17 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
         });
 
         const created = results.filter((r) => r.created).length;
+        const succeeded = results.filter((r) => r.ok).length;
+        const failed = results.length - succeeded;
         await logToolEvent(server, 'store_memories', {
           total: results.length,
           created,
         });
 
-        return createToolResponse({ ok: true, result: { items: results } });
+        return createToolResponse({
+          ok: true,
+          result: { items: results, succeeded, failed },
+        });
       } catch (err) {
         return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
       }

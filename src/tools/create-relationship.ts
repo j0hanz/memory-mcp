@@ -76,9 +76,6 @@ export function registerCreateRelationship(
           ok: true,
           result: {
             created,
-            fromHash: params.from_hash,
-            toHash: params.to_hash,
-            relationType: params.relation_type,
           },
         });
       } catch (err) {
