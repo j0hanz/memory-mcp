@@ -42,6 +42,7 @@
 ## 5) Agent Behavioral Rules (Do Nots)
 
 - Do not introduce new dependencies without updating npm manifests/lockfiles through the package manager (see `package.json`, `package-lock.json`).
+- Do not write long comments or jsdocs, keep comments short, simpel and one line.
 - Do not edit lockfiles manually (see `package-lock.json` presence).
 - Do not commit secrets; never print `.env` values or MCP registry tokens (see `.gitignore` entries for `.env*` and `.mcpregistry_*`).
 - Do not change tool contracts/schemas without updating related tests in `src/__tests__/` (see `src/schemas/inputs.ts`, `src/__tests__/recall.test.ts`).
