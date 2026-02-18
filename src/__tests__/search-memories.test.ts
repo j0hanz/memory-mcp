@@ -1,10 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import assert from 'node:assert/strict';
-import { DatabaseSync } from 'node:sqlite';
 import { before, describe, it } from 'node:test';
 
-import { initDatabase } from '../db/index.js';
+import { initTypedDatabase } from '../db/index.js';
+import type { TypedDb } from '../db/typed.js';
 import { createServer } from '../server.js';
 import { callTool } from './helpers.js';
 
@@ -19,10 +19,10 @@ interface SearchResult {
 
 describe('search_memories tool', () => {
   let server: McpServer;
-  let db: DatabaseSync;
+  let db: TypedDb;
 
   before(async () => {
-    db = initDatabase(':memory:');
+    db = initTypedDatabase(':memory:');
     server = createServer(db);
 
     // Seed some memories

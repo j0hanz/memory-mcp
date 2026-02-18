@@ -1,6 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import type { DatabaseSync } from 'node:sqlite';
+import type { TypedDb } from '../db/typed.js';
 
 type LogLevel = 'debug' | 'info' | 'notice' | 'warning' | 'error';
 
@@ -17,10 +17,7 @@ export async function logToolEvent(
   await server.sendLoggingMessage({ level, logger, data });
 }
 
-export function withImmediateTransaction<T>(
-  db: DatabaseSync,
-  action: () => T
-): T {
+export function withImmediateTransaction<T>(db: TypedDb, action: () => T): T {
   db.exec('BEGIN IMMEDIATE');
   try {
     const result = action();

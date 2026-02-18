@@ -54,6 +54,37 @@ export interface RelationshipRow {
   linked_tags?: string;
 }
 
+export interface CountRow {
+  count: number;
+}
+
+export interface TotalRow {
+  total: number;
+}
+
+export interface EdgeRow {
+  from_hash: string;
+  to_hash: string;
+  relation_type: string;
+}
+
+export interface OldestRow {
+  oldest: string | null;
+}
+
+export interface NewestRow {
+  newest: string | null;
+}
+
+export interface TypeRow {
+  memory_type: string;
+  count: number;
+}
+
+export interface HashRow {
+  hash: string;
+}
+
 function parseTags(tags: string): string[] {
   return JSON.parse(tags) as string[];
 }

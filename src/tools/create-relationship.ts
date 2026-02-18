@@ -1,9 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import type { DatabaseSync } from 'node:sqlite';
-
 import type { z } from 'zod/v4';
 
+import type { TypedDb } from '../db/typed.js';
 import { E_NOT_FOUND, E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
 import {
   createErrorResponse,
@@ -16,17 +15,19 @@ import { logToolEvent } from './helpers.js';
 
 type CreateRelInput = z.infer<typeof CreateRelationshipInputSchema>;
 
-function memoryExists(db: DatabaseSync, hash: string): boolean {
+function memoryExists(db: TypedDb, hash: string): boolean {
   return (
-    (db.prepare('SELECT hash FROM memories WHERE hash = ?').get(hash) as
-      | Pick<MemoryRow, 'hash'>
-      | undefined) !== undefined
+    db
+      .prepare<
+        Pick<MemoryRow, 'hash'>
+      >('SELECT hash FROM memories WHERE hash = ?')
+      .get(hash) !== undefined
   );
 }
 
 export function registerCreateRelationship(
   server: McpServer,
-  db: DatabaseSync
+  db: TypedDb
 ): void {
   server.registerTool(
     'create_relationship',

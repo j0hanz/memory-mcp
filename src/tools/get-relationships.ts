@@ -1,9 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import type { DatabaseSync } from 'node:sqlite';
-
 import type { z } from 'zod/v4';
 
+import type { TypedDb } from '../db/typed.js';
 import { E_NOT_FOUND, E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
 import {
   createErrorResponse,
@@ -24,12 +23,9 @@ interface RelWithMemory extends RelationshipRow {
   updated_at: string;
 }
 
-function loadOutgoingRelationships(
-  db: DatabaseSync,
-  hash: string
-): RelWithMemory[] {
+function loadOutgoingRelationships(db: TypedDb, hash: string): RelWithMemory[] {
   return db
-    .prepare(
+    .prepare<RelWithMemory>(
       `SELECT r.from_hash, r.to_hash, r.relation_type, r.created_at,
               m.content, m.tags, m.memory_type, m.importance,
               m.created_at AS created_at_mem, m.updated_at
@@ -38,15 +34,12 @@ function loadOutgoingRelationships(
        WHERE r.from_hash = ?
        ORDER BY r.created_at DESC`
     )
-    .all(hash) as unknown as RelWithMemory[];
+    .all(hash);
 }
 
-function loadIncomingRelationships(
-  db: DatabaseSync,
-  hash: string
-): RelWithMemory[] {
+function loadIncomingRelationships(db: TypedDb, hash: string): RelWithMemory[] {
   return db
-    .prepare(
+    .prepare<RelWithMemory>(
       `SELECT r.from_hash, r.to_hash, r.relation_type, r.created_at,
               m.content, m.tags, m.memory_type, m.importance,
               m.created_at AS created_at_mem, m.updated_at
@@ -55,13 +48,10 @@ function loadIncomingRelationships(
        WHERE r.to_hash = ?
        ORDER BY r.created_at DESC`
     )
-    .all(hash) as unknown as RelWithMemory[];
+    .all(hash);
 }
 
-export function registerGetRelationships(
-  server: McpServer,
-  db: DatabaseSync
-): void {
+export function registerGetRelationships(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'get_relationships',
     {
@@ -75,8 +65,10 @@ export function registerGetRelationships(
     (params: GetRelInput) => {
       try {
         const exists = db
-          .prepare('SELECT hash FROM memories WHERE hash = ?')
-          .get(params.hash) as Pick<MemoryRow, 'hash'> | undefined;
+          .prepare<
+            Pick<MemoryRow, 'hash'>
+          >('SELECT hash FROM memories WHERE hash = ?')
+          .get(params.hash);
 
         if (!exists) {
           return createErrorResponse(

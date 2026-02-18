@@ -1,9 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import type { DatabaseSync } from 'node:sqlite';
-
 import type { z } from 'zod/v4';
 
+import type { TypedDb } from '../db/typed.js';
 import { E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
 import { decodeCursor, encodeCursor } from '../lib/pagination.js';
 import { sanitizeFtsQuery } from '../lib/search.js';
@@ -12,20 +11,13 @@ import {
   createToolResponse,
 } from '../lib/tool-response.js';
 import { parseMemoryRow } from '../lib/types.js';
-import type { Memory, MemoryRow } from '../lib/types.js';
+import type { Memory, MemoryRow, TotalRow } from '../lib/types.js';
 import { SearchMemoriesInputSchema } from '../schemas/inputs.js';
 import { SearchResultSchema } from '../schemas/outputs.js';
 
 type SearchInput = z.infer<typeof SearchMemoriesInputSchema>;
 
-interface TotalRow {
-  total: number;
-}
-
-export function registerSearchMemories(
-  server: McpServer,
-  db: DatabaseSync
-): void {
+export function registerSearchMemories(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'search_memories',
     {
@@ -44,25 +36,25 @@ export function registerSearchMemories(
         const ftsQuery = sanitizeFtsQuery(params.query);
 
         const rows = db
-          .prepare(
+          .prepare<MemoryRow>(
             `SELECT m.* FROM memories m
              JOIN memories_fts ON memories_fts.rowid = m.rowid
              WHERE memories_fts MATCH ?
              ORDER BY memories_fts.rank
              LIMIT ? OFFSET ?`
           )
-          .all(ftsQuery, limit + 1, offset) as unknown as MemoryRow[];
+          .all(ftsQuery, limit + 1, offset);
 
         const hasMore = rows.length > limit;
         const pageRows = hasMore ? rows.slice(0, limit) : rows;
 
         const totalRow = db
-          .prepare(
+          .prepare<TotalRow>(
             `SELECT COUNT(*) AS total FROM memories m
              JOIN memories_fts ON memories_fts.rowid = m.rowid
              WHERE memories_fts MATCH ?`
           )
-          .get(ftsQuery) as unknown as TotalRow;
+          .get(ftsQuery);
 
         const memories: Memory[] = pageRows.map(parseMemoryRow);
         const nextCursor = hasMore ? encodeCursor(offset + limit) : null;
@@ -71,7 +63,7 @@ export function registerSearchMemories(
           ok: true,
           result: {
             memories,
-            total: totalRow.total,
+            total: totalRow?.total ?? 0,
             nextCursor,
           },
         });

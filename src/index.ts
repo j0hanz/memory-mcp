@@ -3,7 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
 import process from 'node:process';
 
-import { initDatabase } from './db/index.js';
+import { initTypedDatabase } from './db/index.js';
 import { createServer } from './server.js';
 
 const MEMORY_DB_PATH = process.env['MEMORY_DB_PATH'] ?? 'memory.db';
@@ -20,7 +20,7 @@ function registerShutdownHandlers(shutdown: () => void): void {
 }
 
 async function main(): Promise<void> {
-  const db = initDatabase(MEMORY_DB_PATH);
+  const db = initTypedDatabase(MEMORY_DB_PATH);
   const server = createServer(db);
   const transport = new StdioServerTransport();
 

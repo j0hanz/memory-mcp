@@ -1,9 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import type { DatabaseSync } from 'node:sqlite';
-
 import type { z } from 'zod/v4';
 
+import type { TypedDb } from '../db/typed.js';
 import { E_NOT_FOUND, E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
 import {
   createErrorResponse,
@@ -22,7 +21,7 @@ function formatRelationship(
 
 export function registerDeleteRelationship(
   server: McpServer,
-  db: DatabaseSync
+  db: TypedDb
 ): void {
   server.registerTool(
     'delete_relationship',

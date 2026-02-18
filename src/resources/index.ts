@@ -4,10 +4,10 @@ import type { Variables } from '@modelcontextprotocol/sdk/shared/uriTemplate.js'
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 
 import { createHashCompletionCallback } from '../completions/index.js';
+import type { TypedDb } from '../db/typed.js';
 import { parseMemoryRow } from '../lib/types.js';
 import type { MemoryRow } from '../lib/types.js';
 
@@ -42,21 +42,15 @@ function createJsonContent(
   };
 }
 
-function readMemoryByHash(
-  db: DatabaseSync,
-  hash: string
-): MemoryRow | undefined {
-  return db.prepare('SELECT * FROM memories WHERE hash = ?').get(hash) as
-    | MemoryRow
-    | undefined;
+function readMemoryByHash(db: TypedDb, hash: string): MemoryRow | undefined {
+  return db
+    .prepare<MemoryRow>('SELECT * FROM memories WHERE hash = ?')
+    .get(hash);
 }
 
 const INSTRUCTIONS_CONTENT = loadInstructions();
 
-export function registerAllResources(
-  server: McpServer,
-  db: DatabaseSync
-): void {
+export function registerAllResources(server: McpServer, db: TypedDb): void {
   server.registerResource(
     'instructions',
     'internal://instructions',

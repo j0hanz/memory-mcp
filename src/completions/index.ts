@@ -1,8 +1,5 @@
-import type { DatabaseSync } from 'node:sqlite';
-
-interface HashRow {
-  hash: string;
-}
+import type { TypedDb } from '../db/typed.js';
+import type { HashRow } from '../lib/types.js';
 
 const HASH_MAX_LENGTH = 64;
 const HASH_COMPLETION_LIMIT = 101;
@@ -12,15 +9,15 @@ const HASH_COMPLETION_LIMIT = 101;
  * Used by ResourceTemplate to provide autocomplete on memory hash values.
  */
 export function createHashCompletionCallback(
-  db: DatabaseSync
+  db: TypedDb
 ): (value: string) => string[] {
   return (value: string): string[] => {
     const prefix = value.slice(0, HASH_MAX_LENGTH);
     const rows = db
-      .prepare(
+      .prepare<HashRow>(
         `SELECT hash FROM memories WHERE hash LIKE ? ORDER BY hash LIMIT ${HASH_COMPLETION_LIMIT}`
       )
-      .all(`${prefix}%`) as unknown as HashRow[];
+      .all(`${prefix}%`);
     return rows.map((r) => r.hash);
   };
 }

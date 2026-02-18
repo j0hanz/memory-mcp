@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { DatabaseSync } from 'node:sqlite';
 import { before, describe, it } from 'node:test';
 
-import { initDatabase } from '../db/index.js';
+import { initTypedDatabase } from '../db/index.js';
+import type { TypedDb } from '../db/typed.js';
 
 const MEMORIES_TABLE_QUERY =
   "SELECT name FROM sqlite_master WHERE type='table' AND name='memories'";
@@ -11,15 +11,15 @@ const RELATIONSHIPS_TABLE_QUERY =
 const MEMORIES_FTS_TABLE_QUERY =
   "SELECT name FROM sqlite_master WHERE type='table' AND name='memories_fts'";
 
-function queryTableName(db: DatabaseSync, sql: string): string | undefined {
-  return (db.prepare(sql).get() as { name: string } | undefined)?.name;
+function queryTableName(db: TypedDb, sql: string): string | undefined {
+  return db.prepare<{ name: string }>(sql).get()?.name;
 }
 
 describe('initDatabase', () => {
-  let db: DatabaseSync;
+  let db: TypedDb;
 
   before(() => {
-    db = initDatabase(':memory:');
+    db = initTypedDatabase(':memory:');
   });
 
   it('creates the memories table', () => {
@@ -45,8 +45,8 @@ describe('initDatabase', () => {
     ).run('a'.repeat(64), 'test content', '["test"]', 'general', 0, now, now);
 
     const row = db
-      .prepare('SELECT hash FROM memories WHERE hash = ?')
-      .get('a'.repeat(64)) as { hash: string } | undefined;
+      .prepare<{ hash: string }>('SELECT hash FROM memories WHERE hash = ?')
+      .get('a'.repeat(64));
     assert.equal(row?.hash, 'a'.repeat(64));
   });
 
@@ -79,7 +79,7 @@ describe('initDatabase', () => {
     db.prepare('DELETE FROM memories WHERE hash = ?').run(h1);
     const rel = db
       .prepare('SELECT * FROM relationships WHERE from_hash = ?')
-      .get(h1) as unknown;
+      .get(h1);
     assert.equal(rel, undefined);
   });
 });

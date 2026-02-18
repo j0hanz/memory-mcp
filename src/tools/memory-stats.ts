@@ -1,28 +1,14 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import type { DatabaseSync } from 'node:sqlite';
-
+import type { TypedDb } from '../db/typed.js';
 import { E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
+import type { NewestRow, OldestRow, TotalRow, TypeRow } from '../lib/types.js';
 import { MemoryStatsInputSchema } from '../schemas/inputs.js';
 import { StatsResultSchema } from '../schemas/outputs.js';
-
-interface CountRow {
-  total: number;
-}
-interface TypeRow {
-  memory_type: string;
-  count: number;
-}
-interface OldestRow {
-  oldest: string | null;
-}
-interface NewestRow {
-  newest: string | null;
-}
 
 function toTypeCounts(rows: TypeRow[]): Record<string, number> {
   const byType: Record<string, number> = {};
@@ -32,7 +18,7 @@ function toTypeCounts(rows: TypeRow[]): Record<string, number> {
   return byType;
 }
 
-export function registerMemoryStats(server: McpServer, db: DatabaseSync): void {
+export function registerMemoryStats(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'memory_stats',
     {
@@ -46,37 +32,37 @@ export function registerMemoryStats(server: McpServer, db: DatabaseSync): void {
     () => {
       try {
         const totalRow = db
-          .prepare('SELECT COUNT(*) AS total FROM memories')
-          .get() as unknown as CountRow;
+          .prepare<TotalRow>('SELECT COUNT(*) AS total FROM memories')
+          .get();
 
         const relationshipRow = db
-          .prepare('SELECT COUNT(*) AS total FROM relationships')
-          .get() as unknown as CountRow;
+          .prepare<TotalRow>('SELECT COUNT(*) AS total FROM relationships')
+          .get();
 
         const typeRows = db
-          .prepare(
+          .prepare<TypeRow>(
             'SELECT memory_type, COUNT(*) AS count FROM memories GROUP BY memory_type ORDER BY count DESC'
           )
-          .all() as unknown as TypeRow[];
+          .all();
 
         const oldestRow = db
-          .prepare('SELECT MIN(created_at) AS oldest FROM memories')
-          .get() as unknown as OldestRow;
+          .prepare<OldestRow>('SELECT MIN(created_at) AS oldest FROM memories')
+          .get();
 
         const newestRow = db
-          .prepare('SELECT MAX(created_at) AS newest FROM memories')
-          .get() as unknown as NewestRow;
+          .prepare<NewestRow>('SELECT MAX(created_at) AS newest FROM memories')
+          .get();
 
         const byType = toTypeCounts(typeRows);
 
         return createToolResponse({
           ok: true,
           result: {
-            totalMemories: totalRow.total,
-            totalRelationships: relationshipRow.total,
+            totalMemories: totalRow?.total ?? 0,
+            totalRelationships: relationshipRow?.total ?? 0,
             byType,
-            oldestCreatedAt: oldestRow.oldest,
-            newestCreatedAt: newestRow.newest,
+            oldestCreatedAt: oldestRow?.oldest ?? null,
+            newestCreatedAt: newestRow?.newest ?? null,
           },
         });
       } catch (err) {

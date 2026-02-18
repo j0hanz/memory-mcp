@@ -1,9 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import type { DatabaseSync } from 'node:sqlite';
-
 import type { z } from 'zod/v4';
 
+import type { TypedDb } from '../db/typed.js';
 import { E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
 import { computeMemoryHash } from '../lib/hash.js';
 import {
@@ -16,7 +15,7 @@ import { logToolEvent } from './helpers.js';
 
 type StoreInput = z.infer<typeof StoreMemoryInputSchema>;
 
-export function registerStoreMemory(server: McpServer, db: DatabaseSync): void {
+export function registerStoreMemory(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'store_memory',
     {

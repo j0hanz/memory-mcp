@@ -1,10 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import assert from 'node:assert/strict';
-import { DatabaseSync } from 'node:sqlite';
 import { before, describe, it } from 'node:test';
 
-import { initDatabase } from '../db/index.js';
+import { initTypedDatabase } from '../db/index.js';
+import type { TypedDb } from '../db/typed.js';
 import { createServer } from '../server.js';
 import { callTool } from './helpers.js';
 
@@ -14,11 +14,11 @@ interface StoreResult {
 }
 
 describe('store_memory tool', () => {
-  let db: DatabaseSync;
+  let db: TypedDb;
   let server: McpServer;
 
   before(() => {
-    db = initDatabase(':memory:');
+    db = initTypedDatabase(':memory:');
     server = createServer(db);
   });
 
@@ -58,8 +58,11 @@ describe('store_memory tool', () => {
     })) as { structuredContent: StoreResult };
     const hash = result.structuredContent.result.hash;
     const row = db
-      .prepare('SELECT memory_type, importance FROM memories WHERE hash = ?')
-      .get(hash) as { memory_type: string; importance: number } | undefined;
+      .prepare<{
+        memory_type: string;
+        importance: number;
+      }>('SELECT memory_type, importance FROM memories WHERE hash = ?')
+      .get(hash);
     assert.equal(row?.memory_type, 'fact');
     assert.equal(row?.importance, 7);
   });

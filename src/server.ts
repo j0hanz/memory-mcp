@@ -1,7 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import type { DatabaseSync } from 'node:sqlite';
-
+import type { TypedDb } from './db/typed.js';
 import { registerAllPrompts } from './prompts/index.js';
 import { registerAllResources } from './resources/index.js';
 import {
@@ -19,7 +18,7 @@ import {
   registerUpdateMemory,
 } from './tools/index.js';
 
-type RegisterToolFn = (server: McpServer, db: DatabaseSync) => void;
+type RegisterToolFn = (server: McpServer, db: TypedDb) => void;
 
 const REGISTER_TOOL_FNS: RegisterToolFn[] = [
   registerStoreMemory,
@@ -36,10 +35,10 @@ const REGISTER_TOOL_FNS: RegisterToolFn[] = [
   registerRecall,
 ];
 
-export function createServer(db: DatabaseSync): McpServer {
+export function createServer(db: TypedDb): McpServer {
   const server = new McpServer(
     {
-      name: '@j0hanz/memory-mcp',
+      name: 'memory-mcp',
       version: '1.0.0',
     },
     {

@@ -2,6 +2,8 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync, type SQLTagStore } from 'node:sqlite';
 
+import { createTypedDb, type TypedDb } from './typed.js';
+
 const SQLITE_TIMEOUT_MS = 5000;
 const FTS5_CHECK_SQL =
   'CREATE VIRTUAL TABLE IF NOT EXISTS __fts5_check USING fts5(x); DROP TABLE __fts5_check;';
@@ -91,6 +93,11 @@ export function initDatabase(path: string): DatabaseSync {
   db.exec(SCHEMA_SQL);
 
   return db;
+}
+
+export function initTypedDatabase(path: string): TypedDb {
+  const db = initDatabase(path);
+  return createTypedDb(db);
 }
 
 export function createStatementCache(db: DatabaseSync): SQLTagStore {

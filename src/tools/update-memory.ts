@@ -1,9 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import type { DatabaseSync } from 'node:sqlite';
-
 import type { z } from 'zod/v4';
 
+import type { TypedDb } from '../db/typed.js';
 import { E_NOT_FOUND, E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
 import { computeMemoryHash } from '../lib/hash.js';
 import {
@@ -17,10 +16,7 @@ import { logToolEvent, withImmediateTransaction } from './helpers.js';
 
 type UpdateInput = z.infer<typeof UpdateMemoryInputSchema>;
 
-export function registerUpdateMemory(
-  server: McpServer,
-  db: DatabaseSync
-): void {
+export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'update_memory',
     {
@@ -33,8 +29,8 @@ export function registerUpdateMemory(
     async (params: UpdateInput) => {
       try {
         const existing = db
-          .prepare('SELECT * FROM memories WHERE hash = ?')
-          .get(params.hash) as MemoryRow | undefined;
+          .prepare<MemoryRow>('SELECT * FROM memories WHERE hash = ?')
+          .get(params.hash);
 
         if (!existing) {
           return createErrorResponse(

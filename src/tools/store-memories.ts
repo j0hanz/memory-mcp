@@ -1,9 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import type { DatabaseSync } from 'node:sqlite';
-
 import type { z } from 'zod/v4';
 
+import type { TypedDb } from '../db/typed.js';
 import { E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
 import { computeMemoryHash } from '../lib/hash.js';
 import {
@@ -17,10 +16,7 @@ import { logToolEvent, withImmediateTransaction } from './helpers.js';
 
 type StoreMemoriesInput = z.infer<typeof StoreMemoriesInputSchema>;
 
-export function registerStoreMemories(
-  server: McpServer,
-  db: DatabaseSync
-): void {
+export function registerStoreMemories(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'store_memories',
     {
@@ -36,7 +32,7 @@ export function registerStoreMemories(
         const now = new Date().toISOString();
         const results = withImmediateTransaction(db, () => {
           const items: BatchItemResult[] = [];
-          const stmt = db.prepare(
+          const stmt = db.prepare<unknown>(
             `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
              VALUES (?, ?, ?, ?, ?, ?, ?)`
           );

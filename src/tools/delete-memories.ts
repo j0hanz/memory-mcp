@@ -1,9 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import type { DatabaseSync } from 'node:sqlite';
-
 import type { z } from 'zod/v4';
 
+import type { TypedDb } from '../db/typed.js';
 import { E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
 import {
   createErrorResponse,
@@ -16,10 +15,7 @@ import { logToolEvent, withImmediateTransaction } from './helpers.js';
 
 type DeleteMemoriesInput = z.infer<typeof DeleteMemoriesInputSchema>;
 
-export function registerDeleteMemories(
-  server: McpServer,
-  db: DatabaseSync
-): void {
+export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'delete_memories',
     {
@@ -33,7 +29,9 @@ export function registerDeleteMemories(
       try {
         const results = withImmediateTransaction(db, () => {
           const items: BatchItemResult[] = [];
-          const stmt = db.prepare('DELETE FROM memories WHERE hash = ?');
+          const stmt = db.prepare<unknown>(
+            'DELETE FROM memories WHERE hash = ?'
+          );
           for (const hash of params.hashes) {
             const result = stmt.run(hash);
             items.push({

@@ -1,9 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import type { DatabaseSync } from 'node:sqlite';
-
 import type { z } from 'zod/v4';
 
+import type { TypedDb } from '../db/typed.js';
 import { E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
 import { decodeCursor, encodeCursor } from '../lib/pagination.js';
 import { sanitizeFtsQuery } from '../lib/search.js';
@@ -12,27 +11,25 @@ import {
   createToolResponse,
 } from '../lib/tool-response.js';
 import { parseMemoryRow } from '../lib/types.js';
-import type { Memory, MemoryRow, RelationshipEdge } from '../lib/types.js';
+import type {
+  EdgeRow,
+  Memory,
+  MemoryRow,
+  RelationshipEdge,
+  TotalRow,
+} from '../lib/types.js';
 import { RecallInputSchema } from '../schemas/inputs.js';
 import { RecallResultSchema } from '../schemas/outputs.js';
 
 type RecallInput = z.infer<typeof RecallInputSchema>;
 
-interface EdgeRow {
-  from_hash: string;
-  to_hash: string;
-  relation_type: string;
-}
-
-interface TotalRow {
-  total: number;
-}
+const MAX_FRONTIER_SIZE = 1000;
 
 function createPlaceholders(count: number): string {
   return new Array(count).fill('?').join(',');
 }
 
-export function registerRecall(server: McpServer, db: DatabaseSync): void {
+export function registerRecall(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'recall',
     {
@@ -52,25 +49,25 @@ export function registerRecall(server: McpServer, db: DatabaseSync): void {
         const ftsQuery = sanitizeFtsQuery(params.query);
 
         const seedRows = db
-          .prepare(
+          .prepare<MemoryRow>(
             `SELECT m.* FROM memories m
              JOIN memories_fts ON memories_fts.rowid = m.rowid
              WHERE memories_fts MATCH ?
              ORDER BY memories_fts.rank
              LIMIT ? OFFSET ?`
           )
-          .all(ftsQuery, limit + 1, offset) as unknown as MemoryRow[];
+          .all(ftsQuery, limit + 1, offset);
 
         const hasMore = seedRows.length > limit;
         const pageSeeds = hasMore ? seedRows.slice(0, limit) : seedRows;
 
         const totalRow = db
-          .prepare(
+          .prepare<TotalRow>(
             `SELECT COUNT(*) AS total FROM memories m
              JOIN memories_fts ON memories_fts.rowid = m.rowid
              WHERE memories_fts MATCH ?`
           )
-          .get(ftsQuery) as unknown as TotalRow;
+          .get(ftsQuery);
 
         // Step 2: BFS traversal up to `depth` hops
         const visitedHashes = new Set<string>(pageSeeds.map((r) => r.hash));
@@ -78,13 +75,16 @@ export function registerRecall(server: McpServer, db: DatabaseSync): void {
         let frontier: string[] = pageSeeds.map((r) => r.hash);
 
         for (let hop = 0; hop < depth && frontier.length > 0; hop++) {
+          if (frontier.length > MAX_FRONTIER_SIZE) {
+            frontier = frontier.slice(0, MAX_FRONTIER_SIZE);
+          }
           const placeholders = createPlaceholders(frontier.length);
           const edgeRows = db
-            .prepare(
+            .prepare<EdgeRow>(
               `SELECT from_hash, to_hash, relation_type FROM relationships
                WHERE from_hash IN (${placeholders}) OR to_hash IN (${placeholders})`
             )
-            .all(...frontier, ...frontier) as unknown as EdgeRow[];
+            .all(...frontier, ...frontier);
 
           const nextHashes: string[] = [];
           for (const edge of edgeRows) {
@@ -110,8 +110,10 @@ export function registerRecall(server: McpServer, db: DatabaseSync): void {
         if (allHashes.length > 0) {
           const placeholders = createPlaceholders(allHashes.length);
           const memRows = db
-            .prepare(`SELECT * FROM memories WHERE hash IN (${placeholders})`)
-            .all(...allHashes) as unknown as MemoryRow[];
+            .prepare<MemoryRow>(
+              `SELECT * FROM memories WHERE hash IN (${placeholders})`
+            )
+            .all(...allHashes);
           memories = memRows.map(parseMemoryRow);
         }
 
@@ -122,7 +124,7 @@ export function registerRecall(server: McpServer, db: DatabaseSync): void {
           result: {
             memories,
             edges: allEdges,
-            total: totalRow.total,
+            total: totalRow?.total ?? 0,
             nextCursor,
           },
         });

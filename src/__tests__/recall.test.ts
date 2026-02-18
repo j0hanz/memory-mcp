@@ -1,10 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import assert from 'node:assert/strict';
-import { DatabaseSync } from 'node:sqlite';
 import { before, describe, it } from 'node:test';
 
-import { initDatabase } from '../db/index.js';
+import { initTypedDatabase } from '../db/index.js';
+import type { TypedDb } from '../db/typed.js';
 import { createServer } from '../server.js';
 import { callTool } from './helpers.js';
 
@@ -29,7 +29,7 @@ describe('recall tool', () => {
   let hashB: string;
 
   before(async () => {
-    const db: DatabaseSync = initDatabase(':memory:');
+    const db: TypedDb = initTypedDatabase(':memory:');
     server = createServer(db);
 
     // Store two memories and link them
