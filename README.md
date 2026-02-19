@@ -22,24 +22,7 @@ Memory MCP provides a local, persistent memory layer for MCP-enabled assistants.
 - **Token-budget retrieval** (`retrieve_context`) selects memories that fit a caller-specified token budget — no manual pagination needed.
 - **Strict Zod input validation** with typed output envelopes and SHA-256 hash addressing.
 - **Resource support** with `internal://instructions` (Markdown guide) and `memory://memories/{hash}` URI template with hash auto-completion.
-- **stdio transport** with clean shutdown handling (`SIGINT`, `SIGTERM`) and no HTTP endpoints.
-
-## Protocol Coverage Matrix
-
-This repository ships a specific MCP server implementation. The docs under `.github/mcp` include broader protocol reference material; use the matrix below for implementation truth in this codebase.
-
-| MCP Area                  | Repository Status              | Evidence                                                                                  |
-| ------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------- |
-| Tools                     | Implemented                    | `src/tools/index.ts` registers 13 tools                                                   |
-| Resources                 | Implemented                    | `src/resources/index.ts` exposes `internal://instructions` and `memory://memories/{hash}` |
-| Prompts                   | Implemented                    | `src/prompts/index.ts` registers `get-help`                                               |
-| Logging                   | Implemented                    | Declared in `src/server.ts` capabilities                                                  |
-| Completions               | Implemented                    | Declared in `src/server.ts`; hash completion in `src/completions/index.ts`                |
-| Progress notifications    | Implemented                    | `src/tools/progress.ts`, used by long-running tools                                       |
-| Sampling                  | Not implemented in this server | Not declared in `src/server.ts` capabilities                                              |
-| Elicitation               | Not implemented in this server | Not declared in `src/server.ts` capabilities                                              |
-| Roots                     | Not implemented in this server | Not declared in `src/server.ts` capabilities                                              |
-| Streamable HTTP transport | Not implemented in this server | Entry point uses stdio in `src/index.ts`                                                  |
+- **stdio transport** with clean shutdown handling (`SIGINT`, `SIGTERM`) and no HTTP endpoints. |
 
 ## Requirements
 
@@ -211,7 +194,7 @@ MCP client config:
 
 ## Documentation Maintenance
 
-- **Owner**: maintainers updating MCP behavior in `src/` must update `README.md` and affected `.github/mcp` mirror pages in the same PR.
+- **Owner**: maintainers updating MCP behavior in `src/` must update `README.md` and affected `mcp/` mirror pages in the same PR.
 - **Link/version policy**: use pinned `https://modelcontextprotocol.io/specification/2025-11-25/...` links for protocol references; avoid `latest` and mixed legacy targets.
 - **Drift-check checklist**:
   - Re-verify capability declarations in `src/server.ts`.
@@ -252,7 +235,7 @@ Store a new memory with content, tags, and optional type/importance. Idempotent 
 | `memory_type` | enum       | No       | `general` | `general`, `fact`, `plan`, `decision`, `reflection`, `lesson`, `error`, `gradient` |
 | `importance`  | `integer`  | No       | `0`       | Priority 0–10                                                                      |
 
-Returns: `{ ok, result: { hash, created } }`
+Returns: `{ hash, created }`
 
 ---
 
@@ -264,7 +247,7 @@ Store multiple memories in one transaction (max 50 items).
 | ------- | ------------------------ | -------- | -------------------------------------------------------------------------------------- |
 | `items` | `Array<StoreMemoryItem>` | Yes      | 1–50 items, each with `content`, `tags`, optional `memory_type`, optional `importance` |
 
-Returns: `{ ok, result: { items, succeeded, failed } }`
+Returns: `{ items, succeeded, failed }`
 
 ---
 
@@ -276,7 +259,7 @@ Retrieve one memory by its SHA-256 hash.
 | ------ | -------- | -------- | ----------------------------- |
 | `hash` | `string` | Yes      | 64-char lowercase SHA-256 hex |
 
-Returns: `{ ok, result: Memory }` or `{ ok: false, error }` on `E_NOT_FOUND`.
+Returns: `Memory` or `{ ok: false, error }` on `E_NOT_FOUND`.
 
 ---
 
@@ -290,7 +273,7 @@ Update content and optionally tags for an existing memory. Returns both hashes.
 | `content` | `string`   | Yes      | —             | Replacement content  |
 | `tags`    | `string[]` | No       | Existing tags | Replacement tags     |
 
-Returns: `{ ok, result: { old_hash, new_hash } }`
+Returns: `{ old_hash, new_hash }`
 
 ---
 
@@ -302,7 +285,7 @@ Delete one memory by hash. Cascades to related relationship rows.
 | ------ | -------- | -------- | ----------- |
 | `hash` | `string` | Yes      | Memory hash |
 
-Returns: `{ ok, result: { hash, deleted } }`
+Returns: `{ hash, deleted }`
 
 ---
 
@@ -314,7 +297,7 @@ Delete multiple memories by hash in one transaction.
 | -------- | ---------- | -------- | ------------------ |
 | `hashes` | `string[]` | Yes      | 1–50 memory hashes |
 
-Returns: `{ ok, result: { items, succeeded, failed } }`
+Returns: `{ items, succeeded, failed }`
 
 ---
 
@@ -331,7 +314,7 @@ Full-text search over memory content and tags using FTS5. Supports importance an
 | `max_importance` | `integer` | No       | —       | Only return memories with importance <= this value (0–10) |
 | `memory_type`    | enum      | No       | —       | Filter by memory type                                     |
 
-Returns: `{ ok, result: { memories, total_returned, nextCursor? } }`
+Returns: `{ memories, total_returned, nextCursor? }`
 
 ---
 
@@ -347,7 +330,7 @@ Suggested `relation_type` values: `related_to`, `causes`, `depends_on`, `parent_
 | `to_hash`       | `string` | Yes      | Target memory hash                                |
 | `relation_type` | `string` | Yes      | Edge label (1–50 chars, no whitespace, free-form) |
 
-Returns: `{ ok, result: { created } }`
+Returns: `{ created }`
 
 ---
 
@@ -361,7 +344,7 @@ Delete one directed relationship edge.
 | `to_hash`       | `string` | Yes      | Target hash       |
 | `relation_type` | `string` | Yes      | Relationship type |
 
-Returns: `{ ok, result: { deleted } }` or `{ ok: false, error }` on `E_NOT_FOUND`.
+Returns: `{ deleted }` or `{ ok: false, error }` on `E_NOT_FOUND`.
 
 ---
 
@@ -374,7 +357,7 @@ Retrieve relationships for a memory, with optional direction filter.
 | `hash`      | `string` | Yes      | —       | Memory hash                       |
 | `direction` | enum     | No       | `both`  | `outgoing`, `incoming`, or `both` |
 
-Returns: `{ ok, result: { relationships, count } }`
+Returns: `{ relationships, count }`
 
 Each relationship includes `from_hash`, `to_hash`, `relation_type`, `created_at`, `linked_hash`, `linked_content`, and `linked_tags`.
 
@@ -394,7 +377,7 @@ Search memories by full-text query, then traverse the relationship graph up to `
 | `max_importance` | `integer` | No       | —       | Seed filter: only memories with importance <= value (0–10) |
 | `memory_type`    | enum      | No       | —       | Seed filter: only memories of this type                    |
 
-Returns: `{ ok, result: { memories, graph, depth_reached, aborted?, nextCursor? } }`
+Returns: `{ memories, graph, depth_reached, aborted?, nextCursor? }`
 
 Each item in `graph` uses the shape:
 
@@ -417,7 +400,7 @@ Search memories and return relevance-ranked results that fit within a caller-spe
 | `token_budget` | `integer` | No       | `4000`      | Maximum estimated tokens to return (100–200000)                                            |
 | `strategy`     | enum      | No       | `relevance` | Sort order: `relevance` (FTS rank), `importance` (highest first), `recency` (newest first) |
 
-Returns: `{ ok, result: { memories, estimated_tokens, truncated } }`
+Returns: `{ memories, estimated_tokens, truncated }`
 
 > [!TIP]
 > Token estimation is approximate (content length ÷ 4). `truncated: true` means the budget was reached before all candidates were included.
@@ -432,17 +415,14 @@ Returns:
 
 ```json
 {
-  "ok": true,
-  "result": {
-    "memories": {
-      "total": 0,
-      "oldest": null,
-      "newest": null,
-      "avg_importance": null
-    },
-    "relationships": { "total": 0 },
-    "by_type": {}
-  }
+  "memories": {
+    "total": 0,
+    "oldest": null,
+    "newest": null,
+    "avg_importance": null
+  },
+  "relationships": { "total": 0 },
+  "by_type": {}
 }
 ```
 
@@ -496,7 +476,7 @@ Returns:
 | SQLite busy timeout             | 5000 ms                                           |
 
 > [!NOTE]
-> Cursor values are base64url-encoded offsets. Treat them as opaque tokens.
+> Cursor values are opaque base64url-encoded tokens. Treat them as opaque and do not parse them.
 
 ## Security
 

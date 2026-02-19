@@ -12,8 +12,12 @@ interface ToolCallResult {
 function getRegisteredTools(
   server: McpServer
 ): Record<string, TestToolDefinition> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (server as any)._registeredTools as Record<string, TestToolDefinition>;
+  const registry = (
+    server as unknown as {
+      _registeredTools?: Record<string, TestToolDefinition>;
+    }
+  )._registeredTools;
+  return registry ?? {};
 }
 
 export async function callTool(

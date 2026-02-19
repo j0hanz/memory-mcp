@@ -106,6 +106,27 @@ describe('recall tool', () => {
     assert.equal(edge.relation_type, 'related_to');
   });
 
+  it('rejects cursor reuse across a different query', async () => {
+    const firstPage = await callTool(server, 'recall', {
+      query: 'memory',
+      depth: 0,
+      limit: 1,
+    });
+    const first = firstPage.structuredContent as RecallResult;
+    assert.ok(first.nextCursor);
+
+    await assert.rejects(
+      () =>
+        callTool(server, 'recall', {
+          query: 'machine learning',
+          depth: 0,
+          limit: 1,
+          cursor: first.nextCursor,
+        }),
+      /E_INVALID_CURSOR/
+    );
+  });
+
   it('sets aborted when traversal exceeds edge budget', async () => {
     const insertMemory = db.prepare(
       `INSERT INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)

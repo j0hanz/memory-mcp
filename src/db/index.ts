@@ -6,6 +6,7 @@ import { createTypedDb, type TypedDb } from './typed.js';
 
 const SQLITE_TIMEOUT_MS = 5000;
 const STATEMENT_CACHE_SIZE = 1000;
+const TARGET_SCHEMA_VERSION = 2;
 const FTS5_CHECK_SQL =
   'CREATE VIRTUAL TABLE IF NOT EXISTS __fts5_check USING fts5(x); DROP TABLE __fts5_check;';
 const FTS5_REQUIRED_MESSAGE =
@@ -48,8 +49,8 @@ const SCHEMA_SQL = `
   END;
 
   CREATE TABLE IF NOT EXISTS relationships (
-    from_hash TEXT NOT NULL REFERENCES memories(hash) ON DELETE CASCADE,
-    to_hash TEXT NOT NULL REFERENCES memories(hash) ON DELETE CASCADE,
+    from_hash TEXT NOT NULL REFERENCES memories(hash) ON DELETE CASCADE ON UPDATE CASCADE,
+    to_hash TEXT NOT NULL REFERENCES memories(hash) ON DELETE CASCADE ON UPDATE CASCADE,
     relation_type TEXT NOT NULL,
     created_at TEXT NOT NULL,
     PRIMARY KEY (from_hash, to_hash, relation_type)
@@ -68,6 +69,16 @@ const SCHEMA_SQL = `
     ON relationships(to_hash);
 `;
 
+interface UserVersionRow {
+  user_version: number;
+}
+
+interface ForeignKeyRow {
+  table: string;
+  from: string;
+  on_update: string;
+}
+
 function assertFts5Available(db: DatabaseSync): void {
   try {
     db.exec(FTS5_CHECK_SQL);
@@ -84,6 +95,86 @@ function ensureParentDir(path: string): void {
   mkdirSync(dirname(path), { recursive: true });
 }
 
+function readUserVersion(db: DatabaseSync): number {
+  const row = db.prepare('PRAGMA user_version').get() as
+    | UserVersionRow
+    | undefined;
+  return row?.user_version ?? 0;
+}
+
+function writeUserVersion(db: DatabaseSync, version: number): void {
+  db.exec(`PRAGMA user_version = ${version}`);
+}
+
+function needsRelationshipsCascadeUpdateMigration(db: DatabaseSync): boolean {
+  const rows = db
+    .prepare("PRAGMA foreign_key_list('relationships')")
+    .all() as unknown as ForeignKeyRow[];
+  if (rows.length === 0) {
+    return false;
+  }
+
+  for (const row of rows) {
+    const isMemoryEdge =
+      row.table === 'memories' &&
+      (row.from === 'from_hash' || row.from === 'to_hash');
+    if (!isMemoryEdge) {
+      continue;
+    }
+
+    if (row.on_update.toUpperCase() !== 'CASCADE') {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function migrateRelationshipsCascadeUpdate(db: DatabaseSync): void {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.exec('ALTER TABLE relationships RENAME TO relationships_old');
+    db.exec(`
+      CREATE TABLE relationships (
+        from_hash TEXT NOT NULL REFERENCES memories(hash) ON DELETE CASCADE ON UPDATE CASCADE,
+        to_hash TEXT NOT NULL REFERENCES memories(hash) ON DELETE CASCADE ON UPDATE CASCADE,
+        relation_type TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (from_hash, to_hash, relation_type)
+      ) STRICT;
+    `);
+    db.exec(`
+      INSERT INTO relationships (from_hash, to_hash, relation_type, created_at)
+      SELECT from_hash, to_hash, relation_type, created_at
+      FROM relationships_old
+    `);
+    db.exec('DROP TABLE relationships_old');
+    db.exec(
+      'CREATE INDEX IF NOT EXISTS idx_relationships_from ON relationships(from_hash)'
+    );
+    db.exec(
+      'CREATE INDEX IF NOT EXISTS idx_relationships_to ON relationships(to_hash)'
+    );
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
+
+function applyMigrations(db: DatabaseSync): void {
+  const currentVersion = readUserVersion(db);
+  const needsCascadeMigration = needsRelationshipsCascadeUpdateMigration(db);
+
+  if (needsCascadeMigration) {
+    migrateRelationshipsCascadeUpdate(db);
+  }
+
+  if (currentVersion < TARGET_SCHEMA_VERSION || needsCascadeMigration) {
+    writeUserVersion(db, TARGET_SCHEMA_VERSION);
+  }
+}
+
 function configureDatabase(db: DatabaseSync): void {
   // Enable defensive mode (SQLite v3.39+ / Node 24.12+: prevents deliberate DB corruption)
   db.exec(DEFENSIVE_PRAGMA_SQL);
@@ -92,6 +183,7 @@ function configureDatabase(db: DatabaseSync): void {
   assertFts5Available(db);
 
   db.exec(SCHEMA_SQL);
+  applyMigrations(db);
 }
 
 export function initDatabase(path: string): DatabaseSync {

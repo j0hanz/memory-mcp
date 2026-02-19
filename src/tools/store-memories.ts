@@ -3,7 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
-import { E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
+import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
 import { computeMemoryHash } from '../lib/hash.js';
 import {
   createErrorResponse,
@@ -76,14 +76,19 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
             total: results.length,
             created,
           });
+          const notifications: Promise<void>[] = [];
           for (const item of results) {
             if (item.created) {
-              await notifyMemoryResourceUpdated(server, item.hash);
+              notifications.push(
+                notifyMemoryResourceUpdated(server, item.hash)
+              );
             }
           }
+          await Promise.allSettled(notifications);
 
           return createToolResponse({ items: results, succeeded, failed });
         } catch (err) {
+          rethrowMcpError(err);
           return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
         }
       },

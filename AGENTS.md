@@ -37,6 +37,7 @@
 - **Patterns Observed:**
   - Tool registration uses Zod input/output schemas plus standardized response helpers (`createToolResponse` / `createErrorResponse`) (observed in `src/tools/store-memory.ts`).
   - Database bootstrapping verifies FTS5 availability and applies full schema+indexes at startup (observed in `src/db/index.ts`).
+  - Database startup applies schema-versioned migrations via `PRAGMA user_version` (observed in `src/db/index.ts`).
   - Recall traversal uses bounded BFS safeguards (`MAX_FRONTIER_SIZE`, `MAX_EDGE_ROWS`, `MAX_VISITED_NODES`) with abort signaling (observed in `src/tools/recall.ts`).
   - Import ordering and formatting are enforced by Prettier + import-sort plugin (see `.prettierrc`, `package.json`).
 
@@ -54,9 +55,10 @@
 - **Framework:** Node test runner (`node:test`) with TS execution via `tsx/esm` in fast path (see `src/__tests__/store-memory.test.ts`, `package.json` script `test:fast`, `scripts/tasks.mjs`).
 - **Where tests live:** `src/__tests__/*.test.ts` (see `src/__tests__/`).
 - **Approach:** Tool-level tests exercise registered MCP handlers with in-memory SQLite (`:memory:`) via direct tool invocation helpers (see `src/__tests__/store-memory.test.ts`, `src/__tests__/helpers.ts`).
+- **Integration coverage:** Protocol-level e2e tests run client↔server flows through `InMemoryTransport` (see `src/__tests__/protocol-e2e.test.ts`).
 - **Build coupling:** Full `npm run test` pipeline performs build stages before running tests (see `scripts/tasks.mjs` `TestTasks.test` + `Pipeline.fullBuild`).
 - **Additional discovery:** Test runner also looks for `tests/**/*.test.ts` when a `tests/` directory exists (see `scripts/tasks.mjs` `CONFIG.test.patterns` + `findTestPatterns`).
-- **UNVERIFIED:** Separate integration/e2e test suite — no dedicated `e2e` folder or CI workflow evidence found.
+- **UNVERIFIED:** Dedicated external-system e2e suite (network/process-bound) — no separate folder/workflow evidence found.
 
 ## 7) Common Pitfalls (Optional; Verified Only)
 

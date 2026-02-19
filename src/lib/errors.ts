@@ -1,3 +1,5 @@
+import { McpError } from '@modelcontextprotocol/sdk/types.js';
+
 export const E_NOT_FOUND = 'E_NOT_FOUND';
 export const E_INVALID_CURSOR = 'E_INVALID_CURSOR';
 export const E_DB_ERROR = 'E_DB_ERROR';
@@ -8,4 +10,10 @@ export function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   if (typeof err === 'string') return err;
   return 'Unknown error occurred';
+}
+
+export function rethrowMcpError(err: unknown): void {
+  if (err instanceof McpError) {
+    throw err;
+  }
 }

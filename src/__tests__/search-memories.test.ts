@@ -108,6 +108,44 @@ describe('search_memories tool', () => {
     }
   });
 
+  it('uses opaque keyset cursor for stable pagination', async () => {
+    const firstPage = await callTool(server, 'search_memories', {
+      query: 'limit test',
+      limit: 1,
+    });
+    const first = firstPage.structuredContent as SearchResult;
+    assert.equal(first.memories.length, 1);
+    assert.ok(first.nextCursor, 'Expected nextCursor on first page');
+
+    const secondPage = await callTool(server, 'search_memories', {
+      query: 'limit test',
+      limit: 1,
+      cursor: first.nextCursor,
+    });
+    const second = secondPage.structuredContent as SearchResult;
+    assert.equal(second.memories.length, 1);
+    assert.notEqual(second.memories[0]?.hash, first.memories[0]?.hash);
+  });
+
+  it('rejects cursor reuse across a different query', async () => {
+    const firstPage = await callTool(server, 'search_memories', {
+      query: 'limit test',
+      limit: 1,
+    });
+    const first = firstPage.structuredContent as SearchResult;
+    assert.ok(first.nextCursor);
+
+    await assert.rejects(
+      () =>
+        callTool(server, 'search_memories', {
+          query: 'TypeScript',
+          limit: 1,
+          cursor: first.nextCursor,
+        }),
+      /E_INVALID_CURSOR/
+    );
+  });
+
   describe('with filters', () => {
     before(() => {
       const now = new Date().toISOString();

@@ -44,6 +44,9 @@ const SEARCH_QUERY_SCHEMA = z
   .string()
   .min(1, { error: 'Query must not be empty' })
   .max(1000, { error: 'Query must be at most 1000 characters' });
+const CURSOR_SCHEMA = z
+  .string()
+  .max(2048, { error: 'Cursor must be at most 2048 characters' });
 
 export const SUGGESTED_RELATION_TYPES = [
   'related_to',
@@ -147,10 +150,9 @@ export const SearchMemoriesInputSchema = z.strictObject({
     .optional()
     .prefault(20)
     .describe('Maximum number of results to return (default 20)'),
-  cursor: z
-    .string()
-    .optional()
-    .describe('Pagination cursor from previous response'),
+  cursor: CURSOR_SCHEMA.optional().describe(
+    'Pagination cursor from previous response'
+  ),
   min_importance: describeImportanceFilter(SEARCH_MIN_IMPORTANCE_DESCRIPTION),
   max_importance: describeImportanceFilter(SEARCH_MAX_IMPORTANCE_DESCRIPTION),
   memory_type: MEMORY_TYPE_SCHEMA.optional().describe(
@@ -174,10 +176,9 @@ export const RecallInputSchema = z.strictObject({
     .optional()
     .prefault(10)
     .describe('Maximum seed memories to retrieve (default 10)'),
-  cursor: z
-    .string()
-    .optional()
-    .describe('Pagination cursor from previous response'),
+  cursor: CURSOR_SCHEMA.optional().describe(
+    'Pagination cursor from previous response'
+  ),
   min_importance: describeImportanceFilter(RECALL_MIN_IMPORTANCE_DESCRIPTION),
   max_importance: describeImportanceFilter(RECALL_MAX_IMPORTANCE_DESCRIPTION),
   memory_type: MEMORY_TYPE_SCHEMA.optional().describe(

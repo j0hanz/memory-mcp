@@ -6,8 +6,13 @@ import process from 'node:process';
 import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
-import { E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
-import { decodeCursor, encodeCursor, splitPage } from '../lib/pagination.js';
+import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
+import { splitPage } from '../lib/pagination.js';
+import {
+  buildSearchCursorScope,
+  decodeSearchCursor,
+  encodeSearchCursor,
+} from '../lib/search-cursor.js';
 import {
   buildAndWhereClause,
   buildFilterClauses,
@@ -77,21 +82,55 @@ function loadSeedRows(
   db: TypedDb,
   query: string,
   limit: number,
-  offset: number,
+  cursor:
+    | {
+        mode: 'offset';
+        offset: number;
+      }
+    | {
+        mode: 'keyset';
+        rank: number;
+        hash: string;
+      }
+    | undefined,
   filters: MemoryFilters
 ): MemoryRow[] {
   const ftsQuery = sanitizeFtsQuery(query);
   const filter = buildFilterClauses(filters);
   const whereExtra = buildAndWhereClause(filter.clauses);
+  if (!cursor || cursor.mode === 'offset') {
+    const offset = cursor?.offset ?? 0;
+    return db
+      .prepareOnce<MemoryRow>(
+        `SELECT m.*, memories_fts.rank AS rank FROM memories m
+         JOIN memories_fts ON memories_fts.rowid = m.rowid
+         WHERE memories_fts MATCH ?${whereExtra}
+         ORDER BY memories_fts.rank, m.hash
+         LIMIT ? OFFSET ?`
+      )
+      .all(ftsQuery, ...filter.params, limit + 1, offset);
+  }
+
   return db
     .prepareOnce<MemoryRow>(
       `SELECT m.*, memories_fts.rank AS rank FROM memories m
        JOIN memories_fts ON memories_fts.rowid = m.rowid
        WHERE memories_fts MATCH ?${whereExtra}
-       ORDER BY memories_fts.rank
-       LIMIT ? OFFSET ?`
+         AND (
+           memories_fts.rank > ?
+           OR (memories_fts.rank = ? AND m.hash > ?)
+         )
+       ORDER BY memories_fts.rank, m.hash
+       LIMIT ?`
     )
-    .all(ftsQuery, ...filter.params, limit + 1, offset);
+    .all(
+      ftsQuery,
+      ...filter.params,
+      cursor.rank,
+      cursor.rank,
+      cursor.hash,
+      limit + 1
+    );
 }
 
 function traverseGraph(
@@ -264,7 +303,11 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
     },
     async (params: RecallInput, extra) => {
       const { depth, limit, cursor } = params;
-      const offset = cursor ? decodeCursor(cursor) : 0;
+      const filters = toMemoryFilters(params);
+      const scope = buildSearchCursorScope(params.query, filters);
+      const decodedCursor = cursor
+        ? decodeSearchCursor(cursor, scope)
+        : undefined;
       const contextLabel = `⊙ recall: ${params.query} [depth ${depth}]`;
       const completionCurrent = depth + 1;
 
@@ -291,8 +334,8 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
           db,
           params.query,
           limit,
-          offset,
-          toMemoryFilters(params)
+          decodedCursor,
+          filters
         );
         const { page: pageSeeds, hasMore } = splitPage(seedRows, limit);
 
@@ -322,7 +365,14 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
           memories.push(memory);
         }
 
-        const nextCursor = hasMore ? encodeCursor(offset + limit) : undefined;
+        let nextCursor: string | undefined;
+        if (hasMore && pageSeeds.length > 0) {
+          const lastSeed = pageSeeds[pageSeeds.length - 1];
+          if (lastSeed !== undefined) {
+            const rank = lastSeed.rank ?? 0;
+            nextCursor = encodeSearchCursor(scope, rank, lastSeed.hash);
+          }
+        }
 
         result = createToolResponse({
           memories,
@@ -332,6 +382,7 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
           ...(nextCursor ? { nextCursor } : {}),
         });
       } catch (err) {
+        rethrowMcpError(err);
         result = createErrorResponse(E_UNKNOWN, getErrorMessage(err));
       }
 

@@ -1,10 +1,11 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
-import { E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
+import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
 import { sanitizeFtsQuery } from '../lib/search.js';
 import {
   createErrorResponse,
@@ -104,6 +105,14 @@ function formatCompletionMessage(
   return `⊙ retrieve_context: ${query} • ${memoriesCount} memories, ${estimatedTokens} tokens${truncated}`;
 }
 
+function throwIfAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) {
+    return;
+  }
+
+  throw new McpError(ErrorCode.RequestTimeout, 'Request cancelled');
+}
+
 export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'retrieve_context',
@@ -127,6 +136,7 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
 
       let result: CallToolResult;
       try {
+        throwIfAborted(extra.signal);
         const orderBy = ORDER_BY_MAP[strategy];
         const rows = loadContextRows(db, query, orderBy);
         const rowCapExceeded = rows.length > RETRIEVE_CONTEXT_LIMIT;
@@ -146,6 +156,7 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
         let scanned = 0;
 
         for (let i = 0; i < candidateCount; i += 1) {
+          throwIfAborted(extra.signal);
           const row = rows[i];
           if (row === undefined) {
             break;
@@ -171,6 +182,7 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
           truncated,
         });
       } catch (err) {
+        rethrowMcpError(err);
         result = createErrorResponse(E_UNKNOWN, getErrorMessage(err));
       }
 

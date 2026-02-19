@@ -21,7 +21,11 @@ export async function logToolEvent(
     return;
   }
 
-  await server.sendLoggingMessage({ level, logger, data });
+  try {
+    await server.sendLoggingMessage({ level, logger, data });
+  } catch {
+    // best-effort logging
+  }
 }
 
 export function nowIso(): string {

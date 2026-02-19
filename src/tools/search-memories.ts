@@ -3,8 +3,13 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
-import { E_UNKNOWN, getErrorMessage } from '../lib/errors.js';
-import { decodeCursor, encodeCursor, splitPage } from '../lib/pagination.js';
+import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
+import { splitPage } from '../lib/pagination.js';
+import {
+  buildSearchCursorScope,
+  decodeSearchCursor,
+  encodeSearchCursor,
+} from '../lib/search-cursor.js';
 import {
   buildAndWhereClause,
   buildFilterClauses,
@@ -28,21 +33,55 @@ function loadSearchRows(
   db: TypedDb,
   query: string,
   limit: number,
-  offset: number,
+  cursor:
+    | {
+        mode: 'offset';
+        offset: number;
+      }
+    | {
+        mode: 'keyset';
+        rank: number;
+        hash: string;
+      }
+    | undefined,
   filters: MemoryFilters
 ): MemoryRow[] {
   const ftsQuery = sanitizeFtsQuery(query);
   const filter = buildFilterClauses(filters);
   const whereExtra = buildAndWhereClause(filter.clauses);
+  if (!cursor || cursor.mode === 'offset') {
+    const offset = cursor?.offset ?? 0;
+    return db
+      .prepareOnce<MemoryRow>(
+        `SELECT m.*, memories_fts.rank AS rank FROM memories m
+         JOIN memories_fts ON memories_fts.rowid = m.rowid
+         WHERE memories_fts MATCH ?${whereExtra}
+         ORDER BY memories_fts.rank, m.hash
+         LIMIT ? OFFSET ?`
+      )
+      .all(ftsQuery, ...filter.params, limit + 1, offset);
+  }
+
   return db
     .prepareOnce<MemoryRow>(
       `SELECT m.*, memories_fts.rank AS rank FROM memories m
        JOIN memories_fts ON memories_fts.rowid = m.rowid
        WHERE memories_fts MATCH ?${whereExtra}
-       ORDER BY memories_fts.rank
-       LIMIT ? OFFSET ?`
+         AND (
+           memories_fts.rank > ?
+           OR (memories_fts.rank = ? AND m.hash > ?)
+         )
+       ORDER BY memories_fts.rank, m.hash
+       LIMIT ?`
     )
-    .all(ftsQuery, ...filter.params, limit + 1, offset);
+    .all(
+      ftsQuery,
+      ...filter.params,
+      cursor.rank,
+      cursor.rank,
+      cursor.hash,
+      limit + 1
+    );
 }
 
 export function registerSearchMemories(server: McpServer, db: TypedDb): void {
@@ -60,13 +99,17 @@ export function registerSearchMemories(server: McpServer, db: TypedDb): void {
       (params: SearchInput) => {
         try {
           const { limit, cursor } = params;
-          const offset = cursor ? decodeCursor(cursor) : 0;
+          const filters = toMemoryFilters(params);
+          const scope = buildSearchCursorScope(params.query, filters);
+          const decodedCursor = cursor
+            ? decodeSearchCursor(cursor, scope)
+            : undefined;
           const rows = loadSearchRows(
             db,
             params.query,
             limit,
-            offset,
-            toMemoryFilters(params)
+            decodedCursor,
+            filters
           );
           const { page: pageRows, hasMore } = splitPage(rows, limit);
 
@@ -74,7 +117,14 @@ export function registerSearchMemories(server: McpServer, db: TypedDb): void {
           for (const row of pageRows) {
             memories.push(parseMemoryRow(row));
           }
-          const nextCursor = hasMore ? encodeCursor(offset + limit) : undefined;
+          let nextCursor: string | undefined;
+          if (hasMore && pageRows.length > 0) {
+            const lastRow = pageRows[pageRows.length - 1];
+            if (lastRow !== undefined) {
+              const rank = lastRow.rank ?? 0;
+              nextCursor = encodeSearchCursor(scope, rank, lastRow.hash);
+            }
+          }
 
           return createToolResponse({
             memories,
@@ -82,6 +132,7 @@ export function registerSearchMemories(server: McpServer, db: TypedDb): void {
             ...(nextCursor ? { nextCursor } : {}),
           });
         } catch (err) {
+          rethrowMcpError(err);
           return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
         }
       },
