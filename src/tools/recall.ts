@@ -1,5 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import {
+  type CallToolResult,
+  McpError,
+} from '@modelcontextprotocol/sdk/types.js';
 
 import process from 'node:process';
 
@@ -246,9 +249,6 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
       const { depth, limit, cursor } = params;
       const filters = toMemoryFilters(params);
       const scope = buildSearchCursorScope(params.query, filters);
-      const decodedCursor = cursor
-        ? decodeSearchCursor(cursor, scope)
-        : undefined;
       const contextLabel = `⊙ recall: ${params.query} [depth ${depth}]`;
       const completionCurrent = depth + 1;
 
@@ -261,15 +261,20 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
       const hopReporter = progressWithMessage(
         createProgressReporter(extra),
         ({ current, total }) =>
-          `⊙ recall: ${params.query} [hop ${current}/${total ?? current}]`
+          `⊙ recall: ${params.query} [hop ${current}/${Math.max((total ?? current) - 1, current)}]`
       );
 
-      const onHop: ProgressNotifier = (hop: number, total: number): void => {
-        hopReporter({ current: hop + 1, total });
+      const onHop: ProgressNotifier = (hop: number): void => {
+        hopReporter({ current: hop + 1, total: completionCurrent });
       };
 
-      let result: CallToolResult;
+      let result: CallToolResult | undefined;
+      let thrownError: McpError | undefined;
       try {
+        const decodedCursor = cursor
+          ? decodeSearchCursor(cursor, scope)
+          : undefined;
+
         // Step 1: FTS seed search
         const seedRows = loadRankedSearchRows(
           db,
@@ -322,17 +327,30 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
           ...(nextCursor ? { nextCursor } : {}),
         });
       } catch (err) {
-        rethrowMcpError(err);
-        result = createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+        if (err instanceof McpError) {
+          thrownError = err;
+        } else {
+          rethrowMcpError(err);
+          result = createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+        }
       }
+
+      await hopReporter.flush();
+
+      const completionResult =
+        result ?? createErrorResponse(E_UNKNOWN, getErrorMessage(thrownError));
 
       await notifyProgress(extra, {
         current: completionCurrent,
         total: completionCurrent,
-        message: formatRecallCompletionMessage(params.query, result),
+        message: formatRecallCompletionMessage(params.query, completionResult),
       });
 
-      return result;
+      if (thrownError) {
+        throw thrownError;
+      }
+
+      return completionResult;
     }
   );
 }

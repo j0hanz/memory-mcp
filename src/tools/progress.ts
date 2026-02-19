@@ -24,6 +24,17 @@ interface ProgressReporterOptions {
   minIntervalMs?: number;
 }
 
+interface ProgressSnapshot {
+  current: number;
+  total?: number;
+}
+
+export type ProgressReporter<
+  TProgress extends ProgressSnapshot = ProgressUpdate,
+> = ((progress: TProgress) => void) & {
+  flush: () => Promise<void>;
+};
+
 interface WrappedHandlerOptions<TArgs> {
   completionMessage?: (args: TArgs, result: CallToolResult) => string;
   progressMessage: (args: TArgs) => string;
@@ -112,13 +123,14 @@ export async function notifyProgress(
 export function createProgressReporter(
   extra: ProgressContext,
   options: ProgressReporterOptions = {}
-): (progress: ProgressUpdate) => void {
+): ProgressReporter {
   const minIntervalMs = options.minIntervalMs ?? DEFAULT_PROGRESS_INTERVAL_MS;
   let lastCurrent = 0;
   let lastReportedAt = 0;
   let isCompleted = false;
+  let notificationChain: Promise<void> = Promise.resolve();
 
-  return (progress: ProgressUpdate): void => {
+  const reporter = ((progress: ProgressUpdate): void => {
     if (isCompleted) {
       return;
     }
@@ -148,15 +160,23 @@ export function createProgressReporter(
       payload.message = progress.message;
     }
 
-    void notifyProgress(extra, payload);
+    notificationChain = notificationChain.then(() =>
+      notifyProgress(extra, payload)
+    );
+  }) as ProgressReporter;
+
+  reporter.flush = async (): Promise<void> => {
+    await notificationChain;
   };
+
+  return reporter;
 }
 
 export function progressWithMessage(
-  reporter: (progress: ProgressUpdate) => void,
-  getMessage: (progress: { current: number; total?: number }) => string
-): (progress: { current: number; total?: number }) => void {
-  return ({ current, total }): void => {
+  reporter: ProgressReporter,
+  getMessage: (progress: ProgressSnapshot) => string
+): ProgressReporter<ProgressSnapshot> {
+  const wrapped = (({ current, total }: ProgressSnapshot): void => {
     const message = getMessage(
       total === undefined ? { current } : { current, total }
     );
@@ -165,7 +185,11 @@ export function progressWithMessage(
       ...(total === undefined ? {} : { total }),
       message,
     });
-  };
+  }) as ProgressReporter<ProgressSnapshot>;
+
+  wrapped.flush = (): Promise<void> => reporter.flush();
+
+  return wrapped;
 }
 
 export function wrapToolHandler<TArgs>(

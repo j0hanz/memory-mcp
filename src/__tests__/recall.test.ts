@@ -6,7 +6,7 @@ import { before, describe, it } from 'node:test';
 import { initTypedDatabase } from '../db/index.js';
 import type { TypedDb } from '../db/typed.js';
 import { createServer } from '../server.js';
-import { callTool } from './helpers.js';
+import { callTool, callToolWithProgress } from './helpers.js';
 
 interface RecallResult {
   memories: Array<{
@@ -178,6 +178,70 @@ describe('recall tool', () => {
     const data = result.structuredContent as RecallResult;
     assert.equal(data.aborted, true);
     assert.ok(data.graph.length > 0);
+  });
+
+  it('emits aligned hop/completion totals and monotonic progress', async () => {
+    const outcome = await callToolWithProgress(server, 'recall', {
+      query: 'machine learning',
+      depth: 1,
+    });
+    assert.equal(outcome.error, undefined);
+
+    const progress = outcome.notifications.map((notification) => {
+      const { params } = notification;
+      return {
+        current: params.progress,
+        total: params.total,
+      };
+    });
+
+    assert.ok(progress.length >= 3);
+    assert.equal(progress[0]?.current, 0);
+    assert.equal(progress[0]?.total, 2);
+
+    const final = progress[progress.length - 1];
+    assert.equal(final?.current, 2);
+    assert.equal(final?.total, 2);
+
+    for (const entry of progress) {
+      assert.equal(entry.total, 2);
+    }
+
+    for (let i = 1; i < progress.length; i += 1) {
+      assert.ok(
+        progress[i]!.current >= progress[i - 1]!.current,
+        `Expected monotonic progress: ${progress[i - 1]!.current} -> ${progress[i]!.current}`
+      );
+    }
+  });
+
+  it('emits completion progress when cursor decode throws', async () => {
+    const firstPage = await callTool(server, 'recall', {
+      query: 'memory',
+      depth: 0,
+      limit: 1,
+    });
+    const payload = firstPage.structuredContent as RecallResult;
+    assert.ok(payload.nextCursor);
+
+    const outcome = await callToolWithProgress(server, 'recall', {
+      query: 'different query text',
+      depth: 0,
+      limit: 1,
+      cursor: payload.nextCursor,
+    });
+
+    assert.ok(outcome.error instanceof Error);
+    assert.match(outcome.error.message, /E_INVALID_CURSOR/);
+    assert.ok(outcome.notifications.length >= 2);
+
+    const first = outcome.notifications[0]?.params;
+    const final =
+      outcome.notifications[outcome.notifications.length - 1]?.params;
+    assert.equal(first?.progress, 0);
+    assert.equal(first?.total, 1);
+    assert.equal(final?.progress, 1);
+    assert.equal(final?.total, 1);
   });
 
   describe('with filters', () => {

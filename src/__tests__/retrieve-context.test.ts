@@ -6,7 +6,7 @@ import { before, describe, it } from 'node:test';
 import { initTypedDatabase } from '../db/index.js';
 import type { TypedDb } from '../db/typed.js';
 import { createServer } from '../server.js';
-import { callTool } from './helpers.js';
+import { callTool, callToolWithProgress } from './helpers.js';
 
 interface RetrieveContextResult {
   memories: Array<{
@@ -28,9 +28,7 @@ describe('retrieve_context tool', () => {
     server = createServer(db);
 
     const now = new Date().toISOString();
-    // Content is 210 chars each → ceil(210/4) = 53 tokens
-    // With token_budget=100: first memory accepted (0+53=53<=100),
-    // second memory truncates (53+53=106 > 100)
+    // Insert test memories with varying importance but identical content to verify relevance ranking and token counting. Content is padded to ensure multiple tokens per memory for truncation testing.
     const suffix = 'filler '.repeat(27) + 'end'; // 27×7 + 3 = 192 chars
 
     // High-importance memory relevant to 'context retrieval'
@@ -147,5 +145,45 @@ describe('retrieve_context tool', () => {
     const data = result.structuredContent as RetrieveContextResult;
     assert.equal(data.truncated, true);
     assert.equal(data.memories.length, 200);
+  });
+
+  it('keeps scan/final totals aligned in progress updates', async () => {
+    const outcome = await callToolWithProgress(server, 'retrieve_context', {
+      query: 'context retrieval',
+      token_budget: 100000,
+    });
+    assert.equal(outcome.error, undefined);
+
+    const withTotals = outcome.notifications
+      .map((notification) => notification.params)
+      .filter((params) => params.total !== undefined);
+
+    assert.ok(withTotals.length >= 2);
+    const finalTotal = withTotals[withTotals.length - 1]?.total;
+    for (const params of withTotals) {
+      assert.equal(params.total, finalTotal);
+    }
+
+    const final = withTotals[withTotals.length - 1];
+    assert.equal(final?.progress, final?.total);
+  });
+
+  it('emits completion progress when request is cancelled', async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const outcome = await callToolWithProgress(
+      server,
+      'retrieve_context',
+      { query: 'context retrieval' },
+      { signal: controller.signal }
+    );
+    assert.ok(outcome.error instanceof Error);
+    assert.match(outcome.error.message, /Request cancelled/);
+    assert.ok(outcome.notifications.length >= 2);
+
+    const final =
+      outcome.notifications[outcome.notifications.length - 1]?.params;
+    assert.equal(final?.progress, final?.total);
   });
 });

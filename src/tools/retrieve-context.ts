@@ -134,12 +134,20 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
       const tokenBudget = params.token_budget;
       const contextLabel = `⊙ retrieve_context: ${query} [${strategy}]`;
       let completionCurrent = 1;
+
       await notifyProgress(extra, {
         current: 0,
         message: `${contextLabel} [budget ${tokenBudget}]`,
       });
 
-      let result: CallToolResult;
+      const loopProgress = progressWithMessage(
+        createProgressReporter(extra),
+        ({ current, total }) =>
+          `${contextLabel} [scan ${current}/${Math.max((total ?? current) - 1, current)}]`
+      );
+
+      let result: CallToolResult | undefined;
+      let thrownError: McpError | undefined;
       try {
         throwIfAborted(extra.signal);
         const orderBy = ORDER_BY_MAP[strategy];
@@ -148,12 +156,7 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
         const candidateCount = rowCapExceeded
           ? RETRIEVE_CONTEXT_LIMIT
           : rows.length;
-
-        const loopProgress = progressWithMessage(
-          createProgressReporter(extra),
-          ({ current, total }) =>
-            `${contextLabel} [scan ${current}/${total ?? current}]`
-        );
+        completionCurrent = candidateCount + 1;
 
         let estimatedTokens = 0;
         let truncated = rowCapExceeded;
@@ -169,7 +172,12 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
           const mem = parseMemoryRow(row);
           const tokens = estimateTokens(mem.content);
           scanned += 1;
-          reportSelectionProgress(loopProgress, scanned, candidateCount, false);
+          reportSelectionProgress(
+            loopProgress,
+            scanned,
+            completionCurrent,
+            false
+          );
           if (estimatedTokens + tokens > tokenBudget) {
             truncated = true;
             break;
@@ -178,8 +186,7 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
           selected.push(mem);
         }
 
-        reportSelectionProgress(loopProgress, scanned, candidateCount, true);
-        completionCurrent = candidateCount + 1;
+        reportSelectionProgress(loopProgress, scanned, completionCurrent, true);
 
         result = createToolResponse({
           memories: selected,
@@ -187,17 +194,30 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
           truncated,
         });
       } catch (err) {
-        rethrowMcpError(err);
-        result = createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+        if (err instanceof McpError) {
+          thrownError = err;
+        } else {
+          rethrowMcpError(err);
+          result = createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+        }
       }
+
+      await loopProgress.flush();
+
+      const completionResult =
+        result ?? createErrorResponse(E_UNKNOWN, getErrorMessage(thrownError));
 
       await notifyProgress(extra, {
         current: completionCurrent,
         total: completionCurrent,
-        message: formatCompletionMessage(query, result),
+        message: formatCompletionMessage(query, completionResult),
       });
 
-      return result;
+      if (thrownError) {
+        throw thrownError;
+      }
+
+      return completionResult;
     }
   );
 }
