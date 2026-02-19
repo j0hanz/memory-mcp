@@ -5,6 +5,7 @@ import { findPackageJSON } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 import type { TypedDb } from './db/typed.js';
+import { loadInstructions } from './lib/instructions.js';
 import { registerAllPrompts } from './prompts/index.js';
 import { registerAllResources } from './resources/index.js';
 import { registerAllTools } from './tools/index.js';
@@ -82,6 +83,7 @@ function createIconDescriptors(): IconDescriptor[] | undefined {
 export function createServer(db: TypedDb): McpServer {
   const { version } = loadPackageManifest();
   const icons = createIconDescriptors();
+  const instructions = loadInstructions();
   const server = new McpServer(
     {
       name: SERVER_NAME,
@@ -90,6 +92,7 @@ export function createServer(db: TypedDb): McpServer {
     },
     {
       capabilities: SERVER_CAPABILITIES,
+      instructions,
     }
   );
 
