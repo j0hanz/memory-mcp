@@ -70,7 +70,10 @@ export function registerSearchMemories(server: McpServer, db: TypedDb): void {
           );
           const { page: pageRows, hasMore } = splitPage(rows, limit);
 
-          const memories: Memory[] = pageRows.map(parseMemoryRow);
+          const memories: Memory[] = [];
+          for (const row of pageRows) {
+            memories.push(parseMemoryRow(row));
+          }
           const nextCursor = hasMore ? encodeCursor(offset + limit) : undefined;
 
           return createToolResponse({

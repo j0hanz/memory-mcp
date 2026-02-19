@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 const BASE_DIR = fileURLToPath(new URL('.', import.meta.url));
 const FALLBACK_INSTRUCTIONS =
   '# Memory instructions\n\nSee the README for usage details.';
+let cachedInstructions: string | undefined;
 
 function getInstructionPaths(): string[] {
   return [
@@ -14,13 +15,20 @@ function getInstructionPaths(): string[] {
 }
 
 export function loadInstructions(): string {
+  if (cachedInstructions !== undefined) {
+    return cachedInstructions;
+  }
+
   const paths = getInstructionPaths();
   for (const p of paths) {
     try {
-      return readFileSync(p, 'utf8');
+      cachedInstructions = readFileSync(p, 'utf8');
+      return cachedInstructions;
     } catch {
       // try next path
     }
   }
-  return FALLBACK_INSTRUCTIONS;
+
+  cachedInstructions = FALLBACK_INSTRUCTIONS;
+  return cachedInstructions;
 }

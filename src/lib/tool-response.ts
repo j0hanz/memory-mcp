@@ -27,11 +27,16 @@ function buildResponse(
   structured: Record<string, unknown>,
   isError = false
 ): CallToolResult {
-  return {
+  const response: CallToolResult = {
     content: [toTextContent(structured)],
     structuredContent: structured,
-    ...(isError ? { isError: true } : {}),
   };
+
+  if (isError) {
+    response.isError = true;
+  }
+
+  return response;
 }
 
 export function createToolResponse(

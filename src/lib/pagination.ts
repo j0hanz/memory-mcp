@@ -60,5 +60,5 @@ export function splitPage<T>(rows: readonly T[], limit: number): PageSlice<T> {
     return { page: rows.slice(0, limit), hasMore: true };
   }
 
-  return { page: [...rows], hasMore: false };
+  return { page: rows.slice(), hasMore: false };
 }

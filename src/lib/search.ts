@@ -56,5 +56,10 @@ export function buildAndWhereClause(clauses: readonly string[]): string {
     return '';
   }
 
-  return ` ${clauses.map((clause) => `AND ${clause}`).join(' ')}`;
+  let sql = '';
+  for (const clause of clauses) {
+    sql += ` AND ${clause}`;
+  }
+
+  return sql;
 }

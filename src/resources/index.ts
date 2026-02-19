@@ -31,7 +31,7 @@ function getSingleVariable(
 
 function readMemoryByHash(db: TypedDb, hash: string): MemoryRow | undefined {
   return db
-    .prepare<MemoryRow>('SELECT * FROM memories WHERE hash = ?')
+    .prepareOnce<MemoryRow>('SELECT * FROM memories WHERE hash = ?')
     .get(hash);
 }
 

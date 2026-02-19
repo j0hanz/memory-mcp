@@ -64,7 +64,13 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
             return items;
           });
 
-          const created = results.filter((r) => r.created).length;
+          let created = 0;
+          for (const item of results) {
+            if (item.created) {
+              created += 1;
+            }
+          }
+
           const { succeeded, failed } = summarizeBatch(results);
           await logToolEvent(server, 'store_memories', {
             total: results.length,

@@ -48,12 +48,20 @@ function toNotificationParams(
   progressToken: ProgressToken,
   progress: ProgressUpdate
 ): ProgressNotification['params'] {
-  return {
+  const params: ProgressNotification['params'] = {
     progressToken,
     progress: progress.current,
-    ...(progress.total !== undefined ? { total: progress.total } : {}),
-    ...(progress.message !== undefined ? { message: progress.message } : {}),
   };
+
+  if (progress.total !== undefined) {
+    params.total = progress.total;
+  }
+
+  if (progress.message !== undefined) {
+    params.message = progress.message;
+  }
+
+  return params;
 }
 
 function isFailedResult(result: CallToolResult): boolean {
@@ -132,11 +140,15 @@ export function createProgressReporter(
     isCompleted =
       progress.total !== undefined && monotonicCurrent >= progress.total;
 
-    void notifyProgress(extra, {
-      current: monotonicCurrent,
-      ...(progress.total !== undefined ? { total: progress.total } : {}),
-      ...(progress.message !== undefined ? { message: progress.message } : {}),
-    });
+    const payload: ProgressUpdate = { current: monotonicCurrent };
+    if (progress.total !== undefined) {
+      payload.total = progress.total;
+    }
+    if (progress.message !== undefined) {
+      payload.message = progress.message;
+    }
+
+    void notifyProgress(extra, payload);
   };
 }
 
@@ -145,14 +157,18 @@ export function progressWithMessage(
   getMessage: (progress: { current: number; total?: number }) => string
 ): (progress: { current: number; total?: number }) => void {
   return ({ current, total }): void => {
-    const message = getMessage({
-      current,
-      ...(total !== undefined ? { total } : {}),
-    });
+    if (total === undefined) {
+      reporter({
+        current,
+        message: getMessage({ current }),
+      });
+      return;
+    }
+
     reporter({
       current,
-      ...(total !== undefined ? { total } : {}),
-      message,
+      total,
+      message: getMessage({ current, total }),
     });
   };
 }

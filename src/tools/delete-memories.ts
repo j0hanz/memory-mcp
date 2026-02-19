@@ -52,13 +52,18 @@ export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
             return items;
           });
 
-          const deleted = results.filter((r) => r.deleted).length;
+          let deleted = 0;
+          for (const item of results) {
+            if (item.deleted) {
+              deleted += 1;
+            }
+          }
+
           const { succeeded, failed } = summarizeBatch(results);
           await logToolEvent(server, 'delete_memories', {
             total: params.hashes.length,
             deleted,
           });
-
           for (const item of results) {
             if (item.deleted) {
               await notifyMemoryResourceUpdated(server, item.hash);

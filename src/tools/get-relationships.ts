@@ -91,11 +91,20 @@ export function registerGetRelationships(server: McpServer, db: TypedDb): void {
           }
 
           const directions = DIRECTIONS_BY_MODE[params.direction];
-          const rows = directions.flatMap((direction) =>
-            loadRelationships(db, params.hash, direction)
-          );
+          const rows: RelWithLinkedMemory[] = [];
+          for (const direction of directions) {
+            const directionRows = loadRelationships(db, params.hash, direction);
+            for (const row of directionRows) {
+              rows.push(row);
+            }
+          }
 
-          const relationships = rows.map(toRelationshipWithMemory);
+          const relationships = new Array<RelationshipWithMemory>(rows.length);
+          let index = 0;
+          for (const row of rows) {
+            relationships[index] = toRelationshipWithMemory(row);
+            index += 1;
+          }
 
           return createToolResponse({
             relationships,

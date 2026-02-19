@@ -50,8 +50,7 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
             );
           }
 
-          const existingTags = parseTags(existing.tags);
-          const newTags = params.tags ?? existingTags;
+          const newTags = params.tags ?? parseTags(existing.tags);
           const newHash = computeMemoryHash(params.content, newTags);
           const now = nowIso();
 

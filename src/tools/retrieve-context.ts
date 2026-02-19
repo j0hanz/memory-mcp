@@ -76,11 +76,12 @@ function formatCompletionMessage(
   query: string,
   result: CallToolResult
 ): string {
+  const failedMessage = `⊙ retrieve_context: ${query} • failed`;
   if (result.isError) {
-    return `⊙ retrieve_context: ${query} • failed`;
+    return failedMessage;
   }
   if (!isOkStructuredToolResult(result)) {
-    return `⊙ retrieve_context: ${query} • failed`;
+    return failedMessage;
   }
 
   const payload = getToolResultPayload(result);
@@ -129,9 +130,9 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
         const orderBy = ORDER_BY_MAP[strategy];
         const rows = loadContextRows(db, query, orderBy);
         const rowCapExceeded = rows.length > RETRIEVE_CONTEXT_LIMIT;
-        const candidateRows = rowCapExceeded
-          ? rows.slice(0, RETRIEVE_CONTEXT_LIMIT)
-          : rows;
+        const candidateCount = rowCapExceeded
+          ? RETRIEVE_CONTEXT_LIMIT
+          : rows.length;
 
         const loopProgress = progressWithMessage(
           createProgressReporter(extra),
@@ -144,16 +145,15 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
         const selected: Memory[] = [];
         let scanned = 0;
 
-        for (const row of candidateRows) {
+        for (let i = 0; i < candidateCount; i += 1) {
+          const row = rows[i];
+          if (row === undefined) {
+            break;
+          }
           const mem = parseMemoryRow(row);
           const tokens = estimateTokens(mem.content);
           scanned += 1;
-          reportSelectionProgress(
-            loopProgress,
-            scanned,
-            candidateRows.length,
-            false
-          );
+          reportSelectionProgress(loopProgress, scanned, candidateCount, false);
           if (estimatedTokens + tokens > tokenBudget) {
             truncated = true;
             break;
@@ -162,13 +162,8 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
           selected.push(mem);
         }
 
-        reportSelectionProgress(
-          loopProgress,
-          scanned,
-          candidateRows.length,
-          true
-        );
-        completionCurrent = candidateRows.length + 1;
+        reportSelectionProgress(loopProgress, scanned, candidateCount, true);
+        completionCurrent = candidateCount + 1;
 
         result = createToolResponse({
           memories: selected,

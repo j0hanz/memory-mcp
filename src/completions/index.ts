@@ -16,9 +16,15 @@ export function createHashCompletionCallback(
   return (value: string): string[] => {
     const escapedPrefix = normalizeHashPrefix(value);
     const rows = db
-      .prepare<HashRow>(HASH_COMPLETION_SQL)
+      .prepareOnce<HashRow>(HASH_COMPLETION_SQL)
       .all(`${escapedPrefix}%`);
-    return rows.map((r) => r.hash);
+    const hashes = new Array<string>(rows.length);
+    let index = 0;
+    for (const row of rows) {
+      hashes[index] = row.hash;
+      index += 1;
+    }
+    return hashes;
   };
 }
 

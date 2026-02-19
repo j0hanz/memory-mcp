@@ -17,6 +17,5 @@ export function getToolResultPayload(
     return undefined;
   }
 
-  const structured = result.structuredContent;
-  return isRecord(structured) ? structured : undefined;
+  return result.structuredContent;
 }

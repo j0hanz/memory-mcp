@@ -87,18 +87,22 @@ export interface HashRow {
   hash: string;
 }
 
-function asStringArray(value: unknown): string[] | undefined {
-  if (!Array.isArray(value)) {
-    return undefined;
-  }
-
-  return value.every((entry) => typeof entry === 'string') ? value : undefined;
-}
-
 export function parseTags(tagsJson: string): string[] {
   try {
     const parsed: unknown = JSON.parse(tagsJson);
-    return asStringArray(parsed) ?? [];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    const tags: string[] = [];
+    for (const entry of parsed) {
+      if (typeof entry !== 'string') {
+        return [];
+      }
+      tags.push(entry);
+    }
+
+    return tags;
   } catch {
     return [];
   }
@@ -106,7 +110,7 @@ export function parseTags(tagsJson: string): string[] {
 
 export function parseMemoryRow(row: MemoryRow): Memory {
   const relevance = row.rank != null ? -row.rank : undefined;
-  return {
+  const memory: Memory = {
     hash: row.hash,
     content: row.content,
     tags: parseTags(row.tags),
@@ -114,6 +118,11 @@ export function parseMemoryRow(row: MemoryRow): Memory {
     importance: row.importance,
     created_at: row.created_at,
     updated_at: row.updated_at,
-    ...(relevance != null ? { relevance } : {}),
   };
+
+  if (relevance != null) {
+    memory.relevance = relevance;
+  }
+
+  return memory;
 }

@@ -58,7 +58,13 @@ export function summarizeBatch(items: readonly BatchItemResult[]): {
   succeeded: number;
   failed: number;
 } {
-  const succeeded = items.filter((item) => item.ok).length;
+  let succeeded = 0;
+  for (const item of items) {
+    if (item.ok) {
+      succeeded += 1;
+    }
+  }
+
   return { succeeded, failed: items.length - succeeded };
 }
 

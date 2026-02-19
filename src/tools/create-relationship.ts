@@ -10,12 +10,14 @@ import {
 } from '../lib/tool-response.js';
 import { CreateRelationshipInputSchema } from '../schemas/inputs.js';
 import { CreateRelationshipResultSchema } from '../schemas/outputs.js';
-import { logToolEvent, memoryExists, nowIso } from './helpers.js';
+import { logToolEvent, nowIso } from './helpers.js';
 import { wrapToolHandler } from './progress.js';
 
 type CreateRelInput = z.infer<typeof CreateRelationshipInputSchema>;
 const INSERT_RELATIONSHIP_SQL = `INSERT OR IGNORE INTO relationships (from_hash, to_hash, relation_type, created_at)
   VALUES (?, ?, ?, ?)`;
+const SELECT_HASHES_SQL =
+  'SELECT hash FROM memories WHERE hash IN (?, ?) LIMIT 2';
 
 function formatMemoryNotFound(kind: 'Source' | 'Target', hash: string): string {
   return `${kind} memory not found: ${hash}`;
@@ -25,12 +27,22 @@ function getMissingEndpoint(
   db: TypedDb,
   params: Pick<CreateRelInput, 'from_hash' | 'to_hash'>
 ): { kind: 'Source' | 'Target'; hash: string } | undefined {
-  if (!memoryExists(db, params.from_hash)) {
+  const rows = db
+    .prepareOnce<{ hash: string }>(SELECT_HASHES_SQL)
+    .all(params.from_hash, params.to_hash);
+  const found = new Set<string>();
+  for (const row of rows) {
+    found.add(row.hash);
+  }
+
+  if (!found.has(params.from_hash)) {
     return { kind: 'Source', hash: params.from_hash };
   }
-  if (!memoryExists(db, params.to_hash)) {
+
+  if (!found.has(params.to_hash)) {
     return { kind: 'Target', hash: params.to_hash };
   }
+
   return undefined;
 }
 

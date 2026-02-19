@@ -106,24 +106,32 @@ function traverseGraph(
   depthReached: number;
   aborted: boolean;
 } {
-  const visited = new Set<string>(seeds.map((r) => r.hash));
+  const visited = new Set<string>();
+  const frontier: string[] = [];
+  for (const seed of seeds) {
+    visited.add(seed.hash);
+    frontier.push(seed.hash);
+  }
+
   const edges: RelationshipEdge[] = [];
   const seenEdges = new Set<string>();
-  let frontier: string[] = seeds.map((r) => r.hash);
   let depthReached = 0;
   let aborted = false;
 
-  for (let hop = 0; hop < depth && frontier.length > 0; hop++) {
+  for (let hop = 0; hop < depth && frontier.length > 0; hop += 1) {
     if (signal?.aborted) {
       aborted = true;
       break;
     }
+
     depthReached = hop + 1;
     onHop?.(hop, depth);
+
     if (frontier.length > MAX_FRONTIER_SIZE) {
-      frontier = frontier.slice(0, MAX_FRONTIER_SIZE);
+      frontier.length = MAX_FRONTIER_SIZE;
       aborted = true;
     }
+
     const remainingEdgeBudget = MAX_EDGE_ROWS - edges.length;
     const remainingNodeBudget = MAX_VISITED_NODES - visited.size;
     if (remainingEdgeBudget <= 0 || remainingNodeBudget <= 0) {
@@ -131,24 +139,24 @@ function traverseGraph(
       break;
     }
 
+    const frontierJson = JSON.stringify(frontier);
     const edgeRows = db
       .prepareOnce<EdgeRow>(EDGE_QUERY_SQL)
-      .all(
-        JSON.stringify(frontier),
-        JSON.stringify(frontier),
-        remainingEdgeBudget + 1
-      );
-
-    const rows =
+      .all(frontierJson, frontierJson, remainingEdgeBudget + 1);
+    const rowsToProcess =
       edgeRows.length > remainingEdgeBudget
-        ? edgeRows.slice(0, remainingEdgeBudget)
-        : edgeRows;
+        ? remainingEdgeBudget
+        : edgeRows.length;
     if (edgeRows.length > remainingEdgeBudget) {
       aborted = true;
     }
 
     const nextHashes: string[] = [];
-    for (const edge of rows) {
+    for (let i = 0; i < rowsToProcess; i += 1) {
+      const edge = edgeRows[i];
+      if (edge === undefined) {
+        break;
+      }
       const edgeKey = `${edge.from_hash}|${edge.to_hash}|${edge.relation_type}`;
       if (!seenEdges.has(edgeKey)) {
         seenEdges.add(edgeKey);
@@ -159,20 +167,34 @@ function traverseGraph(
         });
       }
 
-      for (const h of [edge.from_hash, edge.to_hash]) {
-        if (!visited.has(h)) {
-          if (visited.size >= MAX_VISITED_NODES) {
-            aborted = true;
-            break;
-          }
-          visited.add(h);
-          if (nextHashes.length < MAX_FRONTIER_SIZE) {
-            nextHashes.push(h);
-          } else {
-            aborted = true;
-          }
+      if (!visited.has(edge.from_hash)) {
+        if (visited.size >= MAX_VISITED_NODES) {
+          aborted = true;
+          break;
+        }
+
+        visited.add(edge.from_hash);
+        if (nextHashes.length < MAX_FRONTIER_SIZE) {
+          nextHashes.push(edge.from_hash);
+        } else {
+          aborted = true;
         }
       }
+
+      if (!visited.has(edge.to_hash)) {
+        if (visited.size >= MAX_VISITED_NODES) {
+          aborted = true;
+          break;
+        }
+
+        visited.add(edge.to_hash);
+        if (nextHashes.length < MAX_FRONTIER_SIZE) {
+          nextHashes.push(edge.to_hash);
+        } else {
+          aborted = true;
+        }
+      }
+
       if (
         aborted &&
         (edges.length >= MAX_EDGE_ROWS || visited.size >= MAX_VISITED_NODES)
@@ -180,31 +202,35 @@ function traverseGraph(
         break;
       }
     }
-    frontier = nextHashes;
+    frontier.length = 0;
+    frontier.push(...nextHashes);
   }
 
   return { edges, visited, depthReached, aborted };
 }
 
-function loadMemoriesByHashes(db: TypedDb, hashes: string[]): Memory[] {
+function loadMemoriesByHashes(
+  db: TypedDb,
+  hashes: readonly string[]
+): MemoryRow[] {
   if (hashes.length === 0) {
     return [];
   }
-  const memRows = db
+  return db
     .prepareOnce<MemoryRow>(MEMORIES_BY_HASH_SQL)
     .all(JSON.stringify(hashes));
-  return memRows.map(parseMemoryRow);
 }
 
 function formatRecallCompletionMessage(
   query: string,
   result: CallToolResult
 ): string {
+  const failedMessage = `⊙ recall: ${query} • failed`;
   if (result.isError) {
-    return `⊙ recall: ${query} • failed`;
+    return failedMessage;
   }
   if (!isOkStructuredToolResult(result)) {
-    return `⊙ recall: ${query} • failed`;
+    return failedMessage;
   }
 
   const payload = getToolResultPayload(result);
@@ -285,10 +311,16 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
         for (const seed of pageSeeds) {
           if (seed.rank != null) seedRelevance.set(seed.hash, -seed.rank);
         }
-        const memories = loadMemoriesByHashes(db, allHashes).map((m) => {
-          const rel = seedRelevance.get(m.hash);
-          return rel != null ? { ...m, relevance: rel } : m;
-        });
+        const memoryRows = loadMemoriesByHashes(db, allHashes);
+        const memories: Memory[] = [];
+        for (const row of memoryRows) {
+          const memory = parseMemoryRow(row);
+          const rel = seedRelevance.get(memory.hash);
+          if (rel != null) {
+            memory.relevance = rel;
+          }
+          memories.push(memory);
+        }
 
         const nextCursor = hasMore ? encodeCursor(offset + limit) : undefined;
 
