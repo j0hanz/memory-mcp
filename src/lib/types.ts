@@ -105,12 +105,15 @@ export function parseTags(tagsJson: string): string[] {
 }
 
 export function parseMemoryRow(row: MemoryRow): Memory {
-  const { rank, ...rest } = row;
-  const relevance = rank != null ? -rank : undefined;
-
+  const relevance = row.rank != null ? -row.rank : undefined;
   return {
-    ...rest,
+    hash: row.hash,
+    content: row.content,
     tags: parseTags(row.tags),
+    memory_type: row.memory_type,
+    importance: row.importance,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
     ...(relevance != null ? { relevance } : {}),
   };
 }

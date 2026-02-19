@@ -4,7 +4,6 @@ export const E_UNKNOWN = 'E_UNKNOWN';
 
 export function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
-  const errorAsString = typeof err === 'string' ? err : undefined;
-  if (errorAsString != null) return errorAsString;
+  if (typeof err === 'string') return err;
   return 'Unknown error occurred';
 }

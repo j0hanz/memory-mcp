@@ -1,8 +1,11 @@
 import { z } from 'zod/v4';
 
+const STRING_SCHEMA = z.string();
+const NUMBER_SCHEMA = z.number();
+
 export const ErrorResultSchema = z.strictObject({
-  code: z.string(),
-  message: z.string(),
+  code: STRING_SCHEMA,
+  message: STRING_SCHEMA,
 });
 
 const OK_SCHEMA = z.boolean();
@@ -24,14 +27,14 @@ function createOutputSchema<T extends z.ZodType>(
 }
 
 export const MemorySchema = z.strictObject({
-  hash: z.string(),
-  content: z.string(),
-  tags: z.array(z.string()),
-  memory_type: z.string(),
-  importance: z.number(),
-  created_at: z.string(),
-  updated_at: z.string(),
-  relevance: z.number().optional(),
+  hash: STRING_SCHEMA,
+  content: STRING_SCHEMA,
+  tags: z.array(STRING_SCHEMA),
+  memory_type: STRING_SCHEMA,
+  importance: NUMBER_SCHEMA,
+  created_at: STRING_SCHEMA,
+  updated_at: STRING_SCHEMA,
+  relevance: NUMBER_SCHEMA.optional(),
 });
 
 export const MemoryResultSchema = createOutputSchema(MemorySchema);

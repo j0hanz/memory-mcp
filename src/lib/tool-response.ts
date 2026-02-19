@@ -13,6 +13,16 @@ function toTextContent(value: unknown): TextContent {
   return { type: 'text', text: JSON.stringify(value) };
 }
 
+function createStructuredError(
+  code: string,
+  message: string
+): StructuredToolResponse {
+  return {
+    ok: false,
+    error: { code, message },
+  };
+}
+
 function buildResponse(
   structured: StructuredToolResponse,
   isError = false
@@ -34,9 +44,5 @@ export function createErrorResponse(
   code: string,
   message: string
 ): CallToolResult {
-  const structured: StructuredToolResponse = {
-    ok: false,
-    error: { code, message },
-  };
-  return buildResponse(structured, true);
+  return buildResponse(createStructuredError(code, message), true);
 }

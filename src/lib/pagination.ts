@@ -13,17 +13,21 @@ export interface PageSlice<T> {
   hasMore: boolean;
 }
 
+function isNonNegativeInteger(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    Number.isFinite(value) &&
+    value >= 0
+  );
+}
+
 function isCursorPayload(value: unknown): value is CursorPayload {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
   const { offset } = value as Record<string, unknown>;
-  return (
-    typeof offset === 'number' &&
-    Number.isInteger(offset) &&
-    Number.isFinite(offset) &&
-    offset >= 0
-  );
+  return isNonNegativeInteger(offset);
 }
 
 function parseCursorPayload(cursor: string): CursorPayload {

@@ -72,6 +72,24 @@ const IMPORTANCE_SCHEMA = z
   .max(10)
   .describe('Priority level 0-10 (0=lowest, 10=critical)');
 const IMPORTANCE_FILTER_SCHEMA = z.int().min(0).max(10).optional();
+const SEARCH_MIN_IMPORTANCE_DESCRIPTION =
+  'Filter: only return memories with importance >= this value';
+const SEARCH_MAX_IMPORTANCE_DESCRIPTION =
+  'Filter: only return memories with importance <= this value';
+const SEARCH_MEMORY_TYPE_DESCRIPTION =
+  'Filter: only return memories of this type';
+const RECALL_MIN_IMPORTANCE_DESCRIPTION =
+  'Filter: only seed memories with importance >= this value';
+const RECALL_MAX_IMPORTANCE_DESCRIPTION =
+  'Filter: only seed memories with importance <= this value';
+const RECALL_MEMORY_TYPE_DESCRIPTION =
+  'Filter: only seed memories of this type';
+
+function describeImportanceFilter(
+  description: string
+): z.ZodOptional<z.ZodNumber> {
+  return IMPORTANCE_FILTER_SCHEMA.clone().describe(description);
+}
 
 const STORE_MEMORY_SHAPE = {
   content: CONTENT_SCHEMA,
@@ -133,14 +151,10 @@ export const SearchMemoriesInputSchema = z.strictObject({
     .string()
     .optional()
     .describe('Pagination cursor from previous response'),
-  min_importance: IMPORTANCE_FILTER_SCHEMA.clone().describe(
-    'Filter: only return memories with importance >= this value'
-  ),
-  max_importance: IMPORTANCE_FILTER_SCHEMA.clone().describe(
-    'Filter: only return memories with importance <= this value'
-  ),
+  min_importance: describeImportanceFilter(SEARCH_MIN_IMPORTANCE_DESCRIPTION),
+  max_importance: describeImportanceFilter(SEARCH_MAX_IMPORTANCE_DESCRIPTION),
   memory_type: MEMORY_TYPE_SCHEMA.optional().describe(
-    'Filter: only return memories of this type'
+    SEARCH_MEMORY_TYPE_DESCRIPTION
   ),
 });
 
@@ -164,14 +178,10 @@ export const RecallInputSchema = z.strictObject({
     .string()
     .optional()
     .describe('Pagination cursor from previous response'),
-  min_importance: IMPORTANCE_FILTER_SCHEMA.clone().describe(
-    'Filter: only seed memories with importance >= this value'
-  ),
-  max_importance: IMPORTANCE_FILTER_SCHEMA.clone().describe(
-    'Filter: only seed memories with importance <= this value'
-  ),
+  min_importance: describeImportanceFilter(RECALL_MIN_IMPORTANCE_DESCRIPTION),
+  max_importance: describeImportanceFilter(RECALL_MAX_IMPORTANCE_DESCRIPTION),
   memory_type: MEMORY_TYPE_SCHEMA.optional().describe(
-    'Filter: only seed memories of this type'
+    RECALL_MEMORY_TYPE_DESCRIPTION
   ),
 });
 

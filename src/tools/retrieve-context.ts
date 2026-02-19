@@ -19,6 +19,7 @@ import {
   notifyProgress,
   progressWithMessage,
 } from './progress.js';
+import { getToolResultPayload, isOkStructuredToolResult } from './result.js';
 
 type RetrieveContextInput = z.infer<typeof RetrieveContextInputSchema>;
 type ContextStrategy = RetrieveContextInput['strategy'];
@@ -82,24 +83,15 @@ function formatCompletionMessage(
   if (result.isError) {
     return `⊙ retrieve_context: ${query} • failed`;
   }
-  if (
-    typeof result.structuredContent !== 'object' ||
-    !('ok' in result.structuredContent) ||
-    result.structuredContent.ok !== true
-  ) {
+  if (!isOkStructuredToolResult(result)) {
     return `⊙ retrieve_context: ${query} • failed`;
   }
 
-  const structured = result.structuredContent;
-  if (
-    !('result' in structured) ||
-    typeof structured.result !== 'object' ||
-    structured.result === null
-  ) {
+  const payload = getToolResultPayload(result);
+  if (!payload) {
     return `⊙ retrieve_context: ${query} • completed`;
   }
 
-  const payload = structured.result;
   const memoriesCount =
     'memories' in payload && Array.isArray(payload.memories)
       ? payload.memories.length

@@ -9,7 +9,7 @@ import {
   createToolResponse,
 } from '../lib/tool-response.js';
 import { parseTags } from '../lib/types.js';
-import type { RelationshipRow } from '../lib/types.js';
+import type { RelationshipRow, RelationshipWithMemory } from '../lib/types.js';
 import { GetRelationshipsInputSchema } from '../schemas/inputs.js';
 import { RelationshipResultSchema } from '../schemas/outputs.js';
 import { memoryExists } from './helpers.js';
@@ -55,6 +55,20 @@ function loadRelationships(
     .all(hash);
 }
 
+function toRelationshipWithMemory(
+  row: RelWithLinkedMemory
+): RelationshipWithMemory {
+  return {
+    from_hash: row.from_hash,
+    to_hash: row.to_hash,
+    relation_type: row.relation_type,
+    created_at: row.created_at,
+    linked_hash: row.linked_hash,
+    linked_content: row.linked_content,
+    linked_tags: parseTags(row.linked_tags),
+  };
+}
+
 export function registerGetRelationships(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'get_relationships',
@@ -81,15 +95,7 @@ export function registerGetRelationships(server: McpServer, db: TypedDb): void {
             loadRelationships(db, params.hash, direction)
           );
 
-          const relationships = rows.map((r) => ({
-            from_hash: r.from_hash,
-            to_hash: r.to_hash,
-            relation_type: r.relation_type,
-            created_at: r.created_at,
-            linked_hash: r.linked_hash,
-            linked_content: r.linked_content,
-            linked_tags: parseTags(r.linked_tags),
-          }));
+          const relationships = rows.map(toRelationshipWithMemory);
 
           return createToolResponse({
             ok: true,

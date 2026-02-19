@@ -11,13 +11,10 @@ import {
 import { parseMemoryRow } from '../lib/types.js';
 import { GetMemoryInputSchema } from '../schemas/inputs.js';
 import { MemoryResultSchema } from '../schemas/outputs.js';
-import { getMemoryRow } from './helpers.js';
+import { formatMemoryNotFound, getMemoryRow } from './helpers.js';
 import { wrapToolHandler } from './progress.js';
 
 type GetInput = z.infer<typeof GetMemoryInputSchema>;
-function formatMemoryNotFound(hash: string): string {
-  return `Memory not found: ${hash}`;
-}
 
 export function registerGetMemory(server: McpServer, db: TypedDb): void {
   server.registerTool(

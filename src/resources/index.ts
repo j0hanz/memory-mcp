@@ -16,6 +16,7 @@ const FALLBACK_INSTRUCTIONS =
   '# Memory instructions\n\nSee the README for usage details.';
 const HASH_REGEX = /^[a-f0-9]{64}$/;
 const INSTRUCTIONS_URI = 'internal://instructions';
+const MEMORY_RESOURCE_URI_TEMPLATE = 'memory://memories/{hash}';
 
 function getInstructionPaths(): string[] {
   return [
@@ -87,7 +88,7 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
 
   server.registerResource(
     'memory',
-    new ResourceTemplate('memory://memories/{hash}', {
+    new ResourceTemplate(MEMORY_RESOURCE_URI_TEMPLATE, {
       list: undefined,
       complete: { hash: hashCompletion },
     }),

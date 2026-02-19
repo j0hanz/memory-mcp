@@ -24,6 +24,17 @@ function formatRelationship(
   return `${params.from_hash} -[${params.relation_type}]-> ${params.to_hash}`;
 }
 
+function deleteRelationship(
+  db: TypedDb,
+  params: Pick<DeleteRelInput, 'from_hash' | 'to_hash' | 'relation_type'>
+): boolean {
+  return (
+    db
+      .prepare(DELETE_RELATIONSHIP_SQL)
+      .run(params.from_hash, params.to_hash, params.relation_type).changes > 0
+  );
+}
+
 export function registerDeleteRelationship(
   server: McpServer,
   db: TypedDb
@@ -40,11 +51,7 @@ export function registerDeleteRelationship(
     wrapToolHandler(
       (params: DeleteRelInput) => {
         try {
-          const result = db
-            .prepare(DELETE_RELATIONSHIP_SQL)
-            .run(params.from_hash, params.to_hash, params.relation_type);
-
-          if (result.changes === 0) {
+          if (!deleteRelationship(db, params)) {
             return createErrorResponse(
               E_NOT_FOUND,
               `Relationship not found: ${formatRelationship(params)}`

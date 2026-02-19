@@ -13,6 +13,7 @@ import { parseTags } from '../lib/types.js';
 import { UpdateMemoryInputSchema } from '../schemas/inputs.js';
 import { UpdateResultSchema } from '../schemas/outputs.js';
 import {
+  formatMemoryNotFound,
   getMemoryRow,
   logToolEvent,
   notifyMemoryResourceUpdated,
@@ -25,9 +26,6 @@ type UpdateInput = z.infer<typeof UpdateMemoryInputSchema>;
 const UPDATE_MEMORY_SQL = `UPDATE memories
   SET hash = ?, content = ?, tags = ?, updated_at = ?
   WHERE hash = ?`;
-function formatMemoryNotFound(hash: string): string {
-  return `Memory not found: ${hash}`;
-}
 
 export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
   server.registerTool(

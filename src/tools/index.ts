@@ -12,7 +12,9 @@ import { registerStoreMemories } from './store-memories.js';
 import { registerStoreMemory } from './store-memory.js';
 import { registerUpdateMemory } from './update-memory.js';
 
-export const TOOL_REGISTRARS = [
+type ToolRegistrar = typeof registerStoreMemory;
+
+export const TOOL_REGISTRARS: readonly ToolRegistrar[] = [
   registerStoreMemory,
   registerGetMemory,
   registerUpdateMemory,
@@ -26,4 +28,4 @@ export const TOOL_REGISTRARS = [
   registerGetRelationships,
   registerRecall,
   registerRetrieveContext,
-] as const;
+];

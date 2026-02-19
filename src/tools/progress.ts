@@ -44,6 +44,18 @@ function toProgressToken(value: unknown): ProgressToken | undefined {
   return undefined;
 }
 
+function toNotificationParams(
+  progressToken: ProgressToken,
+  progress: ProgressUpdate
+): ProgressNotification['params'] {
+  return {
+    progressToken,
+    progress: progress.current,
+    ...(progress.total !== undefined ? { total: progress.total } : {}),
+    ...(progress.message !== undefined ? { message: progress.message } : {}),
+  };
+}
+
 function isFailedResult(result: CallToolResult): boolean {
   if (result.isError) {
     return true;
@@ -82,14 +94,7 @@ export async function notifyProgress(
   try {
     await extra.sendNotification({
       method: 'notifications/progress',
-      params: {
-        progressToken,
-        progress: progress.current,
-        ...(progress.total !== undefined ? { total: progress.total } : {}),
-        ...(progress.message !== undefined
-          ? { message: progress.message }
-          : {}),
-      },
+      params: toNotificationParams(progressToken, progress),
     });
   } catch {
     // best-effort progress

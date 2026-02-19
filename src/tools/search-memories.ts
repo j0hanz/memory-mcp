@@ -19,23 +19,10 @@ import { parseMemoryRow } from '../lib/types.js';
 import type { Memory, MemoryRow } from '../lib/types.js';
 import { SearchMemoriesInputSchema } from '../schemas/inputs.js';
 import { SearchResultSchema } from '../schemas/outputs.js';
+import { toMemoryFilters } from './helpers.js';
 import { wrapToolHandler } from './progress.js';
 
 type SearchInput = z.infer<typeof SearchMemoriesInputSchema>;
-
-function toMemoryFilters(params: SearchInput): MemoryFilters {
-  const filters: MemoryFilters = {};
-  if (params.min_importance != null) {
-    filters.min_importance = params.min_importance;
-  }
-  if (params.max_importance != null) {
-    filters.max_importance = params.max_importance;
-  }
-  if (params.memory_type != null) {
-    filters.memory_type = params.memory_type;
-  }
-  return filters;
-}
 
 function loadSearchRows(
   db: TypedDb,

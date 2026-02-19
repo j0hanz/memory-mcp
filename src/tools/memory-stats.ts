@@ -36,6 +36,13 @@ function getTotalCount(db: TypedDb, sql: string): number {
   return db.prepare<TotalRow>(sql).get()?.total ?? 0;
 }
 
+function getNullableField<T extends object, K extends keyof T>(
+  row: T | undefined,
+  key: K
+): T[K] | null {
+  return row?.[key] ?? null;
+}
+
 export function registerMemoryStats(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'memory_stats',
@@ -70,9 +77,12 @@ export function registerMemoryStats(server: McpServer, db: TypedDb): void {
             result: {
               memories: {
                 total: totalMemories,
-                oldest: oldestRow?.oldest ?? null,
-                newest: newestRow?.newest ?? null,
-                avg_importance: avgImportanceRow?.avg_importance ?? null,
+                oldest: getNullableField(oldestRow, 'oldest'),
+                newest: getNullableField(newestRow, 'newest'),
+                avg_importance: getNullableField(
+                  avgImportanceRow,
+                  'avg_importance'
+                ),
               },
               relationships: {
                 total: totalRelationships,

@@ -5,12 +5,16 @@ const HASH_MAX_LENGTH = 64;
 const HASH_COMPLETION_LIMIT = 101;
 const HASH_COMPLETION_SQL = `SELECT hash FROM memories WHERE hash LIKE ? ESCAPE '\\' ORDER BY hash LIMIT ${HASH_COMPLETION_LIMIT}`;
 
+function normalizeHashPrefix(value: string): string {
+  return escapeLikePattern(value.slice(0, HASH_MAX_LENGTH));
+}
+
 // Returns a completion callback for the `hash` URI variable.
 export function createHashCompletionCallback(
   db: TypedDb
 ): (value: string) => string[] {
   return (value: string): string[] => {
-    const escapedPrefix = escapeLikePattern(value.slice(0, HASH_MAX_LENGTH));
+    const escapedPrefix = normalizeHashPrefix(value);
     const rows = db
       .prepare<HashRow>(HASH_COMPLETION_SQL)
       .all(`${escapedPrefix}%`);

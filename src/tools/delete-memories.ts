@@ -14,6 +14,7 @@ import { BatchResultSchema } from '../schemas/outputs.js';
 import {
   logToolEvent,
   notifyMemoryResourceUpdated,
+  summarizeBatch,
   withImmediateTransaction,
 } from './helpers.js';
 import { wrapToolHandler } from './progress.js';
@@ -21,14 +22,6 @@ import { wrapToolHandler } from './progress.js';
 type DeleteMemoriesInput = z.infer<typeof DeleteMemoriesInputSchema>;
 
 const DELETE_MEMORY_SQL = 'DELETE FROM memories WHERE hash = ?';
-
-function summarizeBatch(items: readonly BatchItemResult[]): {
-  succeeded: number;
-  failed: number;
-} {
-  const succeeded = items.filter((item) => item.ok).length;
-  return { succeeded, failed: items.length - succeeded };
-}
 
 export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
   server.registerTool(

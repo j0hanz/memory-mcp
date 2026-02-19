@@ -44,9 +44,10 @@ const GET_HELP_PROMPT_CONFIG = {
   description:
     'Return the full usage instructions for all memory tools and workflows.',
 } as const;
+const GET_HELP_PROMPT_NAME = 'get-help';
 
 export function registerAllPrompts(server: McpServer): void {
-  server.registerPrompt('get-help', GET_HELP_PROMPT_CONFIG, () => ({
+  server.registerPrompt(GET_HELP_PROMPT_NAME, GET_HELP_PROMPT_CONFIG, () => ({
     messages: HELP_MESSAGES,
   }));
 }

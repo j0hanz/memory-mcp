@@ -10,6 +10,7 @@ const FTS5_CHECK_SQL =
   'CREATE VIRTUAL TABLE IF NOT EXISTS __fts5_check USING fts5(x); DROP TABLE __fts5_check;';
 const FTS5_REQUIRED_MESSAGE =
   'SQLite FTS5 extension is not available. memory-mcp requires a SQLite build with FTS5 support.';
+const DEFENSIVE_PRAGMA_SQL = 'PRAGMA defensive = ON';
 
 const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS memories (
@@ -85,7 +86,7 @@ function ensureParentDir(path: string): void {
 
 function configureDatabase(db: DatabaseSync): void {
   // Enable defensive mode (SQLite v3.39+ / Node 24.12+: prevents deliberate DB corruption)
-  db.exec('PRAGMA defensive = ON');
+  db.exec(DEFENSIVE_PRAGMA_SQL);
 
   // Verify FTS5 support
   assertFts5Available(db);

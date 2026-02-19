@@ -16,6 +16,7 @@ import {
   logToolEvent,
   normalizeMemoryType,
   nowIso,
+  summarizeBatch,
   withImmediateTransaction,
 } from './helpers.js';
 import { wrapToolHandler } from './progress.js';
@@ -23,14 +24,6 @@ import { wrapToolHandler } from './progress.js';
 type StoreMemoriesInput = z.infer<typeof StoreMemoriesInputSchema>;
 const INSERT_MEMORY_SQL = `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
   VALUES (?, ?, ?, ?, ?, ?, ?)`;
-
-function summarizeBatch(items: readonly BatchItemResult[]): {
-  succeeded: number;
-  failed: number;
-} {
-  const succeeded = items.filter((item) => item.ok).length;
-  return { succeeded, failed: items.length - succeeded };
-}
 
 export function registerStoreMemories(server: McpServer, db: TypedDb): void {
   server.registerTool(

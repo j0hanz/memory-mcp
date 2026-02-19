@@ -18,6 +18,28 @@ type StoreInput = z.infer<typeof StoreMemoryInputSchema>;
 const INSERT_MEMORY_SQL = `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
   VALUES (?, ?, ?, ?, ?, ?, ?)`;
 
+function insertMemory(
+  db: TypedDb,
+  params: StoreInput,
+  hash: string,
+  memoryType: string,
+  now: string
+): boolean {
+  const tagsJson = JSON.stringify(params.tags);
+  const insertResult = db
+    .prepare(INSERT_MEMORY_SQL)
+    .run(
+      hash,
+      params.content,
+      tagsJson,
+      memoryType,
+      params.importance,
+      now,
+      now
+    );
+  return insertResult.changes > 0;
+}
+
 export function registerStoreMemory(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'store_memory',
@@ -32,25 +54,10 @@ export function registerStoreMemory(server: McpServer, db: TypedDb): void {
     wrapToolHandler(
       async (params: StoreInput) => {
         try {
-          const { importance } = params;
           const memoryType = normalizeMemoryType(params.memory_type);
           const hash = computeMemoryHash(params.content, params.tags);
           const now = nowIso();
-          const tagsJson = JSON.stringify(params.tags);
-
-          const insertResult = db
-            .prepare(INSERT_MEMORY_SQL)
-            .run(
-              hash,
-              params.content,
-              tagsJson,
-              memoryType,
-              importance,
-              now,
-              now
-            );
-
-          const created = insertResult.changes > 0;
+          const created = insertMemory(db, params, hash, memoryType, now);
           await logToolEvent(server, 'store', { hash, created });
 
           return createToolResponse({ ok: true, result: { hash, created } });

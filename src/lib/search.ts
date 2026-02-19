@@ -27,21 +27,27 @@ export interface FilterClauses {
   params: SQLInputValue[];
 }
 
+const FILTER_RULES: readonly {
+  key: keyof MemoryFilters;
+  clause: string;
+}[] = [
+  { key: 'min_importance', clause: 'm.importance >= ?' },
+  { key: 'max_importance', clause: 'm.importance <= ?' },
+  { key: 'memory_type', clause: 'm.memory_type = ?' },
+];
+
 export function buildFilterClauses(filters: MemoryFilters): FilterClauses {
   const clauses: string[] = [];
   const params: SQLInputValue[] = [];
-  if (filters.min_importance != null) {
-    clauses.push('m.importance >= ?');
-    params.push(filters.min_importance);
+
+  for (const rule of FILTER_RULES) {
+    const value = filters[rule.key];
+    if (value != null) {
+      clauses.push(rule.clause);
+      params.push(value);
+    }
   }
-  if (filters.max_importance != null) {
-    clauses.push('m.importance <= ?');
-    params.push(filters.max_importance);
-  }
-  if (filters.memory_type != null) {
-    clauses.push('m.memory_type = ?');
-    params.push(filters.memory_type);
-  }
+
   return { clauses, params };
 }
 

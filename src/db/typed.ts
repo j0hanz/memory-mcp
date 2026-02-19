@@ -4,10 +4,12 @@ import type {
   StatementResultingChanges,
 } from 'node:sqlite';
 
+type SqlParams = SQLInputValue[];
+
 export interface TypedStatement<T> {
-  all(...params: SQLInputValue[]): T[];
-  get(...params: SQLInputValue[]): T | undefined;
-  run(...params: SQLInputValue[]): StatementResultingChanges;
+  all(...params: SqlParams): T[];
+  get(...params: SqlParams): T | undefined;
+  run(...params: SqlParams): StatementResultingChanges;
 }
 
 export class TypedDb {
@@ -16,9 +18,9 @@ export class TypedDb {
   prepare<T>(sql: string): TypedStatement<T> {
     const stmt = this.db.prepare(sql);
     return {
-      all: (...params: SQLInputValue[]) => stmt.all(...params) as T[],
-      get: (...params: SQLInputValue[]) => stmt.get(...params) as T | undefined,
-      run: (...params: SQLInputValue[]) => stmt.run(...params),
+      all: (...params: SqlParams) => stmt.all(...params) as T[],
+      get: (...params: SqlParams) => stmt.get(...params) as T | undefined,
+      run: (...params: SqlParams) => stmt.run(...params),
     };
   }
 

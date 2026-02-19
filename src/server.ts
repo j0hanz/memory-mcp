@@ -14,24 +14,24 @@ const ICON_MIME = 'image/svg+xml';
 const ICON_SIZES = ['any'];
 const MAX_ICON_BYTES = 2 * 1024 * 1024;
 const SERVER_NAME = 'memory-mcp';
+
+interface PackageManifest {
+  version: string;
+}
+
 interface IconDescriptor {
   src: string;
   mimeType: string;
   sizes: string[];
 }
 
-function loadPackageJson(): { version: string } {
+function loadPackageManifest(): PackageManifest {
   const pkgPath = findPackageJSON('.', import.meta.url);
   if (!pkgPath) {
     throw new Error('Could not find package.json');
   }
 
-  return JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string };
-}
-
-function loadPackageVersion(): string {
-  const { version } = loadPackageJson();
-  return version;
+  return JSON.parse(readFileSync(pkgPath, 'utf-8')) as PackageManifest;
 }
 
 function getLocalIconData(): string | undefined {
@@ -68,11 +68,12 @@ function createIconDescriptors(): IconDescriptor[] | undefined {
 }
 
 export function createServer(db: TypedDb): McpServer {
+  const { version } = loadPackageManifest();
   const icons = createIconDescriptors();
   const server = new McpServer(
     {
       name: SERVER_NAME,
-      version: loadPackageVersion(),
+      version,
       ...(icons ? { icons } : {}),
     },
     {

@@ -27,11 +27,13 @@ import type {
 } from '../lib/types.js';
 import { RecallInputSchema } from '../schemas/inputs.js';
 import { RecallResultSchema } from '../schemas/outputs.js';
+import { toMemoryFilters } from './helpers.js';
 import {
   createProgressReporter,
   notifyProgress,
   progressWithMessage,
 } from './progress.js';
+import { getToolResultPayload, isOkStructuredToolResult } from './result.js';
 
 type RecallInput = z.infer<typeof RecallInputSchema>;
 type ProgressNotifier = (hop: number, total: number) => void;
@@ -62,20 +64,6 @@ const MAX_VISITED_NODES = parseEnvInt(
   100,
   50000
 );
-
-function toMemoryFilters(params: RecallInput): MemoryFilters {
-  const filters: MemoryFilters = {};
-  if (params.min_importance != null) {
-    filters.min_importance = params.min_importance;
-  }
-  if (params.max_importance != null) {
-    filters.max_importance = params.max_importance;
-  }
-  if (params.memory_type != null) {
-    filters.memory_type = params.memory_type;
-  }
-  return filters;
-}
 
 function createPlaceholders(count: number): string {
   return new Array(count).fill('?').join(',');
@@ -215,24 +203,15 @@ function formatRecallCompletionMessage(
   if (result.isError) {
     return `⊙ recall: ${query} • failed`;
   }
-  if (
-    typeof result.structuredContent !== 'object' ||
-    !('ok' in result.structuredContent) ||
-    result.structuredContent.ok !== true
-  ) {
+  if (!isOkStructuredToolResult(result)) {
     return `⊙ recall: ${query} • failed`;
   }
 
-  const structured = result.structuredContent;
-  if (
-    !('result' in structured) ||
-    typeof structured.result !== 'object' ||
-    structured.result === null
-  ) {
+  const payload = getToolResultPayload(result);
+  if (!payload) {
     return `⊙ recall: ${query} • completed`;
   }
 
-  const payload = structured.result;
   const memoriesCount =
     'memories' in payload && Array.isArray(payload.memories)
       ? payload.memories.length

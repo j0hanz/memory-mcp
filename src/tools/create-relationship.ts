@@ -21,6 +21,19 @@ function formatMemoryNotFound(kind: 'Source' | 'Target', hash: string): string {
   return `${kind} memory not found: ${hash}`;
 }
 
+function getMissingEndpoint(
+  db: TypedDb,
+  params: Pick<CreateRelInput, 'from_hash' | 'to_hash'>
+): { kind: 'Source' | 'Target'; hash: string } | undefined {
+  if (!memoryExists(db, params.from_hash)) {
+    return { kind: 'Source', hash: params.from_hash };
+  }
+  if (!memoryExists(db, params.to_hash)) {
+    return { kind: 'Target', hash: params.to_hash };
+  }
+  return undefined;
+}
+
 export function registerCreateRelationship(
   server: McpServer,
   db: TypedDb
@@ -38,17 +51,11 @@ export function registerCreateRelationship(
     wrapToolHandler(
       async (params: CreateRelInput) => {
         try {
-          if (!memoryExists(db, params.from_hash)) {
+          const missing = getMissingEndpoint(db, params);
+          if (missing) {
             return createErrorResponse(
               E_NOT_FOUND,
-              formatMemoryNotFound('Source', params.from_hash)
-            );
-          }
-
-          if (!memoryExists(db, params.to_hash)) {
-            return createErrorResponse(
-              E_NOT_FOUND,
-              formatMemoryNotFound('Target', params.to_hash)
+              formatMemoryNotFound(missing.kind, missing.hash)
             );
           }
 
