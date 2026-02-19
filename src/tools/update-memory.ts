@@ -34,6 +34,18 @@ const UPDATE_MEMORY_SQL = `UPDATE memories
   SET hash = ?, content = ?, tags = ?, updated_at = ?
   WHERE hash = ?`;
 
+async function notifyUpdatedMemoryResources(
+  server: McpServer,
+  oldHash: string,
+  newHash: string
+): Promise<void> {
+  const notifications = [notifyMemoryResourceUpdated(server, oldHash)];
+  if (newHash !== oldHash) {
+    notifications.push(notifyMemoryResourceUpdated(server, newHash));
+  }
+  await Promise.allSettled(notifications);
+}
+
 export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'update_memory',
@@ -81,14 +93,7 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
             oldHash: params.hash,
             newHash,
           });
-
-          const notifications = [
-            notifyMemoryResourceUpdated(server, params.hash),
-          ];
-          if (newHash !== params.hash) {
-            notifications.push(notifyMemoryResourceUpdated(server, newHash));
-          }
-          await Promise.allSettled(notifications);
+          await notifyUpdatedMemoryResources(server, params.hash, newHash);
 
           return createToolResponse({
             old_hash: params.hash,

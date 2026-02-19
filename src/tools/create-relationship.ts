@@ -35,10 +35,7 @@ function getMissingEndpoint(
   const rows = db
     .prepareOnce<{ hash: string }>(SELECT_HASHES_SQL)
     .all(params.from_hash, params.to_hash);
-  const found = new Set<string>();
-  for (const row of rows) {
-    found.add(row.hash);
-  }
+  const found = new Set(rows.map((row) => row.hash));
 
   if (!found.has(params.from_hash)) {
     return { kind: 'Source', hash: params.from_hash };

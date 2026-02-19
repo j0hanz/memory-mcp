@@ -12,14 +12,27 @@ const HASH_REGEX = /^[a-f0-9]{64}$/;
 const INSTRUCTIONS_URI = 'internal://instructions';
 const MEMORY_RESOURCE_URI_TEMPLATE = 'memory://memories/{hash}';
 
-function createJsonContent(
-  uri: string,
-  payload: unknown
-): { uri: string; mimeType: 'application/json'; text: string } {
+interface JsonResourceContent {
+  uri: string;
+  mimeType: 'application/json';
+  text: string;
+}
+
+function createJsonContent(uri: string, payload: unknown): JsonResourceContent {
   return {
     uri,
     mimeType: 'application/json',
     text: JSON.stringify(payload),
+  };
+}
+
+function createErrorResourceContents(
+  uri: string,
+  error: string,
+  hash?: string
+): { contents: JsonResourceContent[] } {
+  return {
+    contents: [createJsonContent(uri, { error, ...(hash ? { hash } : {}) })],
   };
 }
 
@@ -77,17 +90,13 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
       const hash = getSingleVariable(rawHash);
 
       if (!hash || !HASH_REGEX.test(hash)) {
-        return {
-          contents: [createJsonContent(uri.href, { error: 'Invalid hash' })],
-        };
+        return createErrorResourceContents(uri.href, 'Invalid hash');
       }
 
       const row = readMemoryByHash(db, hash);
 
       if (!row) {
-        return {
-          contents: [createJsonContent(uri.href, { error: 'Not found', hash })],
-        };
+        return createErrorResourceContents(uri.href, 'Not found', hash);
       }
 
       return {

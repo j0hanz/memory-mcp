@@ -13,12 +13,7 @@ import {
   decodeSearchCursor,
   encodeSearchCursor,
 } from '../lib/search-cursor.js';
-import {
-  buildAndWhereClause,
-  buildFilterClauses,
-  sanitizeFtsQuery,
-} from '../lib/search.js';
-import type { MemoryFilters } from '../lib/search.js';
+import { loadRankedSearchRows } from '../lib/search.js';
 import {
   createErrorResponse,
   createToolResponse,
@@ -42,6 +37,14 @@ import { getToolResultPayload, isOkStructuredToolResult } from './result.js';
 
 type RecallInput = z.infer<typeof RecallInputSchema>;
 type ProgressNotifier = (hop: number, total: number) => void;
+
+function countPayloadArrayItems(
+  payload: Record<string, unknown>,
+  key: string
+): number {
+  const value = payload[key];
+  return Array.isArray(value) ? value.length : 0;
+}
 
 function parseEnvInt(
   name: string,
@@ -77,61 +80,6 @@ const EDGE_QUERY_SQL = `SELECT from_hash, to_hash, relation_type FROM relationsh
 
 const MEMORIES_BY_HASH_SQL =
   'SELECT * FROM memories WHERE hash IN (SELECT value FROM json_each(?))';
-
-function loadSeedRows(
-  db: TypedDb,
-  query: string,
-  limit: number,
-  cursor:
-    | {
-        mode: 'offset';
-        offset: number;
-      }
-    | {
-        mode: 'keyset';
-        rank: number;
-        hash: string;
-      }
-    | undefined,
-  filters: MemoryFilters
-): MemoryRow[] {
-  const ftsQuery = sanitizeFtsQuery(query);
-  const filter = buildFilterClauses(filters);
-  const whereExtra = buildAndWhereClause(filter.clauses);
-  if (!cursor || cursor.mode === 'offset') {
-    const offset = cursor?.offset ?? 0;
-    return db
-      .prepareOnce<MemoryRow>(
-        `SELECT m.*, memories_fts.rank AS rank FROM memories m
-         JOIN memories_fts ON memories_fts.rowid = m.rowid
-         WHERE memories_fts MATCH ?${whereExtra}
-         ORDER BY memories_fts.rank, m.hash
-         LIMIT ? OFFSET ?`
-      )
-      .all(ftsQuery, ...filter.params, limit + 1, offset);
-  }
-
-  return db
-    .prepareOnce<MemoryRow>(
-      `SELECT m.*, memories_fts.rank AS rank FROM memories m
-       JOIN memories_fts ON memories_fts.rowid = m.rowid
-       WHERE memories_fts MATCH ?${whereExtra}
-         AND (
-           memories_fts.rank > ?
-           OR (memories_fts.rank = ? AND m.hash > ?)
-         )
-       ORDER BY memories_fts.rank, m.hash
-       LIMIT ?`
-    )
-    .all(
-      ftsQuery,
-      ...filter.params,
-      cursor.rank,
-      cursor.rank,
-      cursor.hash,
-      limit + 1
-    );
-}
 
 function traverseGraph(
   db: TypedDb,
@@ -277,14 +225,8 @@ function formatRecallCompletionMessage(
     return `⊙ recall: ${query} • completed`;
   }
 
-  const memoriesCount =
-    'memories' in payload && Array.isArray(payload.memories)
-      ? payload.memories.length
-      : 0;
-  const edgesCount =
-    'graph' in payload && Array.isArray(payload.graph)
-      ? payload.graph.length
-      : 0;
+  const memoriesCount = countPayloadArrayItems(payload, 'memories');
+  const edgesCount = countPayloadArrayItems(payload, 'graph');
   const aborted = 'aborted' in payload && payload.aborted === true;
 
   return `⊙ recall: ${query} • ${memoriesCount} memories, ${edgesCount} edges${aborted ? ' [aborted]' : ''}`;
@@ -330,7 +272,7 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
       let result: CallToolResult;
       try {
         // Step 1: FTS seed search
-        const seedRows = loadSeedRows(
+        const seedRows = loadRankedSearchRows(
           db,
           params.query,
           limit,
@@ -355,15 +297,14 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
           if (seed.rank != null) seedRelevance.set(seed.hash, -seed.rank);
         }
         const memoryRows = loadMemoriesByHashes(db, allHashes);
-        const memories: Memory[] = [];
-        for (const row of memoryRows) {
+        const memories: Memory[] = memoryRows.map((row) => {
           const memory = parseMemoryRow(row);
           const rel = seedRelevance.get(memory.hash);
           if (rel != null) {
             memory.relevance = rel;
           }
-          memories.push(memory);
-        }
+          return memory;
+        });
 
         let nextCursor: string | undefined;
         if (hasMore && pageSeeds.length > 0) {

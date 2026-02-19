@@ -12,6 +12,13 @@ const FTS5_CHECK_SQL =
 const FTS5_REQUIRED_MESSAGE =
   'SQLite FTS5 extension is not available. memory-mcp requires a SQLite build with FTS5 support.';
 const DEFENSIVE_PRAGMA_SQL = 'PRAGMA defensive = ON';
+const RELATIONSHIPS_TABLE_SQL = `CREATE TABLE IF NOT EXISTS relationships (
+    from_hash TEXT NOT NULL REFERENCES memories(hash) ON DELETE CASCADE ON UPDATE CASCADE,
+    to_hash TEXT NOT NULL REFERENCES memories(hash) ON DELETE CASCADE ON UPDATE CASCADE,
+    relation_type TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (from_hash, to_hash, relation_type)
+  ) STRICT;`;
 
 const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS memories (
@@ -48,13 +55,7 @@ const SCHEMA_SQL = `
       VALUES ('delete', old.rowid, old.content, old.tags);
   END;
 
-  CREATE TABLE IF NOT EXISTS relationships (
-    from_hash TEXT NOT NULL REFERENCES memories(hash) ON DELETE CASCADE ON UPDATE CASCADE,
-    to_hash TEXT NOT NULL REFERENCES memories(hash) ON DELETE CASCADE ON UPDATE CASCADE,
-    relation_type TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    PRIMARY KEY (from_hash, to_hash, relation_type)
-  ) STRICT;
+  ${RELATIONSHIPS_TABLE_SQL}
 
   CREATE INDEX IF NOT EXISTS idx_memories_importance
     ON memories(importance DESC);
@@ -134,15 +135,7 @@ function migrateRelationshipsCascadeUpdate(db: DatabaseSync): void {
   db.exec('BEGIN IMMEDIATE');
   try {
     db.exec('ALTER TABLE relationships RENAME TO relationships_old');
-    db.exec(`
-      CREATE TABLE relationships (
-        from_hash TEXT NOT NULL REFERENCES memories(hash) ON DELETE CASCADE ON UPDATE CASCADE,
-        to_hash TEXT NOT NULL REFERENCES memories(hash) ON DELETE CASCADE ON UPDATE CASCADE,
-        relation_type TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        PRIMARY KEY (from_hash, to_hash, relation_type)
-      ) STRICT;
-    `);
+    db.exec(RELATIONSHIPS_TABLE_SQL.replace(' IF NOT EXISTS', ''));
     db.exec(`
       INSERT INTO relationships (from_hash, to_hash, relation_type, created_at)
       SELECT from_hash, to_hash, relation_type, created_at

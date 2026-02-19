@@ -26,6 +26,20 @@ type StoreMemoriesInput = z.infer<typeof StoreMemoriesInputSchema>;
 const INSERT_MEMORY_SQL = `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
   VALUES (?, ?, ?, ?, ?, ?, ?)`;
 
+function countCreated(items: readonly BatchItemResult[]): number {
+  return items.reduce((count, item) => (item.created ? count + 1 : count), 0);
+}
+
+async function notifyCreatedResources(
+  server: McpServer,
+  items: readonly BatchItemResult[]
+): Promise<void> {
+  const notifications = items
+    .filter((item) => item.created)
+    .map((item) => notifyMemoryResourceUpdated(server, item.hash));
+  await Promise.allSettled(notifications);
+}
+
 export function registerStoreMemories(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'store_memories',
@@ -64,27 +78,13 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
             return items;
           });
 
-          let created = 0;
-          for (const item of results) {
-            if (item.created) {
-              created += 1;
-            }
-          }
-
+          const created = countCreated(results);
           const { succeeded, failed } = summarizeBatch(results);
           await logToolEvent(server, 'store_memories', {
             total: results.length,
             created,
           });
-          const notifications: Promise<void>[] = [];
-          for (const item of results) {
-            if (item.created) {
-              notifications.push(
-                notifyMemoryResourceUpdated(server, item.hash)
-              );
-            }
-          }
-          await Promise.allSettled(notifications);
+          await notifyCreatedResources(server, results);
 
           return createToolResponse({ items: results, succeeded, failed });
         } catch (err) {

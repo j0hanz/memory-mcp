@@ -10,12 +10,16 @@ function normalizeTags(tags: readonly string[]): readonly string[] {
   return [...tags].sort();
 }
 
+function stableTagsJson(tags: readonly string[]): string {
+  return JSON.stringify(normalizeTags(tags));
+}
+
 export function computeMemoryHash(
   content: string,
   tags: readonly string[]
 ): string {
   return createHash(MEMORY_HASH_ALGORITHM)
     .update(content)
-    .update(JSON.stringify(normalizeTags(tags)))
+    .update(stableTagsJson(tags))
     .digest('hex');
 }

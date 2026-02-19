@@ -28,18 +28,28 @@ function scheduleForcedShutdown(): NodeJS.Timeout {
   return timer;
 }
 
+async function closeServer(
+  server: ReturnType<typeof createServer>
+): Promise<void> {
+  try {
+    await server.close();
+  } catch {
+    // ignore close errors
+  }
+}
+
 async function runShutdown(
   server: ReturnType<typeof createServer>,
   db: ReturnType<typeof initTypedDatabase>
 ): Promise<void> {
   const timer = scheduleForcedShutdown();
   try {
-    await server.close();
-  } catch {
-    // ignore close errors
+    await closeServer(server);
+    db.close();
+  } finally {
+    clearTimeout(timer);
   }
-  db.close();
-  clearTimeout(timer);
+
   process.exit(CLEAN_EXIT_CODE);
 }
 

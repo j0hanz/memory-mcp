@@ -7,13 +7,20 @@ import { fileURLToPath } from 'node:url';
 import type { TypedDb } from './db/typed.js';
 import { registerAllPrompts } from './prompts/index.js';
 import { registerAllResources } from './resources/index.js';
-import { TOOL_REGISTRARS } from './tools/index.js';
+import { registerAllTools } from './tools/index.js';
 
 const ICON_ASSET = 'logo.svg';
 const ICON_MIME = 'image/svg+xml';
 const ICON_SIZES = ['any'];
 const MAX_ICON_BYTES = 2 * 1024 * 1024;
 const SERVER_NAME = 'memory-mcp';
+const SERVER_CAPABILITIES = {
+  logging: {},
+  completions: {},
+  resources: { subscribe: true },
+  prompts: {},
+  tools: {},
+} as const;
 
 interface PackageManifest {
   version: string;
@@ -26,13 +33,17 @@ interface IconDescriptor {
   theme?: 'light' | 'dark';
 }
 
+function parsePackageManifest(contents: string): PackageManifest {
+  return JSON.parse(contents) as PackageManifest;
+}
+
 function loadPackageManifest(): PackageManifest {
   const pkgPath = findPackageJSON('.', import.meta.url);
   if (!pkgPath) {
     throw new Error('Could not find package.json');
   }
 
-  return JSON.parse(readFileSync(pkgPath, 'utf-8')) as PackageManifest;
+  return parsePackageManifest(readFileSync(pkgPath, 'utf-8'));
 }
 
 function getLocalIconData(): string | undefined {
@@ -78,20 +89,11 @@ export function createServer(db: TypedDb): McpServer {
       ...(icons ? { icons } : {}),
     },
     {
-      capabilities: {
-        logging: {},
-        completions: {},
-        resources: { subscribe: true },
-        prompts: {},
-        tools: {},
-      },
+      capabilities: SERVER_CAPABILITIES,
     }
   );
 
-  for (const registerTool of TOOL_REGISTRARS) {
-    registerTool(server, db);
-  }
-
+  registerAllTools(server, db);
   registerAllResources(server, db);
   registerAllPrompts(server);
 

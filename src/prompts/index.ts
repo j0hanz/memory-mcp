@@ -5,22 +5,26 @@ import { loadInstructions } from '../lib/instructions.js';
 
 const INSTRUCTIONS_CONTENT = loadInstructions();
 
-const HELP_MESSAGES: PromptMessage[] = [
-  {
-    role: 'user',
-    content: {
-      type: 'text',
-      text: 'Show me the memory usage instructions.',
+function createHelpMessages(instructions: string): PromptMessage[] {
+  return [
+    {
+      role: 'user',
+      content: {
+        type: 'text',
+        text: 'Show me the memory usage instructions.',
+      },
     },
-  },
-  {
-    role: 'assistant',
-    content: {
-      type: 'text',
-      text: INSTRUCTIONS_CONTENT,
+    {
+      role: 'assistant',
+      content: {
+        type: 'text',
+        text: instructions,
+      },
     },
-  },
-];
+  ];
+}
+
+const HELP_MESSAGES = createHelpMessages(INSTRUCTIONS_CONTENT);
 
 const GET_HELP_PROMPT_CONFIG = {
   title: 'Get Help',

@@ -35,6 +35,14 @@ const ORDER_BY_MAP = {
   relevance: 'memories_fts.rank',
 } as const satisfies Record<ContextStrategy, string>;
 
+function countPayloadArrayItems(
+  payload: Record<string, unknown>,
+  key: string
+): number {
+  const value = payload[key];
+  return Array.isArray(value) ? value.length : 0;
+}
+
 function estimateTokens(content: string): number {
   return Math.ceil(content.length / ESTIMATED_CHARS_PER_TOKEN);
 }
@@ -90,10 +98,7 @@ function formatCompletionMessage(
     return `⊙ retrieve_context: ${query} • completed`;
   }
 
-  const memoriesCount =
-    'memories' in payload && Array.isArray(payload.memories)
-      ? payload.memories.length
-      : 0;
+  const memoriesCount = countPayloadArrayItems(payload, 'memories');
   const estimatedTokens =
     'estimated_tokens' in payload &&
     typeof payload.estimated_tokens === 'number'

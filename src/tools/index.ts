@@ -32,3 +32,9 @@ export const TOOL_REGISTRARS: readonly ToolRegistrar[] = [
   registerRecall,
   registerRetrieveContext,
 ];
+
+export function registerAllTools(server: McpServer, db: TypedDb): void {
+  for (const registerTool of TOOL_REGISTRARS) {
+    registerTool(server, db);
+  }
+}

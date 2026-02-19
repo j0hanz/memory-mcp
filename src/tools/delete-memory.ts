@@ -26,6 +26,10 @@ type DeleteInput = z.infer<typeof DeleteMemoryInputSchema>;
 
 const DELETE_MEMORY_SQL = 'DELETE FROM memories WHERE hash = ?';
 
+function deleteByHash(db: TypedDb, hash: string): boolean {
+  return db.prepareOnce(DELETE_MEMORY_SQL).run(hash).changes > 0;
+}
+
 export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'delete_memory',
@@ -40,9 +44,7 @@ export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
     wrapToolHandler(
       async (params: DeleteInput) => {
         try {
-          const result = db.prepareOnce(DELETE_MEMORY_SQL).run(params.hash);
-
-          if (result.changes === 0) {
+          if (!deleteByHash(db, params.hash)) {
             return createErrorResponse(
               E_NOT_FOUND,
               formatMemoryNotFound(params.hash)

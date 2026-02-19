@@ -2,6 +2,7 @@ import { z } from 'zod/v4';
 
 const STRING_SCHEMA = z.string();
 const NUMBER_SCHEMA = z.number();
+const BOOLEAN_SCHEMA = z.boolean();
 
 export const ErrorResultSchema = z.strictObject({
   code: STRING_SCHEMA,
@@ -22,26 +23,26 @@ export const MemorySchema = z.strictObject({
 export const MemoryResultSchema = MemorySchema;
 
 export const StoreResultSchema = z.strictObject({
-  hash: z.string(),
-  created: z.boolean(),
+  hash: STRING_SCHEMA,
+  created: BOOLEAN_SCHEMA,
 });
 
 export const UpdateResultSchema = z.strictObject({
-  old_hash: z.string(),
-  new_hash: z.string(),
+  old_hash: STRING_SCHEMA,
+  new_hash: STRING_SCHEMA,
 });
 
 export const DeleteResultSchema = z.strictObject({
-  hash: z.string(),
-  deleted: z.boolean(),
+  hash: STRING_SCHEMA,
+  deleted: BOOLEAN_SCHEMA,
 });
 
 export const BatchItemResultSchema = z.strictObject({
-  hash: z.string(),
-  ok: z.boolean(),
-  created: z.boolean().optional(),
-  deleted: z.boolean().optional(),
-  error: z.string().optional(),
+  hash: STRING_SCHEMA,
+  ok: BOOLEAN_SCHEMA,
+  created: BOOLEAN_SCHEMA.optional(),
+  deleted: BOOLEAN_SCHEMA.optional(),
+  error: STRING_SCHEMA.optional(),
 });
 
 export const BatchResultSchema = z.strictObject({
@@ -87,27 +88,27 @@ export const DeleteRelationshipResultSchema = z.strictObject({
 
 export const StatsResultSchema = z.strictObject({
   memories: z.strictObject({
-    total: z.number(),
-    oldest: z.string().nullable(),
-    newest: z.string().nullable(),
-    avg_importance: z.number().nullable(),
+    total: NUMBER_SCHEMA,
+    oldest: STRING_SCHEMA.nullable(),
+    newest: STRING_SCHEMA.nullable(),
+    avg_importance: NUMBER_SCHEMA.nullable(),
   }),
   relationships: z.strictObject({
-    total: z.number(),
+    total: NUMBER_SCHEMA,
   }),
-  by_type: z.record(z.string(), z.number()),
+  by_type: z.record(STRING_SCHEMA, NUMBER_SCHEMA),
 });
 
 export const RecallResultSchema = z.strictObject({
   memories: z.array(MemorySchema),
   graph: z.array(RelationshipEdgeSchema),
-  depth_reached: z.number(),
-  aborted: z.boolean().optional(),
-  nextCursor: z.string().optional(),
+  depth_reached: NUMBER_SCHEMA,
+  aborted: BOOLEAN_SCHEMA.optional(),
+  nextCursor: STRING_SCHEMA.optional(),
 });
 
 export const RetrieveContextResultSchema = z.strictObject({
   memories: z.array(MemorySchema),
-  estimated_tokens: z.number(),
-  truncated: z.boolean(),
+  estimated_tokens: NUMBER_SCHEMA,
+  truncated: BOOLEAN_SCHEMA,
 });

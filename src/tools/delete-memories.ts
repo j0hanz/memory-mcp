@@ -23,6 +23,20 @@ type DeleteMemoriesInput = z.infer<typeof DeleteMemoriesInputSchema>;
 
 const DELETE_MEMORY_SQL = 'DELETE FROM memories WHERE hash = ?';
 
+function countDeleted(items: readonly BatchItemResult[]): number {
+  return items.reduce((count, item) => (item.deleted ? count + 1 : count), 0);
+}
+
+async function notifyDeletedResources(
+  server: McpServer,
+  items: readonly BatchItemResult[]
+): Promise<void> {
+  const notifications = items
+    .filter((item) => item.deleted)
+    .map((item) => notifyMemoryResourceUpdated(server, item.hash));
+  await Promise.allSettled(notifications);
+}
+
 export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'delete_memories',
@@ -52,27 +66,13 @@ export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
             return items;
           });
 
-          let deleted = 0;
-          for (const item of results) {
-            if (item.deleted) {
-              deleted += 1;
-            }
-          }
-
+          const deleted = countDeleted(results);
           const { succeeded, failed } = summarizeBatch(results);
           await logToolEvent(server, 'delete_memories', {
             total: params.hashes.length,
             deleted,
           });
-          const notifications: Promise<void>[] = [];
-          for (const item of results) {
-            if (item.deleted) {
-              notifications.push(
-                notifyMemoryResourceUpdated(server, item.hash)
-              );
-            }
-          }
-          await Promise.allSettled(notifications);
+          await notifyDeletedResources(server, results);
 
           return createToolResponse({ items: results, succeeded, failed });
         } catch (err) {

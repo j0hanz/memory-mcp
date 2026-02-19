@@ -157,18 +157,13 @@ export function progressWithMessage(
   getMessage: (progress: { current: number; total?: number }) => string
 ): (progress: { current: number; total?: number }) => void {
   return ({ current, total }): void => {
-    if (total === undefined) {
-      reporter({
-        current,
-        message: getMessage({ current }),
-      });
-      return;
-    }
-
+    const message = getMessage(
+      total === undefined ? { current } : { current, total }
+    );
     reporter({
       current,
-      total,
-      message: getMessage({ current, total }),
+      ...(total === undefined ? {} : { total }),
+      message,
     });
   };
 }

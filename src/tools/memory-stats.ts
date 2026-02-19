@@ -36,6 +36,18 @@ function getTotalCount(db: TypedDb, sql: string): number {
   return db.prepareOnce<TotalRow>(sql).get()?.total ?? 0;
 }
 
+function getMemoryExtremes(db: TypedDb): {
+  oldest: string | null;
+  newest: string | null;
+} {
+  const oldestRow = db.prepareOnce<OldestRow>(OLDEST_MEMORY_SQL).get();
+  const newestRow = db.prepareOnce<NewestRow>(NEWEST_MEMORY_SQL).get();
+  return {
+    oldest: oldestRow?.oldest ?? null,
+    newest: newestRow?.newest ?? null,
+  };
+}
+
 export function registerMemoryStats(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'memory_stats',
@@ -54,10 +66,7 @@ export function registerMemoryStats(server: McpServer, db: TypedDb): void {
           const totalRelationships = getTotalCount(db, TOTAL_RELATIONSHIPS_SQL);
 
           const typeRows = db.prepareOnce<TypeRow>(TYPE_COUNTS_SQL).all();
-
-          const oldestRow = db.prepareOnce<OldestRow>(OLDEST_MEMORY_SQL).get();
-
-          const newestRow = db.prepareOnce<NewestRow>(NEWEST_MEMORY_SQL).get();
+          const { oldest, newest } = getMemoryExtremes(db);
 
           const avgImportanceRow = db
             .prepareOnce<AvgImportanceRow>(AVG_IMPORTANCE_SQL)
@@ -68,8 +77,8 @@ export function registerMemoryStats(server: McpServer, db: TypedDb): void {
           return createToolResponse({
             memories: {
               total: totalMemories,
-              oldest: oldestRow?.oldest ?? null,
-              newest: newestRow?.newest ?? null,
+              oldest,
+              newest,
               avg_importance: avgImportanceRow?.avg_importance ?? null,
             },
             relationships: {

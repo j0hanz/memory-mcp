@@ -96,20 +96,12 @@ export function registerGetRelationships(server: McpServer, db: TypedDb): void {
           }
 
           const directions = DIRECTIONS_BY_MODE[params.direction];
-          const rows: RelWithLinkedMemory[] = [];
-          for (const direction of directions) {
-            const directionRows = loadRelationships(db, params.hash, direction);
-            for (const row of directionRows) {
-              rows.push(row);
-            }
-          }
-
-          const relationships = new Array<RelationshipWithMemory>(rows.length);
-          let index = 0;
-          for (const row of rows) {
-            relationships[index] = toRelationshipWithMemory(row);
-            index += 1;
-          }
+          const rows: RelWithLinkedMemory[] = directions.flatMap((direction) =>
+            loadRelationships(db, params.hash, direction)
+          );
+          const relationships: RelationshipWithMemory[] = rows.map(
+            toRelationshipWithMemory
+          );
 
           return createToolResponse({
             relationships,

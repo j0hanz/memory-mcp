@@ -21,6 +21,10 @@ import { wrapToolHandler } from './progress.js';
 
 type GetInput = z.infer<typeof GetMemoryInputSchema>;
 
+function notFound(hash: string): ReturnType<typeof createErrorResponse> {
+  return createErrorResponse(E_NOT_FOUND, formatMemoryNotFound(hash));
+}
+
 export function registerGetMemory(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'get_memory',
@@ -37,10 +41,7 @@ export function registerGetMemory(server: McpServer, db: TypedDb): void {
           const row = getMemoryRow(db, params.hash);
 
           if (!row) {
-            return createErrorResponse(
-              E_NOT_FOUND,
-              formatMemoryNotFound(params.hash)
-            );
+            return notFound(params.hash);
           }
 
           const memory = parseMemoryRow(row);

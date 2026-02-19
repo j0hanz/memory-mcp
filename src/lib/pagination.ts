@@ -12,6 +12,11 @@ export interface PageSlice<T> {
   page: T[];
   hasMore: boolean;
 }
+const INVALID_CURSOR_STRUCTURE_MESSAGE = 'Invalid cursor structure';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
 
 function isNonNegativeInteger(value: unknown): value is number {
   return (
@@ -23,10 +28,10 @@ function isNonNegativeInteger(value: unknown): value is number {
 }
 
 function isCursorPayload(value: unknown): value is CursorPayload {
-  if (typeof value !== 'object' || value === null) {
+  if (!isRecord(value)) {
     return false;
   }
-  const { offset } = value as Record<string, unknown>;
+  const { offset } = value;
   return isNonNegativeInteger(offset);
 }
 
@@ -34,7 +39,7 @@ function parseCursorPayload(cursor: string): CursorPayload {
   const json = Buffer.from(cursor, CURSOR_ENCODING).toString();
   const parsed: unknown = JSON.parse(json);
   if (!isCursorPayload(parsed)) {
-    throw new Error('Invalid cursor structure');
+    throw new Error(INVALID_CURSOR_STRUCTURE_MESSAGE);
   }
   return parsed;
 }

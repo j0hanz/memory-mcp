@@ -13,9 +13,10 @@ export function isOkStructuredToolResult(result: CallToolResult): boolean {
 export function getToolResultPayload(
   result: CallToolResult
 ): ToolResultPayload | undefined {
-  if (!isOkStructuredToolResult(result)) {
+  const { structuredContent } = result;
+  if (result.isError === true || !isRecord(structuredContent)) {
     return undefined;
   }
 
-  return result.structuredContent;
+  return structuredContent;
 }

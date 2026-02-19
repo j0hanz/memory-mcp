@@ -33,6 +33,13 @@ export type DecodedSearchCursor =
       offset: number;
     };
 
+function invalidCursor(reason: string): McpError {
+  return new McpError(
+    ErrorCode.InvalidParams,
+    `${E_INVALID_CURSOR}: ${reason}`
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -74,10 +81,7 @@ function parseCursorPayload(cursor: string): unknown {
     const json = Buffer.from(cursor, CURSOR_ENCODING).toString();
     return JSON.parse(json);
   } catch {
-    throw new McpError(
-      ErrorCode.InvalidParams,
-      `${E_INVALID_CURSOR}: malformed cursor`
-    );
+    throw invalidCursor('malformed cursor');
   }
 }
 
@@ -123,10 +127,7 @@ export function decodeSearchCursor(
 
   if (isKeysetCursorPayload(payload)) {
     if (payload.scope !== expectedScope) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        `${E_INVALID_CURSOR}: cursor does not match current query or filters`
-      );
+      throw invalidCursor('cursor does not match current query or filters');
     }
 
     return {
@@ -143,8 +144,5 @@ export function decodeSearchCursor(
     };
   }
 
-  throw new McpError(
-    ErrorCode.InvalidParams,
-    `${E_INVALID_CURSOR}: malformed cursor`
-  );
+  throw invalidCursor('malformed cursor');
 }

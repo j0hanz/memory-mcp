@@ -23,6 +23,23 @@ type StoreInput = z.infer<typeof StoreMemoryInputSchema>;
 const INSERT_MEMORY_SQL = `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
   VALUES (?, ?, ?, ?, ?, ?, ?)`;
 
+function toInsertParams(
+  params: Pick<StoreInput, 'content' | 'tags' | 'importance'>,
+  hash: string,
+  memoryType: string,
+  now: string
+): [string, string, string, string, number, string, string] {
+  return [
+    hash,
+    params.content,
+    JSON.stringify(params.tags),
+    memoryType,
+    params.importance,
+    now,
+    now,
+  ];
+}
+
 function insertMemory(
   db: TypedDb,
   params: StoreInput,
@@ -30,18 +47,9 @@ function insertMemory(
   memoryType: string,
   now: string
 ): boolean {
-  const tagsJson = JSON.stringify(params.tags);
   const insertResult = db
     .prepareOnce(INSERT_MEMORY_SQL)
-    .run(
-      hash,
-      params.content,
-      tagsJson,
-      memoryType,
-      params.importance,
-      now,
-      now
-    );
+    .run(...toInsertParams(params, hash, memoryType, now));
   return insertResult.changes > 0;
 }
 

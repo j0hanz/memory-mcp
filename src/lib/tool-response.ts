@@ -5,7 +5,7 @@ interface TextContent {
   text: string;
 }
 
-interface StructuredToolResponse extends Record<string, unknown> {
+interface StructuredErrorResponse extends Record<string, unknown> {
   ok: boolean;
 }
 
@@ -16,7 +16,7 @@ function toTextContent(value: unknown): TextContent {
 function createStructuredError(
   code: string,
   message: string
-): StructuredToolResponse {
+): StructuredErrorResponse {
   return {
     ok: false,
     error: { code, message },
@@ -27,16 +27,11 @@ function buildResponse(
   structured: Record<string, unknown>,
   isError = false
 ): CallToolResult {
-  const response: CallToolResult = {
+  return {
     content: [toTextContent(structured)],
     structuredContent: structured,
+    ...(isError ? { isError: true } : {}),
   };
-
-  if (isError) {
-    response.isError = true;
-  }
-
-  return response;
 }
 
 export function createToolResponse(

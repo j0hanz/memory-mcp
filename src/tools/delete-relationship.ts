@@ -29,6 +29,12 @@ function formatRelationship(
   return `${params.from_hash} -[${params.relation_type}]-> ${params.to_hash}`;
 }
 
+function createNotFoundRelationshipMessage(
+  params: Pick<DeleteRelInput, 'from_hash' | 'to_hash' | 'relation_type'>
+): string {
+  return `Relationship not found: ${formatRelationship(params)}`;
+}
+
 function deleteRelationship(
   db: TypedDb,
   params: Pick<DeleteRelInput, 'from_hash' | 'to_hash' | 'relation_type'>
@@ -59,7 +65,7 @@ export function registerDeleteRelationship(
           if (!deleteRelationship(db, params)) {
             return createErrorResponse(
               E_NOT_FOUND,
-              `Relationship not found: ${formatRelationship(params)}`
+              createNotFoundRelationshipMessage(params)
             );
           }
 
