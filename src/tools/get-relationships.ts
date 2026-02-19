@@ -98,8 +98,8 @@ export function registerGetRelationships(server: McpServer, db: TypedDb): void {
           const relationships = rows.map(toRelationshipWithMemory);
 
           return createToolResponse({
-            ok: true,
-            result: { relationships, count: relationships.length },
+            relationships,
+            count: relationships.length,
           });
         } catch (err) {
           return createErrorResponse(E_UNKNOWN, getErrorMessage(err));

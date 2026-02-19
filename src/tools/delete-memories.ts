@@ -65,10 +65,7 @@ export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
             }
           }
 
-          return createToolResponse({
-            ok: true,
-            result: { items: results, succeeded, failed },
-          });
+          return createToolResponse({ items: results, succeeded, failed });
         } catch (err) {
           return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
         }

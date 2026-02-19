@@ -9,8 +9,8 @@ import { createServer } from '../server.js';
 import { callTool } from './helpers.js';
 
 interface StoreResult {
-  ok: boolean;
-  result: { hash: string; created: boolean };
+  hash: string;
+  created: boolean;
 }
 
 describe('store_memory tool', () => {
@@ -28,9 +28,8 @@ describe('store_memory tool', () => {
       tags: ['test', 'unit'],
     });
     const data = result.structuredContent as StoreResult;
-    assert.equal(data.ok, true);
-    assert.equal(data.result.created, true);
-    assert.match(data.result.hash, /^[a-f0-9]{64}$/);
+    assert.equal(data.created, true);
+    assert.match(data.hash, /^[a-f0-9]{64}$/);
   });
 
   it('is idempotent — same input returns created:false', async () => {
@@ -42,11 +41,8 @@ describe('store_memory tool', () => {
       content: 'idempotent test',
       tags: ['idem'],
     })) as { structuredContent: StoreResult };
-    assert.equal(
-      r1.structuredContent.result.hash,
-      r2.structuredContent.result.hash
-    );
-    assert.equal(r2.structuredContent.result.created, false);
+    assert.equal(r1.structuredContent.hash, r2.structuredContent.hash);
+    assert.equal(r2.structuredContent.created, false);
   });
 
   it('captures memory_type and importance', async () => {
@@ -56,7 +52,7 @@ describe('store_memory tool', () => {
       memory_type: 'fact',
       importance: 7,
     })) as { structuredContent: StoreResult };
-    const hash = result.structuredContent.result.hash;
+    const hash = result.structuredContent.hash;
     const row = db
       .prepare<{
         memory_type: string;

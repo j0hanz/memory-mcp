@@ -73,12 +73,7 @@ export function registerCreateRelationship(
             created,
           });
 
-          return createToolResponse({
-            ok: true,
-            result: {
-              created,
-            },
-          });
+          return createToolResponse({ created });
         } catch (err) {
           return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
         }

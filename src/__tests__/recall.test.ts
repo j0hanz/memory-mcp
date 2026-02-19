@@ -9,25 +9,22 @@ import { createServer } from '../server.js';
 import { callTool } from './helpers.js';
 
 interface RecallResult {
-  ok: boolean;
-  result: {
-    memories: Array<{
-      hash: string;
-      content: string;
-      memory_type: string;
-      importance: number;
-      relevance?: number;
-    }>;
-    graph: Array<{ from_hash: string; to_hash: string; relation_type: string }>;
-    depth_reached: number;
-    aborted?: boolean;
-    nextCursor?: string;
-  };
+  memories: Array<{
+    hash: string;
+    content: string;
+    memory_type: string;
+    importance: number;
+    relevance?: number;
+  }>;
+  graph: Array<{ from_hash: string; to_hash: string; relation_type: string }>;
+  depth_reached: number;
+  aborted?: boolean;
+  nextCursor?: string;
 }
 
 interface StoreResult {
-  ok: boolean;
-  result: { hash: string; created: boolean };
+  hash: string;
+  created: boolean;
 }
 
 describe('recall tool', () => {
@@ -45,13 +42,13 @@ describe('recall tool', () => {
       content: 'Memory about machine learning algorithms',
       tags: ['ml', 'algorithms'],
     })) as { structuredContent: StoreResult };
-    hashA = r1.structuredContent.result.hash;
+    hashA = r1.structuredContent.hash;
 
     const r2 = (await callTool(server, 'store_memory', {
       content: 'Memory about neural network architectures',
       tags: ['neural', 'deeplearning'],
     })) as { structuredContent: StoreResult };
-    hashB = r2.structuredContent.result.hash;
+    hashB = r2.structuredContent.hash;
 
     await callTool(server, 'create_relationship', {
       from_hash: hashA,
@@ -66,8 +63,7 @@ describe('recall tool', () => {
       depth: 0,
     });
     const data = result.structuredContent as RecallResult;
-    assert.equal(data.ok, true);
-    assert.ok(data.result.memories.some((m) => m.hash === hashA));
+    assert.ok(data.memories.some((m) => m.hash === hashA));
   });
 
   it('includes positive relevance on seed memories', async () => {
@@ -76,7 +72,7 @@ describe('recall tool', () => {
       depth: 0,
     });
     const data = result.structuredContent as RecallResult;
-    const seedMem = data.result.memories.find((m) => m.hash === hashA);
+    const seedMem = data.memories.find((m) => m.hash === hashA);
     assert.ok(seedMem, 'Expected seed memory');
     assert.equal(typeof seedMem.relevance, 'number');
     assert.ok(
@@ -91,10 +87,10 @@ describe('recall tool', () => {
       depth: 1,
     });
     const data = result.structuredContent as RecallResult;
-    const hashes = data.result.memories.map((m) => m.hash);
+    const hashes = data.memories.map((m) => m.hash);
     assert.ok(hashes.includes(hashA));
     assert.ok(hashes.includes(hashB));
-    assert.equal(data.result.aborted, undefined);
+    assert.equal(data.aborted, undefined);
   });
 
   it('includes relationship edges in the result', async () => {
@@ -103,7 +99,7 @@ describe('recall tool', () => {
       depth: 1,
     });
     const data = result.structuredContent as RecallResult;
-    const edge = data.result.graph.find(
+    const edge = data.graph.find(
       (e) => e.from_hash === hashA && e.to_hash === hashB
     );
     assert.ok(edge !== undefined, 'Expected edge between hashA and hashB');
@@ -159,9 +155,8 @@ describe('recall tool', () => {
       limit: 1,
     });
     const data = result.structuredContent as RecallResult;
-    assert.equal(data.ok, true);
-    assert.equal(data.result.aborted, true);
-    assert.ok(data.result.graph.length > 0);
+    assert.equal(data.aborted, true);
+    assert.ok(data.graph.length > 0);
   });
 
   describe('with filters', () => {
@@ -200,9 +195,8 @@ describe('recall tool', () => {
         memory_type: 'fact',
       });
       const data = result.structuredContent as RecallResult;
-      assert.ok(data.ok);
-      assert.ok(data.result.memories.length > 0);
-      for (const mem of data.result.memories) {
+      assert.ok(data.memories.length > 0);
+      for (const mem of data.memories) {
         assert.equal(
           mem.memory_type,
           'fact',
@@ -218,8 +212,7 @@ describe('recall tool', () => {
         min_importance: 5,
       });
       const data = result.structuredContent as RecallResult;
-      assert.ok(data.ok);
-      for (const mem of data.result.memories) {
+      for (const mem of data.memories) {
         assert.ok(
           mem.importance >= 5,
           `Expected importance >= 5, got ${mem.importance}`

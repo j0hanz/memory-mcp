@@ -47,10 +47,7 @@ export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
           await logToolEvent(server, 'delete', { hash: params.hash });
           await notifyMemoryResourceUpdated(server, params.hash);
 
-          return createToolResponse({
-            ok: true,
-            result: { deleted: true, hash: params.hash },
-          });
+          return createToolResponse({ deleted: true, hash: params.hash });
         } catch (err) {
           return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
         }

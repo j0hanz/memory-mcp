@@ -9,19 +9,16 @@ import { createServer } from '../server.js';
 import { callTool } from './helpers.js';
 
 interface SearchResult {
-  ok: boolean;
-  result: {
-    memories: Array<{
-      hash: string;
-      content: string;
-      tags: string[];
-      memory_type: string;
-      importance: number;
-      relevance?: number;
-    }>;
-    total_returned: number;
-    nextCursor?: string;
-  };
+  memories: Array<{
+    hash: string;
+    content: string;
+    tags: string[];
+    memory_type: string;
+    importance: number;
+    relevance?: number;
+  }>;
+  total_returned: number;
+  nextCursor?: string;
 }
 
 describe('search_memories tool', () => {
@@ -57,11 +54,8 @@ describe('search_memories tool', () => {
       query: 'TypeScript',
     });
     const data = result.structuredContent as SearchResult;
-    assert.equal(data.ok, true);
-    assert.ok(data.result.memories.length > 0);
-    assert.ok(
-      data.result.memories.some((m) => m.content.includes('TypeScript'))
-    );
+    assert.ok(data.memories.length > 0);
+    assert.ok(data.memories.some((m) => m.content.includes('TypeScript')));
   });
 
   it('returns empty for no matches', async () => {
@@ -69,8 +63,8 @@ describe('search_memories tool', () => {
       query: 'QuantumComputingXYZ',
     });
     const data = result.structuredContent as SearchResult;
-    assert.equal(data.result.memories.length, 0);
-    assert.equal(data.result.total_returned, 0);
+    assert.equal(data.memories.length, 0);
+    assert.equal(data.total_returned, 0);
   });
 
   it('respects the limit parameter', async () => {
@@ -96,7 +90,7 @@ describe('search_memories tool', () => {
       limit: 2,
     });
     const data = result.structuredContent as SearchResult;
-    assert.ok(data.result.memories.length <= 2);
+    assert.ok(data.memories.length <= 2);
   });
 
   it('includes positive relevance scores', async () => {
@@ -104,8 +98,8 @@ describe('search_memories tool', () => {
       query: 'TypeScript',
     });
     const data = result.structuredContent as SearchResult;
-    assert.ok(data.result.memories.length > 0);
-    for (const mem of data.result.memories) {
+    assert.ok(data.memories.length > 0);
+    for (const mem of data.memories) {
       assert.equal(typeof mem.relevance, 'number');
       assert.ok(
         mem.relevance! > 0,
@@ -149,9 +143,8 @@ describe('search_memories tool', () => {
         memory_type: 'fact',
       });
       const data = result.structuredContent as SearchResult;
-      assert.ok(data.ok);
-      assert.ok(data.result.memories.length > 0);
-      for (const mem of data.result.memories) {
+      assert.ok(data.memories.length > 0);
+      for (const mem of data.memories) {
         assert.equal(
           mem.memory_type,
           'fact',
@@ -166,8 +159,7 @@ describe('search_memories tool', () => {
         min_importance: 5,
       });
       const data = result.structuredContent as SearchResult;
-      assert.ok(data.ok);
-      for (const mem of data.result.memories) {
+      for (const mem of data.memories) {
         assert.ok(
           mem.importance >= 5,
           `Expected importance >= 5, got ${mem.importance}`
@@ -180,8 +172,7 @@ describe('search_memories tool', () => {
         query: 'TypeScript',
       });
       const data = result.structuredContent as SearchResult;
-      assert.ok(data.ok);
-      assert.ok(data.result.memories.length > 0);
+      assert.ok(data.memories.length > 0);
     });
   });
 });

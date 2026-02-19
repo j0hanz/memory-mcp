@@ -70,10 +70,7 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
             created,
           });
 
-          return createToolResponse({
-            ok: true,
-            result: { items: results, succeeded, failed },
-          });
+          return createToolResponse({ items: results, succeeded, failed });
         } catch (err) {
           return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
         }

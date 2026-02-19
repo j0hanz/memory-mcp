@@ -9,17 +9,14 @@ import { createServer } from '../server.js';
 import { callTool } from './helpers.js';
 
 interface RetrieveContextResult {
-  ok: boolean;
-  result: {
-    memories: Array<{
-      hash: string;
-      content: string;
-      memory_type: string;
-      importance: number;
-    }>;
-    estimated_tokens: number;
-    truncated: boolean;
-  };
+  memories: Array<{
+    hash: string;
+    content: string;
+    memory_type: string;
+    importance: number;
+  }>;
+  estimated_tokens: number;
+  truncated: boolean;
 }
 
 describe('retrieve_context tool', () => {
@@ -85,10 +82,9 @@ describe('retrieve_context tool', () => {
       strategy: 'relevance',
     });
     const data = result.structuredContent as RetrieveContextResult;
-    assert.equal(data.ok, true);
-    assert.ok(data.result.memories.length > 0);
-    assert.equal(typeof data.result.estimated_tokens, 'number');
-    assert.ok(data.result.estimated_tokens > 0);
+    assert.ok(data.memories.length > 0);
+    assert.equal(typeof data.estimated_tokens, 'number');
+    assert.ok(data.estimated_tokens > 0);
   });
 
   it('token_budget truncates results at correct boundary', async () => {
@@ -99,11 +95,10 @@ describe('retrieve_context tool', () => {
       token_budget: 100,
     });
     const data = result.structuredContent as RetrieveContextResult;
-    assert.equal(data.ok, true);
-    assert.equal(data.result.truncated, true);
+    assert.equal(data.truncated, true);
     assert.ok(
-      data.result.estimated_tokens <= 100,
-      `Expected estimated_tokens <= 100, got ${data.result.estimated_tokens}`
+      data.estimated_tokens <= 100,
+      `Expected estimated_tokens <= 100, got ${data.estimated_tokens}`
     );
   });
 
@@ -113,11 +108,10 @@ describe('retrieve_context tool', () => {
       strategy: 'importance',
     });
     const data = result.structuredContent as RetrieveContextResult;
-    assert.equal(data.ok, true);
-    assert.ok(data.result.memories.length > 0);
+    assert.ok(data.memories.length > 0);
 
     // Verify descending importance order
-    const importances = data.result.memories.map((m) => m.importance);
+    const importances = data.memories.map((m) => m.importance);
     for (let i = 1; i < importances.length; i++) {
       assert.ok(
         importances[i - 1]! >= importances[i]!,
@@ -151,8 +145,7 @@ describe('retrieve_context tool', () => {
       token_budget: 200000,
     });
     const data = result.structuredContent as RetrieveContextResult;
-    assert.equal(data.ok, true);
-    assert.equal(data.result.truncated, true);
-    assert.equal(data.result.memories.length, 200);
+    assert.equal(data.truncated, true);
+    assert.equal(data.memories.length, 200);
   });
 });

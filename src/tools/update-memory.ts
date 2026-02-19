@@ -72,8 +72,8 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
           await notifyMemoryResourceUpdated(server, params.hash);
 
           return createToolResponse({
-            ok: true,
-            result: { old_hash: params.hash, new_hash: newHash },
+            old_hash: params.hash,
+            new_hash: newHash,
           });
         } catch (err) {
           return createErrorResponse(E_UNKNOWN, getErrorMessage(err));

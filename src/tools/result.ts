@@ -7,8 +7,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function isOkStructuredToolResult(result: CallToolResult): boolean {
-  const structured = result.structuredContent;
-  return isRecord(structured) && structured['ok'] === true;
+  return result.isError !== true && isRecord(result.structuredContent);
 }
 
 export function getToolResultPayload(
@@ -18,7 +17,6 @@ export function getToolResultPayload(
     return undefined;
   }
 
-  const structured = result.structuredContent as Record<string, unknown>;
-  const payload = structured['result'];
-  return isRecord(payload) ? payload : undefined;
+  const structured = result.structuredContent;
+  return isRecord(structured) ? structured : undefined;
 }

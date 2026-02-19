@@ -38,7 +38,7 @@ export function registerGetMemory(server: McpServer, db: TypedDb): void {
             );
           }
 
-          return createToolResponse({ ok: true, result: parseMemoryRow(row) });
+          return createToolResponse({ ...parseMemoryRow(row) });
         } catch (err) {
           return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
         }

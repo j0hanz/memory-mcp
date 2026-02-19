@@ -175,12 +175,9 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
         completionCurrent = candidateRows.length + 1;
 
         result = createToolResponse({
-          ok: true,
-          result: {
-            memories: selected,
-            estimated_tokens: estimatedTokens,
-            truncated,
-          },
+          memories: selected,
+          estimated_tokens: estimatedTokens,
+          truncated,
         });
       } catch (err) {
         result = createErrorResponse(E_UNKNOWN, getErrorMessage(err));

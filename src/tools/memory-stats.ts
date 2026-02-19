@@ -73,22 +73,19 @@ export function registerMemoryStats(server: McpServer, db: TypedDb): void {
           const byType = toTypeCounts(typeRows);
 
           return createToolResponse({
-            ok: true,
-            result: {
-              memories: {
-                total: totalMemories,
-                oldest: getNullableField(oldestRow, 'oldest'),
-                newest: getNullableField(newestRow, 'newest'),
-                avg_importance: getNullableField(
-                  avgImportanceRow,
-                  'avg_importance'
-                ),
-              },
-              relationships: {
-                total: totalRelationships,
-              },
-              by_type: byType,
+            memories: {
+              total: totalMemories,
+              oldest: getNullableField(oldestRow, 'oldest'),
+              newest: getNullableField(newestRow, 'newest'),
+              avg_importance: getNullableField(
+                avgImportanceRow,
+                'avg_importance'
+              ),
             },
+            relationships: {
+              total: totalRelationships,
+            },
+            by_type: byType,
           });
         } catch (err) {
           return createErrorResponse(E_UNKNOWN, getErrorMessage(err));

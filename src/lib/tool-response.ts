@@ -24,7 +24,7 @@ function createStructuredError(
 }
 
 function buildResponse(
-  structured: StructuredToolResponse,
+  structured: Record<string, unknown>,
   isError = false
 ): CallToolResult {
   return {
@@ -35,9 +35,9 @@ function buildResponse(
 }
 
 export function createToolResponse(
-  structured: StructuredToolResponse
+  payload: Record<string, unknown>
 ): CallToolResult {
-  return buildResponse(structured);
+  return buildResponse(payload);
 }
 
 export function createErrorResponse(

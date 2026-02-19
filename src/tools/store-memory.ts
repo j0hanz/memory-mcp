@@ -60,7 +60,7 @@ export function registerStoreMemory(server: McpServer, db: TypedDb): void {
           const created = insertMemory(db, params, hash, memoryType, now);
           await logToolEvent(server, 'store', { hash, created });
 
-          return createToolResponse({ ok: true, result: { hash, created } });
+          return createToolResponse({ hash, created });
         } catch (err) {
           return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
         }

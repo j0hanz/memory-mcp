@@ -58,10 +58,7 @@ export function registerDeleteRelationship(
             );
           }
 
-          return createToolResponse({
-            ok: true,
-            result: DELETE_RELATIONSHIP_RESULT,
-          });
+          return createToolResponse(DELETE_RELATIONSHIP_RESULT);
         } catch (err) {
           return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
         }

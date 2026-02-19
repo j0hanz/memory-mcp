@@ -293,14 +293,11 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
         const nextCursor = hasMore ? encodeCursor(offset + limit) : undefined;
 
         result = createToolResponse({
-          ok: true,
-          result: {
-            memories,
-            graph: traversal.edges,
-            depth_reached: traversal.depthReached,
-            ...(traversal.aborted ? { aborted: true } : {}),
-            ...(nextCursor ? { nextCursor } : {}),
-          },
+          memories,
+          graph: traversal.edges,
+          depth_reached: traversal.depthReached,
+          ...(traversal.aborted ? { aborted: true } : {}),
+          ...(nextCursor ? { nextCursor } : {}),
         });
       } catch (err) {
         result = createErrorResponse(E_UNKNOWN, getErrorMessage(err));

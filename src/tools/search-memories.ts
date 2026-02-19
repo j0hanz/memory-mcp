@@ -74,12 +74,9 @@ export function registerSearchMemories(server: McpServer, db: TypedDb): void {
           const nextCursor = hasMore ? encodeCursor(offset + limit) : undefined;
 
           return createToolResponse({
-            ok: true,
-            result: {
-              memories,
-              total_returned: memories.length,
-              ...(nextCursor ? { nextCursor } : {}),
-            },
+            memories,
+            total_returned: memories.length,
+            ...(nextCursor ? { nextCursor } : {}),
           });
         } catch (err) {
           return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
