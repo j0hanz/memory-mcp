@@ -48,7 +48,7 @@ export function registerGetMemory(server: McpServer, db: TypedDb): void {
       },
       {
         progressMessage: (params: GetInput) =>
-          `get_memory: ${params.hash.slice(0, 12)}... [single]`,
+          `⊙ get_memory: ${params.hash.slice(0, 12)}... [single]`,
       }
     )
   );

@@ -100,7 +100,7 @@ export function registerSearchMemories(server: McpServer, db: TypedDb): void {
       },
       {
         progressMessage: (params: SearchInput) =>
-          `search_memories: ${params.query} [limit ${params.limit}]`,
+          `⊙ search_memories: ${params.query} [limit ${params.limit}]`,
       }
     )
   );

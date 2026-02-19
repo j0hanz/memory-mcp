@@ -82,7 +82,7 @@ export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
       },
       {
         progressMessage: (params: DeleteMemoriesInput) =>
-          `delete_memories: [${params.hashes.length} hashes]`,
+          `⊖ delete_memories: ${params.hashes.length} hashes [batch]`,
       }
     )
   );

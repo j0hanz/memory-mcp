@@ -78,7 +78,7 @@ export function registerCreateRelationship(
       },
       {
         progressMessage: (params: CreateRelInput) =>
-          `create_relationship: ${params.from_hash.slice(0, 8)}... • ${params.to_hash.slice(0, 8)}... [${params.relation_type}]`,
+          `⊕ create_relationship: ${params.from_hash.slice(0, 8)}... • ${params.to_hash.slice(0, 8)}... [${params.relation_type}]`,
       }
     )
   );

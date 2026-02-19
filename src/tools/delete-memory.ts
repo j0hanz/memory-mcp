@@ -56,7 +56,7 @@ export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
       },
       {
         progressMessage: (params: DeleteInput) =>
-          `delete_memory: ${params.hash.slice(0, 12)}... [single]`,
+          `⊖ delete_memory: ${params.hash.slice(0, 12)}... [single]`,
       }
     )
   );

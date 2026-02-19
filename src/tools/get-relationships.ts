@@ -101,7 +101,7 @@ export function registerGetRelationships(server: McpServer, db: TypedDb): void {
       },
       {
         progressMessage: (params: GetRelInput) =>
-          `get_relationships: ${params.hash.slice(0, 12)}... [${params.direction}]`,
+          `⊙ get_relationships: ${params.hash.slice(0, 12)}... [${params.direction}]`,
       }
     )
   );

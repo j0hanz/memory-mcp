@@ -60,7 +60,7 @@ export function registerStoreMemory(server: McpServer, db: TypedDb): void {
       },
       {
         progressMessage: (params: StoreInput) =>
-          `store_memory: [${params.tags.length} tags]`,
+          `⊕ store_memory: ${params.tags.length} tags [single]`,
       }
     )
   );

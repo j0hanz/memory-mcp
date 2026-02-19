@@ -83,7 +83,7 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
       },
       {
         progressMessage: (params: UpdateInput) =>
-          `update_memory: ${params.hash.slice(0, 12)}... [replace content]`,
+          `⊜ update_memory: ${params.hash.slice(0, 12)}... [replace content]`,
       }
     )
   );

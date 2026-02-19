@@ -213,14 +213,14 @@ function formatRecallCompletionMessage(
   result: CallToolResult
 ): string {
   if (result.isError) {
-    return `recall: "${query}" • failed`;
+    return `⊙ recall: ${query} • failed`;
   }
   if (
     typeof result.structuredContent !== 'object' ||
     !('ok' in result.structuredContent) ||
     result.structuredContent.ok !== true
   ) {
-    return `recall: "${query}" • failed`;
+    return `⊙ recall: ${query} • failed`;
   }
 
   const structured = result.structuredContent;
@@ -229,7 +229,7 @@ function formatRecallCompletionMessage(
     typeof structured.result !== 'object' ||
     structured.result === null
   ) {
-    return `recall: "${query}" • completed`;
+    return `⊙ recall: ${query} • completed`;
   }
 
   const payload = structured.result;
@@ -243,7 +243,7 @@ function formatRecallCompletionMessage(
       : 0;
   const aborted = 'aborted' in payload && payload.aborted === true;
 
-  return `recall: "${query}" • ${memoriesCount} memories, ${edgesCount} edges${aborted ? ' [aborted]' : ''}`;
+  return `⊙ recall: ${query} • ${memoriesCount} memories, ${edgesCount} edges${aborted ? ' [aborted]' : ''}`;
 }
 
 export function registerRecall(server: McpServer, db: TypedDb): void {
@@ -260,7 +260,7 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
     async (params: RecallInput, extra) => {
       const { depth, limit, cursor } = params;
       const offset = cursor ? decodeCursor(cursor) : 0;
-      const contextLabel = `recall: "${params.query}" [depth ${depth}]`;
+      const contextLabel = `⊙ recall: ${params.query} [depth ${depth}]`;
       const completionCurrent = depth + 1;
 
       await notifyProgress(extra, {
@@ -272,7 +272,7 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
       const hopReporter = progressWithMessage(
         createProgressReporter(extra),
         ({ current, total }) =>
-          `recall: ${params.query} [hop ${current}/${total ?? current}]`
+          `⊙ recall: ${params.query} [hop ${current}/${total ?? current}]`
       );
 
       const onHop: ProgressNotifier = (hop: number, total: number): void => {

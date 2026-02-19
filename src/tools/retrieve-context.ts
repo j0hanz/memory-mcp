@@ -80,14 +80,14 @@ function formatCompletionMessage(
   result: CallToolResult
 ): string {
   if (result.isError) {
-    return `retrieve_context: "${query}" • failed`;
+    return `⊙ retrieve_context: ${query} • failed`;
   }
   if (
     typeof result.structuredContent !== 'object' ||
     !('ok' in result.structuredContent) ||
     result.structuredContent.ok !== true
   ) {
-    return `retrieve_context: "${query}" • failed`;
+    return `⊙ retrieve_context: ${query} • failed`;
   }
 
   const structured = result.structuredContent;
@@ -96,7 +96,7 @@ function formatCompletionMessage(
     typeof structured.result !== 'object' ||
     structured.result === null
   ) {
-    return `retrieve_context: "${query}" • completed`;
+    return `⊙ retrieve_context: ${query} • completed`;
   }
 
   const payload = structured.result;
@@ -112,7 +112,7 @@ function formatCompletionMessage(
   const truncated =
     'truncated' in payload && payload.truncated === true ? ' [truncated]' : '';
 
-  return `retrieve_context: ${query} • ${memoriesCount} memories, ${estimatedTokens} tokens${truncated}`;
+  return `⊙ retrieve_context: ${query} • ${memoriesCount} memories, ${estimatedTokens} tokens${truncated}`;
 }
 
 export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
@@ -129,7 +129,7 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
     async (params: RetrieveContextInput, extra) => {
       const { query, strategy } = params;
       const tokenBudget = params.token_budget;
-      const contextLabel = `retrieve_context: ${query} [${strategy}]`;
+      const contextLabel = `⊙ retrieve_context: ${query} [${strategy}]`;
       let completionCurrent = 1;
       await notifyProgress(extra, {
         current: 0,

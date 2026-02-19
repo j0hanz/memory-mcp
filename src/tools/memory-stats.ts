@@ -84,7 +84,7 @@ export function registerMemoryStats(server: McpServer, db: TypedDb): void {
           return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
         }
       },
-      { progressMessage: () => 'memory_stats: [aggregate]' }
+      { progressMessage: () => '⊙ memory_stats: [aggregate]' }
     )
   );
 }

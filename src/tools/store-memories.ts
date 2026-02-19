@@ -87,7 +87,7 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
       },
       {
         progressMessage: (params: StoreMemoriesInput) =>
-          `store_memories: [${params.items.length} items]`,
+          `⊕ store_memories: ${params.items.length} items [batch]`,
       }
     )
   );
