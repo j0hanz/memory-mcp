@@ -13,16 +13,21 @@ import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
-import { parseMemoryRow } from '../lib/types.js';
+import { type MemoryRow, parseMemoryRow } from '../lib/types.js';
 import { GetMemoryInputSchema } from '../schemas/inputs.js';
 import { MemoryResultSchema } from '../schemas/outputs.js';
-import { formatMemoryNotFound, getMemoryRow } from './helpers.js';
 import { wrapToolHandler } from './progress.js';
 
 type GetInput = z.infer<typeof GetMemoryInputSchema>;
 
+const SELECT_MEMORY_BY_HASH_SQL = 'SELECT * FROM memories WHERE hash = ?';
+
+function getMemoryRow(db: TypedDb, hash: string): MemoryRow | undefined {
+  return db.prepareOnce<MemoryRow>(SELECT_MEMORY_BY_HASH_SQL).get(hash);
+}
+
 function notFound(hash: string): ReturnType<typeof createErrorResponse> {
-  return createErrorResponse(E_NOT_FOUND, formatMemoryNotFound(hash));
+  return createErrorResponse(E_NOT_FOUND, `Memory not found: ${hash}`);
 }
 
 export function registerGetMemory(server: McpServer, db: TypedDb): void {

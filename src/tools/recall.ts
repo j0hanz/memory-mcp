@@ -13,7 +13,7 @@ import {
   decodeSearchCursor,
   encodeSearchCursor,
 } from '../lib/search-cursor.js';
-import { loadRankedSearchRows } from '../lib/search.js';
+import { loadRankedSearchRows, toMemoryFilters } from '../lib/search.js';
 import {
   createErrorResponse,
   createToolResponse,
@@ -27,7 +27,6 @@ import type {
 } from '../lib/types.js';
 import { RecallInputSchema } from '../schemas/inputs.js';
 import { RecallResultSchema } from '../schemas/outputs.js';
-import { toMemoryFilters } from './helpers.js';
 import {
   createProgressReporter,
   notifyProgress,

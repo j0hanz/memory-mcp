@@ -4,6 +4,7 @@ import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
 import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
+import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
 import {
   createErrorResponse,
   createToolResponse,
@@ -11,12 +12,6 @@ import {
 import type { BatchItemResult } from '../lib/types.js';
 import { DeleteMemoriesInputSchema } from '../schemas/inputs.js';
 import { BatchResultSchema } from '../schemas/outputs.js';
-import {
-  logToolEvent,
-  notifyMemoryResourceUpdated,
-  summarizeBatch,
-  withImmediateTransaction,
-} from './helpers.js';
 import { wrapToolHandler } from './progress.js';
 
 type DeleteMemoriesInput = z.infer<typeof DeleteMemoriesInputSchema>;
@@ -51,7 +46,7 @@ export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
     wrapToolHandler(
       async (params: DeleteMemoriesInput) => {
         try {
-          const results = withImmediateTransaction(db, () => {
+          const results = db.transaction(() => {
             const items: BatchItemResult[] = [];
             const stmt = db.prepareOnce<unknown>(DELETE_MEMORY_SQL);
             for (const hash of params.hashes) {
@@ -67,7 +62,12 @@ export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
           });
 
           const deleted = countDeleted(results);
-          const { succeeded, failed } = summarizeBatch(results);
+          const succeeded = results.reduce(
+            (count, item) => (item.ok ? count + 1 : count),
+            0
+          );
+          const failed = results.length - succeeded;
+
           await logToolEvent(server, 'delete_memories', {
             total: params.hashes.length,
             deleted,

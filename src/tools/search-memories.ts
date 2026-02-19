@@ -10,7 +10,7 @@ import {
   decodeSearchCursor,
   encodeSearchCursor,
 } from '../lib/search-cursor.js';
-import { loadRankedSearchRows } from '../lib/search.js';
+import { loadRankedSearchRows, toMemoryFilters } from '../lib/search.js';
 import {
   createErrorResponse,
   createToolResponse,
@@ -19,7 +19,6 @@ import { parseMemoryRow } from '../lib/types.js';
 import type { Memory } from '../lib/types.js';
 import { SearchMemoriesInputSchema } from '../schemas/inputs.js';
 import { SearchResultSchema } from '../schemas/outputs.js';
-import { toMemoryFilters } from './helpers.js';
 import { wrapToolHandler } from './progress.js';
 
 type SearchInput = z.infer<typeof SearchMemoriesInputSchema>;

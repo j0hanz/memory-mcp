@@ -9,13 +9,13 @@ import {
   getErrorMessage,
   rethrowMcpError,
 } from '../lib/errors.js';
+import { logToolEvent } from '../lib/mcp-utils.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
 import { CreateRelationshipInputSchema } from '../schemas/inputs.js';
 import { CreateRelationshipResultSchema } from '../schemas/outputs.js';
-import { logToolEvent, nowIso } from './helpers.js';
 import { wrapToolHandler } from './progress.js';
 
 type CreateRelInput = z.infer<typeof CreateRelationshipInputSchema>;
@@ -73,7 +73,7 @@ export function registerCreateRelationship(
             );
           }
 
-          const now = nowIso();
+          const now = new Date().toISOString();
           const result = db
             .prepareOnce(INSERT_RELATIONSHIP_SQL)
             .run(params.from_hash, params.to_hash, params.relation_type, now);

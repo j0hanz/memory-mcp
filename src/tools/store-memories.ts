@@ -5,6 +5,7 @@ import type { z } from 'zod/v4';
 import type { TypedDb } from '../db/typed.js';
 import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
 import { computeMemoryHash } from '../lib/hash.js';
+import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
 import {
   createErrorResponse,
   createToolResponse,
@@ -12,14 +13,6 @@ import {
 import type { BatchItemResult } from '../lib/types.js';
 import { StoreMemoriesInputSchema } from '../schemas/inputs.js';
 import { BatchResultSchema } from '../schemas/outputs.js';
-import {
-  logToolEvent,
-  normalizeMemoryType,
-  notifyMemoryResourceUpdated,
-  nowIso,
-  summarizeBatch,
-  withImmediateTransaction,
-} from './helpers.js';
 import { wrapToolHandler } from './progress.js';
 
 type StoreMemoriesInput = z.infer<typeof StoreMemoriesInputSchema>;
@@ -54,14 +47,14 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
     wrapToolHandler(
       async (params: StoreMemoriesInput) => {
         try {
-          const now = nowIso();
-          const results = withImmediateTransaction(db, () => {
+          const now = new Date().toISOString();
+          const results = db.transaction(() => {
             const items: BatchItemResult[] = [];
             const stmt = db.prepareOnce<unknown>(INSERT_MEMORY_SQL);
 
             for (const item of params.items) {
               const { importance, memory_type: rawMemoryType } = item;
-              const memoryType = normalizeMemoryType(rawMemoryType);
+              const memoryType = rawMemoryType ?? 'general';
               const hash = computeMemoryHash(item.content, item.tags);
               const tagsJson = JSON.stringify(item.tags);
               const result = stmt.run(
@@ -73,13 +66,22 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
                 now,
                 now
               );
-              items.push({ hash, ok: true, created: result.changes > 0 });
+              items.push({
+                hash,
+                ok: true,
+                created: result.changes > 0,
+              });
             }
             return items;
           });
 
           const created = countCreated(results);
-          const { succeeded, failed } = summarizeBatch(results);
+          const succeeded = results.reduce(
+            (count, item) => (item.ok ? count + 1 : count),
+            0
+          );
+          const failed = results.length - succeeded;
+
           await logToolEvent(server, 'store_memories', {
             total: results.length,
             created,

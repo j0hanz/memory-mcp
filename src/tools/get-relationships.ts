@@ -17,10 +17,18 @@ import { parseTags } from '../lib/types.js';
 import type { RelationshipRow, RelationshipWithMemory } from '../lib/types.js';
 import { GetRelationshipsInputSchema } from '../schemas/inputs.js';
 import { RelationshipResultSchema } from '../schemas/outputs.js';
-import { memoryExists } from './helpers.js';
 import { wrapToolHandler } from './progress.js';
 
 type GetRelInput = z.infer<typeof GetRelationshipsInputSchema>;
+
+const SELECT_MEMORY_HASH_SQL = 'SELECT hash FROM memories WHERE hash = ?';
+
+function memoryExists(db: TypedDb, hash: string): boolean {
+  return (
+    db.prepareOnce<{ hash: string }>(SELECT_MEMORY_HASH_SQL).get(hash) !==
+    undefined
+  );
+}
 
 interface RelWithLinkedMemory extends RelationshipRow {
   linked_hash: string;

@@ -123,3 +123,19 @@ export function loadRankedSearchRows(
     limit + 1
   );
 }
+
+export function toMemoryFilters(params: {
+  min_importance?: number | undefined;
+  max_importance?: number | undefined;
+  memory_type?: string | undefined;
+}): MemoryFilters {
+  return {
+    ...(params.min_importance != null
+      ? { min_importance: params.min_importance }
+      : {}),
+    ...(params.max_importance != null
+      ? { max_importance: params.max_importance }
+      : {}),
+    ...(params.memory_type != null ? { memory_type: params.memory_type } : {}),
+  };
+}

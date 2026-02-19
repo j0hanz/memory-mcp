@@ -5,18 +5,13 @@ import type { z } from 'zod/v4';
 import type { TypedDb } from '../db/typed.js';
 import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
 import { computeMemoryHash } from '../lib/hash.js';
+import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
 import { StoreMemoryInputSchema } from '../schemas/inputs.js';
 import { StoreResultSchema } from '../schemas/outputs.js';
-import {
-  logToolEvent,
-  normalizeMemoryType,
-  notifyMemoryResourceUpdated,
-  nowIso,
-} from './helpers.js';
 import { wrapToolHandler } from './progress.js';
 
 type StoreInput = z.infer<typeof StoreMemoryInputSchema>;
@@ -67,9 +62,9 @@ export function registerStoreMemory(server: McpServer, db: TypedDb): void {
     wrapToolHandler(
       async (params: StoreInput) => {
         try {
-          const memoryType = normalizeMemoryType(params.memory_type);
+          const memoryType = params.memory_type ?? 'general';
           const hash = computeMemoryHash(params.content, params.tags);
-          const now = nowIso();
+          const now = new Date().toISOString();
           const created = insertMemory(db, params, hash, memoryType, now);
           await logToolEvent(server, 'store', { hash, created });
           if (created) {

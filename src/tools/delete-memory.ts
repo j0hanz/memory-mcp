@@ -9,17 +9,13 @@ import {
   getErrorMessage,
   rethrowMcpError,
 } from '../lib/errors.js';
+import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
 import { DeleteMemoryInputSchema } from '../schemas/inputs.js';
 import { DeleteResultSchema } from '../schemas/outputs.js';
-import {
-  formatMemoryNotFound,
-  logToolEvent,
-  notifyMemoryResourceUpdated,
-} from './helpers.js';
 import { wrapToolHandler } from './progress.js';
 
 type DeleteInput = z.infer<typeof DeleteMemoryInputSchema>;
@@ -47,7 +43,7 @@ export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
           if (!deleteByHash(db, params.hash)) {
             return createErrorResponse(
               E_NOT_FOUND,
-              formatMemoryNotFound(params.hash)
+              `Memory not found: ${params.hash}`
             );
           }
 

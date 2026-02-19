@@ -45,6 +45,18 @@ export class TypedDb {
     return stmt;
   }
 
+  transaction<T>(action: () => T): T {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const result = action();
+      this.db.exec('COMMIT');
+      return result;
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
   exec(sql: string): void {
     this.db.exec(sql);
   }
