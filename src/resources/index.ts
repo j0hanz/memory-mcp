@@ -1,6 +1,7 @@
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Variables } from '@modelcontextprotocol/sdk/shared/uriTemplate.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { createHashCompletionCallback } from '../completions/index.js';
 import type { TypedDb } from '../db/typed.js';
@@ -90,7 +91,10 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
       const hash = getSingleVariable(rawHash);
 
       if (!hash || !HASH_REGEX.test(hash)) {
-        return createErrorResourceContents(uri.href, 'Invalid hash');
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Invalid hash: must be a 64-character hex string'
+        );
       }
 
       const row = readMemoryByHash(db, hash);

@@ -10,6 +10,7 @@ import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
 import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
+import { logToolEvent } from '../lib/mcp-utils.js';
 import { splitPage } from '../lib/pagination.js';
 import {
   buildSearchCursorScope,
@@ -318,6 +319,15 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
             nextCursor = encodeSearchCursor(scope, rank, lastSeed.hash);
           }
         }
+
+        await logToolEvent(server, 'recall', {
+          depth,
+          depth_reached: traversal.depthReached,
+          seed_count: pageSeeds.length,
+          visited_nodes: traversal.visited.size,
+          edge_count: traversal.edges.length,
+          aborted: traversal.aborted,
+        });
 
         result = createToolResponse({
           memories,

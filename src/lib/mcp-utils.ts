@@ -19,16 +19,20 @@ export async function logToolEvent(
   }
 }
 
+const MEMORY_RESOURCE_URI_PREFIX = 'memory://memories/';
+
 export async function notifyMemoryResourceUpdated(
   server: McpServer,
-  uri: string
+  hash: string
 ): Promise<void> {
   if (!server.isConnected()) {
     return;
   }
 
   try {
-    await server.server.sendResourceUpdated({ uri });
+    await server.server.sendResourceUpdated({
+      uri: `${MEMORY_RESOURCE_URI_PREFIX}${hash}`,
+    });
   } catch {
     // best-effort notification
   }
