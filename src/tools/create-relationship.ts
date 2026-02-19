@@ -61,7 +61,7 @@ export function registerCreateRelationship(
 
           const now = nowIso();
           const result = db
-            .prepare(INSERT_RELATIONSHIP_SQL)
+            .prepareOnce(INSERT_RELATIONSHIP_SQL)
             .run(params.from_hash, params.to_hash, params.relation_type, now);
 
           const created = result.changes > 0;

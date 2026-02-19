@@ -43,7 +43,7 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
           const now = nowIso();
           const results = withImmediateTransaction(db, () => {
             const items: BatchItemResult[] = [];
-            const stmt = db.prepare<unknown>(INSERT_MEMORY_SQL);
+            const stmt = db.prepareOnce<unknown>(INSERT_MEMORY_SQL);
 
             for (const item of params.items) {
               const { importance, memory_type: rawMemoryType } = item;

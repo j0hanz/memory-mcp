@@ -13,9 +13,11 @@ export interface TypedStatement<T> {
 }
 
 export class TypedDb {
+  private readonly cache = new Map<string, TypedStatement<unknown>>();
+
   constructor(private readonly db: DatabaseSync) {}
 
-  prepare<T>(sql: string): TypedStatement<T> {
+  private makeStatement<T>(sql: string): TypedStatement<T> {
     const stmt = this.db.prepare(sql);
     return {
       all: (...params: SqlParams) => stmt.all(...params) as T[],
@@ -24,11 +26,26 @@ export class TypedDb {
     };
   }
 
+  prepare<T>(sql: string): TypedStatement<T> {
+    return this.makeStatement<T>(sql);
+  }
+
+  prepareOnce<T>(sql: string): TypedStatement<T> {
+    const cached = this.cache.get(sql);
+    if (cached !== undefined) {
+      return cached as TypedStatement<T>;
+    }
+    const stmt = this.makeStatement<T>(sql);
+    this.cache.set(sql, stmt);
+    return stmt;
+  }
+
   exec(sql: string): void {
     this.db.exec(sql);
   }
 
   close(): void {
+    this.cache.clear();
     this.db.close();
   }
 }

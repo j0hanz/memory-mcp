@@ -33,7 +33,7 @@ function toTypeCounts(rows: TypeRow[]): Record<string, number> {
 }
 
 function getTotalCount(db: TypedDb, sql: string): number {
-  return db.prepare<TotalRow>(sql).get()?.total ?? 0;
+  return db.prepareOnce<TotalRow>(sql).get()?.total ?? 0;
 }
 
 function getNullableField<T extends object, K extends keyof T>(
@@ -60,14 +60,14 @@ export function registerMemoryStats(server: McpServer, db: TypedDb): void {
           const totalMemories = getTotalCount(db, TOTAL_MEMORIES_SQL);
           const totalRelationships = getTotalCount(db, TOTAL_RELATIONSHIPS_SQL);
 
-          const typeRows = db.prepare<TypeRow>(TYPE_COUNTS_SQL).all();
+          const typeRows = db.prepareOnce<TypeRow>(TYPE_COUNTS_SQL).all();
 
-          const oldestRow = db.prepare<OldestRow>(OLDEST_MEMORY_SQL).get();
+          const oldestRow = db.prepareOnce<OldestRow>(OLDEST_MEMORY_SQL).get();
 
-          const newestRow = db.prepare<NewestRow>(NEWEST_MEMORY_SQL).get();
+          const newestRow = db.prepareOnce<NewestRow>(NEWEST_MEMORY_SQL).get();
 
           const avgImportanceRow = db
-            .prepare<AvgImportanceRow>(AVG_IMPORTANCE_SQL)
+            .prepareOnce<AvgImportanceRow>(AVG_IMPORTANCE_SQL)
             .get();
 
           const byType = toTypeCounts(typeRows);

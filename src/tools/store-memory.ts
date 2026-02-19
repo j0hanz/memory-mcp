@@ -32,7 +32,7 @@ function insertMemory(
 ): boolean {
   const tagsJson = JSON.stringify(params.tags);
   const insertResult = db
-    .prepare(INSERT_MEMORY_SQL)
+    .prepareOnce(INSERT_MEMORY_SQL)
     .run(
       hash,
       params.content,

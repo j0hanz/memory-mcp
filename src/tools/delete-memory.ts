@@ -35,7 +35,7 @@ export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
     wrapToolHandler(
       async (params: DeleteInput) => {
         try {
-          const result = db.prepare(DELETE_MEMORY_SQL).run(params.hash);
+          const result = db.prepareOnce(DELETE_MEMORY_SQL).run(params.hash);
 
           if (result.changes === 0) {
             return createErrorResponse(

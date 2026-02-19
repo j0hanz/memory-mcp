@@ -35,7 +35,7 @@ function loadSearchRows(
   const filter = buildFilterClauses(filters);
   const whereExtra = buildAndWhereClause(filter.clauses);
   return db
-    .prepare<MemoryRow>(
+    .prepareOnce<MemoryRow>(
       `SELECT m.*, memories_fts.rank AS rank FROM memories m
        JOIN memories_fts ON memories_fts.rowid = m.rowid
        WHERE memories_fts MATCH ?${whereExtra}

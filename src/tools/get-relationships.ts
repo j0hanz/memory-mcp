@@ -44,7 +44,7 @@ function loadRelationships(
     direction === 'outgoing' ? 'r.to_hash = m.hash' : 'r.from_hash = m.hash';
   const whereColumn = direction === 'outgoing' ? 'r.from_hash' : 'r.to_hash';
   return db
-    .prepare<RelWithLinkedMemory>(
+    .prepareOnce<RelWithLinkedMemory>(
       `SELECT r.from_hash, r.to_hash, r.relation_type, r.created_at,
               m.hash AS linked_hash, m.content AS linked_content, m.tags AS linked_tags
        FROM relationships r

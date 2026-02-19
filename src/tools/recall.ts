@@ -65,9 +65,13 @@ const MAX_VISITED_NODES = parseEnvInt(
   50000
 );
 
-function createPlaceholders(count: number): string {
-  return new Array(count).fill('?').join(',');
-}
+const EDGE_QUERY_SQL = `SELECT from_hash, to_hash, relation_type FROM relationships
+         WHERE from_hash IN (SELECT value FROM json_each(?))
+            OR to_hash   IN (SELECT value FROM json_each(?))
+         LIMIT ?`;
+
+const MEMORIES_BY_HASH_SQL =
+  'SELECT * FROM memories WHERE hash IN (SELECT value FROM json_each(?))';
 
 function loadSeedRows(
   db: TypedDb,
@@ -80,7 +84,7 @@ function loadSeedRows(
   const filter = buildFilterClauses(filters);
   const whereExtra = buildAndWhereClause(filter.clauses);
   return db
-    .prepare<MemoryRow>(
+    .prepareOnce<MemoryRow>(
       `SELECT m.*, memories_fts.rank AS rank FROM memories m
        JOIN memories_fts ON memories_fts.rowid = m.rowid
        WHERE memories_fts MATCH ?${whereExtra}
@@ -127,14 +131,13 @@ function traverseGraph(
       break;
     }
 
-    const placeholders = createPlaceholders(frontier.length);
     const edgeRows = db
-      .prepare<EdgeRow>(
-        `SELECT from_hash, to_hash, relation_type FROM relationships
-         WHERE from_hash IN (${placeholders}) OR to_hash IN (${placeholders})
-         LIMIT ?`
-      )
-      .all(...frontier, ...frontier, remainingEdgeBudget + 1);
+      .prepareOnce<EdgeRow>(EDGE_QUERY_SQL)
+      .all(
+        JSON.stringify(frontier),
+        JSON.stringify(frontier),
+        remainingEdgeBudget + 1
+      );
 
     const rows =
       edgeRows.length > remainingEdgeBudget
@@ -187,12 +190,9 @@ function loadMemoriesByHashes(db: TypedDb, hashes: string[]): Memory[] {
   if (hashes.length === 0) {
     return [];
   }
-  const placeholders = createPlaceholders(hashes.length);
   const memRows = db
-    .prepare<MemoryRow>(
-      `SELECT * FROM memories WHERE hash IN (${placeholders})`
-    )
-    .all(...hashes);
+    .prepareOnce<MemoryRow>(MEMORIES_BY_HASH_SQL)
+    .all(JSON.stringify(hashes));
   return memRows.map(parseMemoryRow);
 }
 

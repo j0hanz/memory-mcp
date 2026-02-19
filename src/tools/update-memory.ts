@@ -56,7 +56,7 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
           const now = nowIso();
 
           withImmediateTransaction(db, () => {
-            db.prepare(UPDATE_MEMORY_SQL).run(
+            db.prepareOnce(UPDATE_MEMORY_SQL).run(
               newHash,
               params.content,
               JSON.stringify(newTags),

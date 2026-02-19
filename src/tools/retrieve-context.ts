@@ -45,7 +45,7 @@ function loadContextRows(
 ): MemoryRow[] {
   const ftsQuery = sanitizeFtsQuery(query);
   return db
-    .prepare<MemoryRow>(
+    .prepareOnce<MemoryRow>(
       `SELECT m.*, memories_fts.rank AS rank FROM memories m
        JOIN memories_fts ON memories_fts.rowid = m.rowid
        WHERE memories_fts MATCH ?

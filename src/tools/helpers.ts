@@ -63,13 +63,14 @@ export function summarizeBatch(items: readonly BatchItemResult[]): {
 }
 
 export function getMemoryRow(db: TypedDb, hash: string): MemoryRow | undefined {
-  return db.prepare<MemoryRow>(SELECT_MEMORY_BY_HASH_SQL).get(hash);
+  return db.prepareOnce<MemoryRow>(SELECT_MEMORY_BY_HASH_SQL).get(hash);
 }
 
 export function memoryExists(db: TypedDb, hash: string): boolean {
   return (
-    db.prepare<Pick<MemoryRow, 'hash'>>(SELECT_MEMORY_HASH_SQL).get(hash) !==
-    undefined
+    db
+      .prepareOnce<Pick<MemoryRow, 'hash'>>(SELECT_MEMORY_HASH_SQL)
+      .get(hash) !== undefined
   );
 }
 

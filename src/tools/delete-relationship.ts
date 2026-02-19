@@ -30,7 +30,7 @@ function deleteRelationship(
 ): boolean {
   return (
     db
-      .prepare(DELETE_RELATIONSHIP_SQL)
+      .prepareOnce(DELETE_RELATIONSHIP_SQL)
       .run(params.from_hash, params.to_hash, params.relation_type).changes > 0
   );
 }
