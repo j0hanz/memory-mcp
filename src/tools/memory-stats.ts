@@ -9,6 +9,7 @@ import {
 import type { NewestRow, OldestRow, TotalRow, TypeRow } from '../lib/types.js';
 import { MemoryStatsInputSchema } from '../schemas/inputs.js';
 import { StatsResultSchema } from '../schemas/outputs.js';
+import { wrapToolHandler } from './progress.js';
 
 interface AvgImportanceRow {
   avg_importance: number | null;
@@ -46,41 +47,44 @@ export function registerMemoryStats(server: McpServer, db: TypedDb): void {
       outputSchema: StatsResultSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    () => {
-      try {
-        const totalMemories = getTotalCount(db, TOTAL_MEMORIES_SQL);
-        const totalRelationships = getTotalCount(db, TOTAL_RELATIONSHIPS_SQL);
+    wrapToolHandler(
+      () => {
+        try {
+          const totalMemories = getTotalCount(db, TOTAL_MEMORIES_SQL);
+          const totalRelationships = getTotalCount(db, TOTAL_RELATIONSHIPS_SQL);
 
-        const typeRows = db.prepare<TypeRow>(TYPE_COUNTS_SQL).all();
+          const typeRows = db.prepare<TypeRow>(TYPE_COUNTS_SQL).all();
 
-        const oldestRow = db.prepare<OldestRow>(OLDEST_MEMORY_SQL).get();
+          const oldestRow = db.prepare<OldestRow>(OLDEST_MEMORY_SQL).get();
 
-        const newestRow = db.prepare<NewestRow>(NEWEST_MEMORY_SQL).get();
+          const newestRow = db.prepare<NewestRow>(NEWEST_MEMORY_SQL).get();
 
-        const avgImportanceRow = db
-          .prepare<AvgImportanceRow>(AVG_IMPORTANCE_SQL)
-          .get();
+          const avgImportanceRow = db
+            .prepare<AvgImportanceRow>(AVG_IMPORTANCE_SQL)
+            .get();
 
-        const byType = toTypeCounts(typeRows);
+          const byType = toTypeCounts(typeRows);
 
-        return createToolResponse({
-          ok: true,
-          result: {
-            memories: {
-              total: totalMemories,
-              oldest: oldestRow?.oldest ?? null,
-              newest: newestRow?.newest ?? null,
-              avg_importance: avgImportanceRow?.avg_importance ?? null,
+          return createToolResponse({
+            ok: true,
+            result: {
+              memories: {
+                total: totalMemories,
+                oldest: oldestRow?.oldest ?? null,
+                newest: newestRow?.newest ?? null,
+                avg_importance: avgImportanceRow?.avg_importance ?? null,
+              },
+              relationships: {
+                total: totalRelationships,
+              },
+              by_type: byType,
             },
-            relationships: {
-              total: totalRelationships,
-            },
-            by_type: byType,
-          },
-        });
-      } catch (err) {
-        return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
-      }
-    }
+          });
+        } catch (err) {
+          return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+        }
+      },
+      { progressMessage: () => 'memory_stats: [aggregate]' }
+    )
   );
 }

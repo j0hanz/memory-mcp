@@ -18,6 +18,7 @@ import {
   nowIso,
   withImmediateTransaction,
 } from './helpers.js';
+import { wrapToolHandler } from './progress.js';
 
 type StoreMemoriesInput = z.infer<typeof StoreMemoriesInputSchema>;
 const INSERT_MEMORY_SQL = `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
@@ -42,46 +43,52 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
       outputSchema: BatchResultSchema,
       annotations: { idempotentHint: true, openWorldHint: false },
     },
-    async (params: StoreMemoriesInput) => {
-      try {
-        const now = nowIso();
-        const results = withImmediateTransaction(db, () => {
-          const items: BatchItemResult[] = [];
-          const stmt = db.prepare<unknown>(INSERT_MEMORY_SQL);
+    wrapToolHandler(
+      async (params: StoreMemoriesInput) => {
+        try {
+          const now = nowIso();
+          const results = withImmediateTransaction(db, () => {
+            const items: BatchItemResult[] = [];
+            const stmt = db.prepare<unknown>(INSERT_MEMORY_SQL);
 
-          for (const item of params.items) {
-            const { importance, memory_type: rawMemoryType } = item;
-            const memoryType = normalizeMemoryType(rawMemoryType);
-            const hash = computeMemoryHash(item.content, item.tags);
-            const tagsJson = JSON.stringify(item.tags);
-            const result = stmt.run(
-              hash,
-              item.content,
-              tagsJson,
-              memoryType,
-              importance,
-              now,
-              now
-            );
-            items.push({ hash, ok: true, created: result.changes > 0 });
-          }
-          return items;
-        });
+            for (const item of params.items) {
+              const { importance, memory_type: rawMemoryType } = item;
+              const memoryType = normalizeMemoryType(rawMemoryType);
+              const hash = computeMemoryHash(item.content, item.tags);
+              const tagsJson = JSON.stringify(item.tags);
+              const result = stmt.run(
+                hash,
+                item.content,
+                tagsJson,
+                memoryType,
+                importance,
+                now,
+                now
+              );
+              items.push({ hash, ok: true, created: result.changes > 0 });
+            }
+            return items;
+          });
 
-        const created = results.filter((r) => r.created).length;
-        const { succeeded, failed } = summarizeBatch(results);
-        await logToolEvent(server, 'store_memories', {
-          total: results.length,
-          created,
-        });
+          const created = results.filter((r) => r.created).length;
+          const { succeeded, failed } = summarizeBatch(results);
+          await logToolEvent(server, 'store_memories', {
+            total: results.length,
+            created,
+          });
 
-        return createToolResponse({
-          ok: true,
-          result: { items: results, succeeded, failed },
-        });
-      } catch (err) {
-        return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+          return createToolResponse({
+            ok: true,
+            result: { items: results, succeeded, failed },
+          });
+        } catch (err) {
+          return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+        }
+      },
+      {
+        progressMessage: (params: StoreMemoriesInput) =>
+          `store_memories: [${params.items.length} items]`,
       }
-    }
+    )
   );
 }

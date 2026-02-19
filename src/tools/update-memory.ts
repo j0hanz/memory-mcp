@@ -19,6 +19,7 @@ import {
   nowIso,
   withImmediateTransaction,
 } from './helpers.js';
+import { wrapToolHandler } from './progress.js';
 
 type UpdateInput = z.infer<typeof UpdateMemoryInputSchema>;
 const UPDATE_MEMORY_SQL = `UPDATE memories
@@ -39,45 +40,51 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
       outputSchema: UpdateResultSchema,
       annotations: { destructiveHint: true, openWorldHint: false },
     },
-    async (params: UpdateInput) => {
-      try {
-        const existing = getMemoryRow(db, params.hash);
+    wrapToolHandler(
+      async (params: UpdateInput) => {
+        try {
+          const existing = getMemoryRow(db, params.hash);
 
-        if (!existing) {
-          return createErrorResponse(
-            E_NOT_FOUND,
-            formatMemoryNotFound(params.hash)
-          );
-        }
+          if (!existing) {
+            return createErrorResponse(
+              E_NOT_FOUND,
+              formatMemoryNotFound(params.hash)
+            );
+          }
 
-        const existingTags = parseTags(existing.tags);
-        const newTags = params.tags ?? existingTags;
-        const newHash = computeMemoryHash(params.content, newTags);
-        const now = nowIso();
+          const existingTags = parseTags(existing.tags);
+          const newTags = params.tags ?? existingTags;
+          const newHash = computeMemoryHash(params.content, newTags);
+          const now = nowIso();
 
-        withImmediateTransaction(db, () => {
-          db.prepare(UPDATE_MEMORY_SQL).run(
+          withImmediateTransaction(db, () => {
+            db.prepare(UPDATE_MEMORY_SQL).run(
+              newHash,
+              params.content,
+              JSON.stringify(newTags),
+              now,
+              params.hash
+            );
+          });
+          await logToolEvent(server, 'update', {
+            oldHash: params.hash,
             newHash,
-            params.content,
-            JSON.stringify(newTags),
-            now,
-            params.hash
-          );
-        });
-        await logToolEvent(server, 'update', {
-          oldHash: params.hash,
-          newHash,
-        });
+          });
 
-        await notifyMemoryResourceUpdated(server, params.hash);
+          await notifyMemoryResourceUpdated(server, params.hash);
 
-        return createToolResponse({
-          ok: true,
-          result: { old_hash: params.hash, new_hash: newHash },
-        });
-      } catch (err) {
-        return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+          return createToolResponse({
+            ok: true,
+            result: { old_hash: params.hash, new_hash: newHash },
+          });
+        } catch (err) {
+          return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+        }
+      },
+      {
+        progressMessage: (params: UpdateInput) =>
+          `update_memory: ${params.hash.slice(0, 12)}... [replace content]`,
       }
-    }
+    )
   );
 }

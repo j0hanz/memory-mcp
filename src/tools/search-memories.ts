@@ -19,6 +19,7 @@ import { parseMemoryRow } from '../lib/types.js';
 import type { Memory, MemoryRow } from '../lib/types.js';
 import { SearchMemoriesInputSchema } from '../schemas/inputs.js';
 import { SearchResultSchema } from '../schemas/outputs.js';
+import { wrapToolHandler } from './progress.js';
 
 type SearchInput = z.infer<typeof SearchMemoriesInputSchema>;
 
@@ -68,33 +69,39 @@ export function registerSearchMemories(server: McpServer, db: TypedDb): void {
       outputSchema: SearchResultSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    (params: SearchInput) => {
-      try {
-        const { limit, cursor } = params;
-        const offset = cursor ? decodeCursor(cursor) : 0;
-        const rows = loadSearchRows(
-          db,
-          params.query,
-          limit,
-          offset,
-          toMemoryFilters(params)
-        );
-        const { page: pageRows, hasMore } = splitPage(rows, limit);
+    wrapToolHandler(
+      (params: SearchInput) => {
+        try {
+          const { limit, cursor } = params;
+          const offset = cursor ? decodeCursor(cursor) : 0;
+          const rows = loadSearchRows(
+            db,
+            params.query,
+            limit,
+            offset,
+            toMemoryFilters(params)
+          );
+          const { page: pageRows, hasMore } = splitPage(rows, limit);
 
-        const memories: Memory[] = pageRows.map(parseMemoryRow);
-        const nextCursor = hasMore ? encodeCursor(offset + limit) : undefined;
+          const memories: Memory[] = pageRows.map(parseMemoryRow);
+          const nextCursor = hasMore ? encodeCursor(offset + limit) : undefined;
 
-        return createToolResponse({
-          ok: true,
-          result: {
-            memories,
-            total_returned: memories.length,
-            ...(nextCursor ? { nextCursor } : {}),
-          },
-        });
-      } catch (err) {
-        return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+          return createToolResponse({
+            ok: true,
+            result: {
+              memories,
+              total_returned: memories.length,
+              ...(nextCursor ? { nextCursor } : {}),
+            },
+          });
+        } catch (err) {
+          return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+        }
+      },
+      {
+        progressMessage: (params: SearchInput) =>
+          `search_memories: ${params.query} [limit ${params.limit}]`,
       }
-    }
+    )
   );
 }

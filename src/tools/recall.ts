@@ -1,4 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 import process from 'node:process';
 
@@ -26,13 +27,14 @@ import type {
 } from '../lib/types.js';
 import { RecallInputSchema } from '../schemas/inputs.js';
 import { RecallResultSchema } from '../schemas/outputs.js';
+import {
+  createProgressReporter,
+  notifyProgress,
+  progressWithMessage,
+} from './progress.js';
 
 type RecallInput = z.infer<typeof RecallInputSchema>;
-type ProgressToken = string | number;
-type ProgressNotifier = (
-  hop: number,
-  total: number
-) => void | PromiseLike<void>;
+type ProgressNotifier = (hop: number, total: number) => void;
 
 function parseEnvInt(
   name: string,
@@ -206,31 +208,42 @@ function loadMemoriesByHashes(db: TypedDb, hashes: string[]): Memory[] {
   return memRows.map(parseMemoryRow);
 }
 
-function createHopNotifier(
-  progressToken: ProgressToken | undefined,
-  sendNotification: (notification: {
-    method: 'notifications/progress';
-    params: { progressToken: ProgressToken; progress: number; total: number };
-  }) => Promise<void>
-): ProgressNotifier | undefined {
-  if (progressToken == null) {
-    return undefined;
+function formatRecallCompletionMessage(
+  query: string,
+  result: CallToolResult
+): string {
+  if (result.isError) {
+    return `recall: "${query}" • failed`;
+  }
+  if (
+    typeof result.structuredContent !== 'object' ||
+    !('ok' in result.structuredContent) ||
+    result.structuredContent.ok !== true
+  ) {
+    return `recall: "${query}" • failed`;
   }
 
-  return (hop: number, total: number) => {
-    void sendNotification({
-      method: 'notifications/progress',
-      params: { progressToken, progress: hop + 1, total },
-    }).catch(() => {});
-  };
-}
-
-function toProgressToken(value: unknown): ProgressToken | undefined {
-  if (typeof value === 'string' || typeof value === 'number') {
-    return value;
+  const structured = result.structuredContent;
+  if (
+    !('result' in structured) ||
+    typeof structured.result !== 'object' ||
+    structured.result === null
+  ) {
+    return `recall: "${query}" • completed`;
   }
 
-  return undefined;
+  const payload = structured.result;
+  const memoriesCount =
+    'memories' in payload && Array.isArray(payload.memories)
+      ? payload.memories.length
+      : 0;
+  const edgesCount =
+    'graph' in payload && Array.isArray(payload.graph)
+      ? payload.graph.length
+      : 0;
+  const aborted = 'aborted' in payload && payload.aborted === true;
+
+  return `recall: "${query}" • ${memoriesCount} memories, ${edgesCount} edges${aborted ? ' [aborted]' : ''}`;
 }
 
 export function registerRecall(server: McpServer, db: TypedDb): void {
@@ -244,16 +257,30 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
       outputSchema: RecallResultSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    (params: RecallInput, { signal, _meta, sendNotification }) => {
+    async (params: RecallInput, extra) => {
+      const { depth, limit, cursor } = params;
+      const offset = cursor ? decodeCursor(cursor) : 0;
+      const contextLabel = `recall: "${params.query}" [depth ${depth}]`;
+      const completionCurrent = depth + 1;
+
+      await notifyProgress(extra, {
+        current: 0,
+        total: completionCurrent,
+        message: contextLabel,
+      });
+
+      const hopReporter = progressWithMessage(
+        createProgressReporter(extra),
+        ({ current, total }) =>
+          `recall: ${params.query} [hop ${current}/${total ?? current}]`
+      );
+
+      const onHop: ProgressNotifier = (hop: number, total: number): void => {
+        hopReporter({ current: hop + 1, total });
+      };
+
+      let result: CallToolResult;
       try {
-        const { depth, limit, cursor } = params;
-        const offset = cursor ? decodeCursor(cursor) : 0;
-
-        const onHop = createHopNotifier(
-          toProgressToken(_meta?.progressToken),
-          sendNotification
-        );
-
         // Step 1: FTS seed search
         const seedRows = loadSeedRows(
           db,
@@ -265,7 +292,13 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
         const { page: pageSeeds, hasMore } = splitPage(seedRows, limit);
 
         // Step 2: BFS traversal up to `depth` hops
-        const traversal = traverseGraph(db, pageSeeds, depth, signal, onHop);
+        const traversal = traverseGraph(
+          db,
+          pageSeeds,
+          depth,
+          extra.signal,
+          onHop
+        );
 
         // Step 3: Load all discovered memory rows
         const allHashes = Array.from(traversal.visited);
@@ -280,7 +313,7 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
 
         const nextCursor = hasMore ? encodeCursor(offset + limit) : undefined;
 
-        return createToolResponse({
+        result = createToolResponse({
           ok: true,
           result: {
             memories,
@@ -291,8 +324,16 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
           },
         });
       } catch (err) {
-        return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+        result = createErrorResponse(E_UNKNOWN, getErrorMessage(err));
       }
+
+      await notifyProgress(extra, {
+        current: completionCurrent,
+        total: completionCurrent,
+        message: formatRecallCompletionMessage(params.query, result),
+      });
+
+      return result;
     }
   );
 }

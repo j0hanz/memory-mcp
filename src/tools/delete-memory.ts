@@ -11,6 +11,7 @@ import {
 import { DeleteMemoryInputSchema } from '../schemas/inputs.js';
 import { DeleteResultSchema } from '../schemas/outputs.js';
 import { logToolEvent, notifyMemoryResourceUpdated } from './helpers.js';
+import { wrapToolHandler } from './progress.js';
 
 type DeleteInput = z.infer<typeof DeleteMemoryInputSchema>;
 
@@ -30,27 +31,33 @@ export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
       outputSchema: DeleteResultSchema,
       annotations: { destructiveHint: true, openWorldHint: false },
     },
-    async (params: DeleteInput) => {
-      try {
-        const result = db.prepare(DELETE_MEMORY_SQL).run(params.hash);
+    wrapToolHandler(
+      async (params: DeleteInput) => {
+        try {
+          const result = db.prepare(DELETE_MEMORY_SQL).run(params.hash);
 
-        if (result.changes === 0) {
-          return createErrorResponse(
-            E_NOT_FOUND,
-            formatMemoryNotFound(params.hash)
-          );
+          if (result.changes === 0) {
+            return createErrorResponse(
+              E_NOT_FOUND,
+              formatMemoryNotFound(params.hash)
+            );
+          }
+
+          await logToolEvent(server, 'delete', { hash: params.hash });
+          await notifyMemoryResourceUpdated(server, params.hash);
+
+          return createToolResponse({
+            ok: true,
+            result: { deleted: true, hash: params.hash },
+          });
+        } catch (err) {
+          return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
         }
-
-        await logToolEvent(server, 'delete', { hash: params.hash });
-        await notifyMemoryResourceUpdated(server, params.hash);
-
-        return createToolResponse({
-          ok: true,
-          result: { deleted: true, hash: params.hash },
-        });
-      } catch (err) {
-        return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+      },
+      {
+        progressMessage: (params: DeleteInput) =>
+          `delete_memory: ${params.hash.slice(0, 12)}... [single]`,
       }
-    }
+    )
   );
 }

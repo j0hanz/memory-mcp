@@ -10,6 +10,7 @@ import {
 } from '../lib/tool-response.js';
 import { DeleteRelationshipInputSchema } from '../schemas/inputs.js';
 import { DeleteRelationshipResultSchema } from '../schemas/outputs.js';
+import { wrapToolHandler } from './progress.js';
 
 type DeleteRelInput = z.infer<typeof DeleteRelationshipInputSchema>;
 
@@ -36,26 +37,32 @@ export function registerDeleteRelationship(
       outputSchema: DeleteRelationshipResultSchema,
       annotations: { destructiveHint: true, openWorldHint: false },
     },
-    (params: DeleteRelInput) => {
-      try {
-        const result = db
-          .prepare(DELETE_RELATIONSHIP_SQL)
-          .run(params.from_hash, params.to_hash, params.relation_type);
+    wrapToolHandler(
+      (params: DeleteRelInput) => {
+        try {
+          const result = db
+            .prepare(DELETE_RELATIONSHIP_SQL)
+            .run(params.from_hash, params.to_hash, params.relation_type);
 
-        if (result.changes === 0) {
-          return createErrorResponse(
-            E_NOT_FOUND,
-            `Relationship not found: ${formatRelationship(params)}`
-          );
+          if (result.changes === 0) {
+            return createErrorResponse(
+              E_NOT_FOUND,
+              `Relationship not found: ${formatRelationship(params)}`
+            );
+          }
+
+          return createToolResponse({
+            ok: true,
+            result: DELETE_RELATIONSHIP_RESULT,
+          });
+        } catch (err) {
+          return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
         }
-
-        return createToolResponse({
-          ok: true,
-          result: DELETE_RELATIONSHIP_RESULT,
-        });
-      } catch (err) {
-        return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+      },
+      {
+        progressMessage: (params: DeleteRelInput) =>
+          `delete_relationship: ${params.from_hash.slice(0, 8)}... • ${params.to_hash.slice(0, 8)}... [${params.relation_type}]`,
       }
-    }
+    )
   );
 }

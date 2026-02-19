@@ -1,4 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 import type { z } from 'zod/v4';
 
@@ -13,12 +14,18 @@ import { parseMemoryRow } from '../lib/types.js';
 import type { Memory, MemoryRow } from '../lib/types.js';
 import { RetrieveContextInputSchema } from '../schemas/inputs.js';
 import { RetrieveContextResultSchema } from '../schemas/outputs.js';
+import {
+  createProgressReporter,
+  notifyProgress,
+  progressWithMessage,
+} from './progress.js';
 
 type RetrieveContextInput = z.infer<typeof RetrieveContextInputSchema>;
 type ContextStrategy = RetrieveContextInput['strategy'];
 
 const RETRIEVE_CONTEXT_LIMIT = 200;
 const ESTIMATED_CHARS_PER_TOKEN = 4;
+const RETRIEVE_CONTEXT_PROGRESS_MILESTONE = 25;
 
 function getOrderBy(strategy: ContextStrategy): string {
   if (strategy === 'importance') {
@@ -51,6 +58,63 @@ function loadContextRows(
     .all(ftsQuery);
 }
 
+function reportSelectionProgress(
+  onProgress:
+    | ((progress: { current: number; total?: number }) => void)
+    | undefined,
+  current: number,
+  total: number,
+  force = false
+): void {
+  if (!onProgress || current === 0) {
+    return;
+  }
+  if (!force && current % RETRIEVE_CONTEXT_PROGRESS_MILESTONE !== 0) {
+    return;
+  }
+  onProgress({ current, total });
+}
+
+function formatCompletionMessage(
+  query: string,
+  result: CallToolResult
+): string {
+  if (result.isError) {
+    return `retrieve_context: "${query}" • failed`;
+  }
+  if (
+    typeof result.structuredContent !== 'object' ||
+    !('ok' in result.structuredContent) ||
+    result.structuredContent.ok !== true
+  ) {
+    return `retrieve_context: "${query}" • failed`;
+  }
+
+  const structured = result.structuredContent;
+  if (
+    !('result' in structured) ||
+    typeof structured.result !== 'object' ||
+    structured.result === null
+  ) {
+    return `retrieve_context: "${query}" • completed`;
+  }
+
+  const payload = structured.result;
+  const memoriesCount =
+    'memories' in payload && Array.isArray(payload.memories)
+      ? payload.memories.length
+      : 0;
+  const estimatedTokens =
+    'estimated_tokens' in payload &&
+    typeof payload.estimated_tokens === 'number'
+      ? payload.estimated_tokens
+      : 0;
+  const truncated =
+    'truncated' in payload && payload.truncated === true ? ' [truncated]' : '';
+
+  return `retrieve_context: ${query} • ${memoriesCount} memories, ${estimatedTokens} tokens${truncated}`;
+}
+
 export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'retrieve_context',
@@ -62,10 +126,18 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
       outputSchema: RetrieveContextResultSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    (params: RetrieveContextInput) => {
+    async (params: RetrieveContextInput, extra) => {
+      const { query, strategy } = params;
+      const tokenBudget = params.token_budget;
+      const contextLabel = `retrieve_context: ${query} [${strategy}]`;
+      let completionCurrent = 1;
+      await notifyProgress(extra, {
+        current: 0,
+        message: `${contextLabel} [budget ${tokenBudget}]`,
+      });
+
+      let result: CallToolResult;
       try {
-        const { query, strategy } = params;
-        const tokenBudget = params.token_budget;
         const orderBy = getOrderBy(strategy);
         const rows = loadContextRows(db, query, orderBy);
         const rowCapExceeded = rows.length > RETRIEVE_CONTEXT_LIMIT;
@@ -73,13 +145,27 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
           ? rows.slice(0, RETRIEVE_CONTEXT_LIMIT)
           : rows;
 
+        const loopProgress = progressWithMessage(
+          createProgressReporter(extra),
+          ({ current, total }) =>
+            `${contextLabel} [scan ${current}/${total ?? current}]`
+        );
+
         let estimatedTokens = 0;
         let truncated = rowCapExceeded;
         const selected: Memory[] = [];
+        let scanned = 0;
 
         for (const row of candidateRows) {
           const mem = parseMemoryRow(row);
           const tokens = estimateTokens(mem.content);
+          scanned += 1;
+          reportSelectionProgress(
+            loopProgress,
+            scanned,
+            candidateRows.length,
+            false
+          );
           if (estimatedTokens + tokens > tokenBudget) {
             truncated = true;
             break;
@@ -88,7 +174,15 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
           selected.push(mem);
         }
 
-        return createToolResponse({
+        reportSelectionProgress(
+          loopProgress,
+          scanned,
+          candidateRows.length,
+          true
+        );
+        completionCurrent = candidateRows.length + 1;
+
+        result = createToolResponse({
           ok: true,
           result: {
             memories: selected,
@@ -97,8 +191,16 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
           },
         });
       } catch (err) {
-        return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+        result = createErrorResponse(E_UNKNOWN, getErrorMessage(err));
       }
+
+      await notifyProgress(extra, {
+        current: completionCurrent,
+        total: completionCurrent,
+        message: formatCompletionMessage(query, result),
+      });
+
+      return result;
     }
   );
 }

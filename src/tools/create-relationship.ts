@@ -11,6 +11,7 @@ import {
 import { CreateRelationshipInputSchema } from '../schemas/inputs.js';
 import { CreateRelationshipResultSchema } from '../schemas/outputs.js';
 import { logToolEvent, memoryExists, nowIso } from './helpers.js';
+import { wrapToolHandler } from './progress.js';
 
 type CreateRelInput = z.infer<typeof CreateRelationshipInputSchema>;
 const INSERT_RELATIONSHIP_SQL = `INSERT OR IGNORE INTO relationships (from_hash, to_hash, relation_type, created_at)
@@ -34,45 +35,51 @@ export function registerCreateRelationship(
       outputSchema: CreateRelationshipResultSchema,
       annotations: { idempotentHint: true, openWorldHint: false },
     },
-    async (params: CreateRelInput) => {
-      try {
-        if (!memoryExists(db, params.from_hash)) {
-          return createErrorResponse(
-            E_NOT_FOUND,
-            formatMemoryNotFound('Source', params.from_hash)
-          );
-        }
+    wrapToolHandler(
+      async (params: CreateRelInput) => {
+        try {
+          if (!memoryExists(db, params.from_hash)) {
+            return createErrorResponse(
+              E_NOT_FOUND,
+              formatMemoryNotFound('Source', params.from_hash)
+            );
+          }
 
-        if (!memoryExists(db, params.to_hash)) {
-          return createErrorResponse(
-            E_NOT_FOUND,
-            formatMemoryNotFound('Target', params.to_hash)
-          );
-        }
+          if (!memoryExists(db, params.to_hash)) {
+            return createErrorResponse(
+              E_NOT_FOUND,
+              formatMemoryNotFound('Target', params.to_hash)
+            );
+          }
 
-        const now = nowIso();
-        const result = db
-          .prepare(INSERT_RELATIONSHIP_SQL)
-          .run(params.from_hash, params.to_hash, params.relation_type, now);
+          const now = nowIso();
+          const result = db
+            .prepare(INSERT_RELATIONSHIP_SQL)
+            .run(params.from_hash, params.to_hash, params.relation_type, now);
 
-        const created = result.changes > 0;
+          const created = result.changes > 0;
 
-        await logToolEvent(server, 'create_relationship', {
-          fromHash: params.from_hash,
-          toHash: params.to_hash,
-          relationType: params.relation_type,
-          created,
-        });
-
-        return createToolResponse({
-          ok: true,
-          result: {
+          await logToolEvent(server, 'create_relationship', {
+            fromHash: params.from_hash,
+            toHash: params.to_hash,
+            relationType: params.relation_type,
             created,
-          },
-        });
-      } catch (err) {
-        return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+          });
+
+          return createToolResponse({
+            ok: true,
+            result: {
+              created,
+            },
+          });
+        } catch (err) {
+          return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+        }
+      },
+      {
+        progressMessage: (params: CreateRelInput) =>
+          `create_relationship: ${params.from_hash.slice(0, 8)}... • ${params.to_hash.slice(0, 8)}... [${params.relation_type}]`,
       }
-    }
+    )
   );
 }

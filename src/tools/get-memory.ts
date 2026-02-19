@@ -12,6 +12,7 @@ import { parseMemoryRow } from '../lib/types.js';
 import { GetMemoryInputSchema } from '../schemas/inputs.js';
 import { MemoryResultSchema } from '../schemas/outputs.js';
 import { getMemoryRow } from './helpers.js';
+import { wrapToolHandler } from './progress.js';
 
 type GetInput = z.infer<typeof GetMemoryInputSchema>;
 function formatMemoryNotFound(hash: string): string {
@@ -28,21 +29,27 @@ export function registerGetMemory(server: McpServer, db: TypedDb): void {
       outputSchema: MemoryResultSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    (params: GetInput) => {
-      try {
-        const row = getMemoryRow(db, params.hash);
+    wrapToolHandler(
+      (params: GetInput) => {
+        try {
+          const row = getMemoryRow(db, params.hash);
 
-        if (!row) {
-          return createErrorResponse(
-            E_NOT_FOUND,
-            formatMemoryNotFound(params.hash)
-          );
+          if (!row) {
+            return createErrorResponse(
+              E_NOT_FOUND,
+              formatMemoryNotFound(params.hash)
+            );
+          }
+
+          return createToolResponse({ ok: true, result: parseMemoryRow(row) });
+        } catch (err) {
+          return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
         }
-
-        return createToolResponse({ ok: true, result: parseMemoryRow(row) });
-      } catch (err) {
-        return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+      },
+      {
+        progressMessage: (params: GetInput) =>
+          `get_memory: ${params.hash.slice(0, 12)}... [single]`,
       }
-    }
+    )
   );
 }

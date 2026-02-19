@@ -16,6 +16,7 @@ import {
   notifyMemoryResourceUpdated,
   withImmediateTransaction,
 } from './helpers.js';
+import { wrapToolHandler } from './progress.js';
 
 type DeleteMemoriesInput = z.infer<typeof DeleteMemoriesInputSchema>;
 
@@ -40,43 +41,49 @@ export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
       outputSchema: BatchResultSchema,
       annotations: { destructiveHint: true, openWorldHint: false },
     },
-    async (params: DeleteMemoriesInput) => {
-      try {
-        const results = withImmediateTransaction(db, () => {
-          const items: BatchItemResult[] = [];
-          const stmt = db.prepare<unknown>(DELETE_MEMORY_SQL);
-          for (const hash of params.hashes) {
-            const result = stmt.run(hash);
-            items.push({
-              hash,
-              ok: true,
-              created: false,
-              deleted: result.changes > 0,
-            });
-          }
-          return items;
-        });
+    wrapToolHandler(
+      async (params: DeleteMemoriesInput) => {
+        try {
+          const results = withImmediateTransaction(db, () => {
+            const items: BatchItemResult[] = [];
+            const stmt = db.prepare<unknown>(DELETE_MEMORY_SQL);
+            for (const hash of params.hashes) {
+              const result = stmt.run(hash);
+              items.push({
+                hash,
+                ok: true,
+                created: false,
+                deleted: result.changes > 0,
+              });
+            }
+            return items;
+          });
 
-        const deleted = results.filter((r) => r.deleted).length;
-        const { succeeded, failed } = summarizeBatch(results);
-        await logToolEvent(server, 'delete_memories', {
-          total: params.hashes.length,
-          deleted,
-        });
+          const deleted = results.filter((r) => r.deleted).length;
+          const { succeeded, failed } = summarizeBatch(results);
+          await logToolEvent(server, 'delete_memories', {
+            total: params.hashes.length,
+            deleted,
+          });
 
-        for (const item of results) {
-          if (item.deleted) {
-            await notifyMemoryResourceUpdated(server, item.hash);
+          for (const item of results) {
+            if (item.deleted) {
+              await notifyMemoryResourceUpdated(server, item.hash);
+            }
           }
+
+          return createToolResponse({
+            ok: true,
+            result: { items: results, succeeded, failed },
+          });
+        } catch (err) {
+          return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
         }
-
-        return createToolResponse({
-          ok: true,
-          result: { items: results, succeeded, failed },
-        });
-      } catch (err) {
-        return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+      },
+      {
+        progressMessage: (params: DeleteMemoriesInput) =>
+          `delete_memories: [${params.hashes.length} hashes]`,
       }
-    }
+    )
   );
 }

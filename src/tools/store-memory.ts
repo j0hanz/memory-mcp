@@ -12,6 +12,7 @@ import {
 import { StoreMemoryInputSchema } from '../schemas/inputs.js';
 import { StoreResultSchema } from '../schemas/outputs.js';
 import { logToolEvent, normalizeMemoryType, nowIso } from './helpers.js';
+import { wrapToolHandler } from './progress.js';
 
 type StoreInput = z.infer<typeof StoreMemoryInputSchema>;
 const INSERT_MEMORY_SQL = `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
@@ -28,33 +29,39 @@ export function registerStoreMemory(server: McpServer, db: TypedDb): void {
       outputSchema: StoreResultSchema,
       annotations: { idempotentHint: true, openWorldHint: false },
     },
-    async (params: StoreInput) => {
-      try {
-        const { importance } = params;
-        const memoryType = normalizeMemoryType(params.memory_type);
-        const hash = computeMemoryHash(params.content, params.tags);
-        const now = nowIso();
-        const tagsJson = JSON.stringify(params.tags);
+    wrapToolHandler(
+      async (params: StoreInput) => {
+        try {
+          const { importance } = params;
+          const memoryType = normalizeMemoryType(params.memory_type);
+          const hash = computeMemoryHash(params.content, params.tags);
+          const now = nowIso();
+          const tagsJson = JSON.stringify(params.tags);
 
-        const insertResult = db
-          .prepare(INSERT_MEMORY_SQL)
-          .run(
-            hash,
-            params.content,
-            tagsJson,
-            memoryType,
-            importance,
-            now,
-            now
-          );
+          const insertResult = db
+            .prepare(INSERT_MEMORY_SQL)
+            .run(
+              hash,
+              params.content,
+              tagsJson,
+              memoryType,
+              importance,
+              now,
+              now
+            );
 
-        const created = insertResult.changes > 0;
-        await logToolEvent(server, 'store', { hash, created });
+          const created = insertResult.changes > 0;
+          await logToolEvent(server, 'store', { hash, created });
 
-        return createToolResponse({ ok: true, result: { hash, created } });
-      } catch (err) {
-        return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+          return createToolResponse({ ok: true, result: { hash, created } });
+        } catch (err) {
+          return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+        }
+      },
+      {
+        progressMessage: (params: StoreInput) =>
+          `store_memory: [${params.tags.length} tags]`,
       }
-    }
+    )
   );
 }

@@ -13,6 +13,7 @@ import type { RelationshipRow } from '../lib/types.js';
 import { GetRelationshipsInputSchema } from '../schemas/inputs.js';
 import { RelationshipResultSchema } from '../schemas/outputs.js';
 import { memoryExists } from './helpers.js';
+import { wrapToolHandler } from './progress.js';
 
 type GetRelInput = z.infer<typeof GetRelationshipsInputSchema>;
 
@@ -65,37 +66,43 @@ export function registerGetRelationships(server: McpServer, db: TypedDb): void {
       outputSchema: RelationshipResultSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    (params: GetRelInput) => {
-      try {
-        if (!memoryExists(db, params.hash)) {
-          return createErrorResponse(
-            E_NOT_FOUND,
-            `Memory not found: ${params.hash}`
+    wrapToolHandler(
+      (params: GetRelInput) => {
+        try {
+          if (!memoryExists(db, params.hash)) {
+            return createErrorResponse(
+              E_NOT_FOUND,
+              `Memory not found: ${params.hash}`
+            );
+          }
+
+          const directions = DIRECTIONS_BY_MODE[params.direction];
+          const rows = directions.flatMap((direction) =>
+            loadRelationships(db, params.hash, direction)
           );
+
+          const relationships = rows.map((r) => ({
+            from_hash: r.from_hash,
+            to_hash: r.to_hash,
+            relation_type: r.relation_type,
+            created_at: r.created_at,
+            linked_hash: r.linked_hash,
+            linked_content: r.linked_content,
+            linked_tags: parseTags(r.linked_tags),
+          }));
+
+          return createToolResponse({
+            ok: true,
+            result: { relationships, count: relationships.length },
+          });
+        } catch (err) {
+          return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
         }
-
-        const directions = DIRECTIONS_BY_MODE[params.direction];
-        const rows = directions.flatMap((direction) =>
-          loadRelationships(db, params.hash, direction)
-        );
-
-        const relationships = rows.map((r) => ({
-          from_hash: r.from_hash,
-          to_hash: r.to_hash,
-          relation_type: r.relation_type,
-          created_at: r.created_at,
-          linked_hash: r.linked_hash,
-          linked_content: r.linked_content,
-          linked_tags: parseTags(r.linked_tags),
-        }));
-
-        return createToolResponse({
-          ok: true,
-          result: { relationships, count: relationships.length },
-        });
-      } catch (err) {
-        return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+      },
+      {
+        progressMessage: (params: GetRelInput) =>
+          `get_relationships: ${params.hash.slice(0, 12)}... [${params.direction}]`,
       }
-    }
+    )
   );
 }
