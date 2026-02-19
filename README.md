@@ -24,6 +24,23 @@ Memory MCP provides a local, persistent memory layer for MCP-enabled assistants.
 - **Resource support** with `internal://instructions` (Markdown guide) and `memory://memories/{hash}` URI template with hash auto-completion.
 - **stdio transport** with clean shutdown handling (`SIGINT`, `SIGTERM`) and no HTTP endpoints.
 
+## Protocol Coverage Matrix
+
+This repository ships a specific MCP server implementation. The docs under `.github/mcp` include broader protocol reference material; use the matrix below for implementation truth in this codebase.
+
+| MCP Area                  | Repository Status              | Evidence                                                                                  |
+| ------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------- |
+| Tools                     | Implemented                    | `src/tools/index.ts` registers 13 tools                                                   |
+| Resources                 | Implemented                    | `src/resources/index.ts` exposes `internal://instructions` and `memory://memories/{hash}` |
+| Prompts                   | Implemented                    | `src/prompts/index.ts` registers `get-help`                                               |
+| Logging                   | Implemented                    | Declared in `src/server.ts` capabilities                                                  |
+| Completions               | Implemented                    | Declared in `src/server.ts`; hash completion in `src/completions/index.ts`                |
+| Progress notifications    | Implemented                    | `src/tools/progress.ts`, used by long-running tools                                       |
+| Sampling                  | Not implemented in this server | Not declared in `src/server.ts` capabilities                                              |
+| Elicitation               | Not implemented in this server | Not declared in `src/server.ts` capabilities                                              |
+| Roots                     | Not implemented in this server | Not declared in `src/server.ts` capabilities                                              |
+| Streamable HTTP transport | Not implemented in this server | Entry point uses stdio in `src/index.ts`                                                  |
+
 ## Requirements
 
 - Node.js `>=24`.
@@ -191,6 +208,16 @@ MCP client config:
 ```
 
 </details>
+
+## Documentation Maintenance
+
+- **Owner**: maintainers updating MCP behavior in `src/` must update `README.md` and affected `.github/mcp` mirror pages in the same PR.
+- **Link/version policy**: use pinned `https://modelcontextprotocol.io/specification/2025-11-25/...` links for protocol references; avoid `latest` and mixed legacy targets.
+- **Drift-check checklist**:
+  - Re-verify capability declarations in `src/server.ts`.
+  - Reconcile tool/resource/prompt docs with `src/tools/index.ts`, `src/resources/index.ts`, and `src/prompts/index.ts`.
+  - Confirm limitations/gotchas in `src/instructions.md` match runtime behavior.
+- **Validation commands**: `npm run type-check`, `npm run test:fast`, `npm run build`.
 
 ## MCP Surface
 

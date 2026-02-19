@@ -78,7 +78,7 @@ These instructions are available as a resource `internal://instructions` or prom
 - Purpose: FTS5 full-text search over content and tags.
 - Input: `query`, `limit` (default 20), `cursor` for pagination.
 - Limits: Max 100 results per call.
-- Gotcha: Query terms are matched individually. FTS5 phrase operators (`"phrase"`) and negation (`-term`) are automatically stripped by the server.
+- Gotcha: Query terms are matched individually; FTS5 phrase operators and negation are not supported.
 
 `recall`
 
