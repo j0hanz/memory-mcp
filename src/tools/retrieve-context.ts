@@ -28,15 +28,11 @@ const RETRIEVE_CONTEXT_LIMIT = 200;
 const ESTIMATED_CHARS_PER_TOKEN = 4;
 const RETRIEVE_CONTEXT_PROGRESS_MILESTONE = 25;
 
-function getOrderBy(strategy: ContextStrategy): string {
-  if (strategy === 'importance') {
-    return 'm.importance DESC, memories_fts.rank';
-  }
-  if (strategy === 'recency') {
-    return 'm.created_at DESC, memories_fts.rank';
-  }
-  return 'memories_fts.rank';
-}
+const ORDER_BY_MAP = {
+  importance: 'm.importance DESC, memories_fts.rank',
+  recency: 'm.created_at DESC, memories_fts.rank',
+  relevance: 'memories_fts.rank',
+} as const satisfies Record<ContextStrategy, string>;
 
 function estimateTokens(content: string): number {
   return Math.ceil(content.length / ESTIMATED_CHARS_PER_TOKEN);
@@ -130,7 +126,7 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
 
       let result: CallToolResult;
       try {
-        const orderBy = getOrderBy(strategy);
+        const orderBy = ORDER_BY_MAP[strategy];
         const rows = loadContextRows(db, query, orderBy);
         const rowCapExceeded = rows.length > RETRIEVE_CONTEXT_LIMIT;
         const candidateRows = rowCapExceeded

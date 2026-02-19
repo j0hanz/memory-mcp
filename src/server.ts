@@ -21,8 +21,9 @@ interface PackageManifest {
 
 interface IconDescriptor {
   src: string;
-  mimeType: string;
-  sizes: string[];
+  mimeType?: string;
+  sizes?: string[];
+  theme?: 'light' | 'dark';
 }
 
 function loadPackageManifest(): PackageManifest {

@@ -231,7 +231,7 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
     {
       title: 'Recall (BFS Graph Traversal)',
       description:
-        'Search memories by full-text query, then traverse the relationship graph up to `depth` hops via BFS. Returns all discovered memories and the edges connecting them.',
+        'Search memories by full-text query, then traverse the relationship graph up to `depth` hops via BFS. Returns all discovered memories and the edges connecting them. Query terms are matched individually; FTS5 phrase operators and negation are not supported.',
       inputSchema: RecallInputSchema,
       outputSchema: RecallResultSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },

@@ -11,7 +11,12 @@ import {
 } from '../lib/tool-response.js';
 import { StoreMemoryInputSchema } from '../schemas/inputs.js';
 import { StoreResultSchema } from '../schemas/outputs.js';
-import { logToolEvent, normalizeMemoryType, nowIso } from './helpers.js';
+import {
+  logToolEvent,
+  normalizeMemoryType,
+  notifyMemoryResourceUpdated,
+  nowIso,
+} from './helpers.js';
 import { wrapToolHandler } from './progress.js';
 
 type StoreInput = z.infer<typeof StoreMemoryInputSchema>;
@@ -59,6 +64,9 @@ export function registerStoreMemory(server: McpServer, db: TypedDb): void {
           const now = nowIso();
           const created = insertMemory(db, params, hash, memoryType, now);
           await logToolEvent(server, 'store', { hash, created });
+          if (created) {
+            await notifyMemoryResourceUpdated(server, hash);
+          }
 
           return createToolResponse({ hash, created });
         } catch (err) {

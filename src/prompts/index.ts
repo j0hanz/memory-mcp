@@ -1,26 +1,9 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { PromptMessage } from '@modelcontextprotocol/sdk/types.js';
 
-const INSTRUCTIONS_CONTENT = `# Memory Instructions
+import { loadInstructions } from '../lib/instructions.js';
 
-> Available as resource \`internal://instructions\`. Load when unsure about tool usage.
-
-## CORE CAPABILITY
-
-- Domain: SQLite-backed memory store with FTS5 search and knowledge graph for AI assistants.
-- Tools: \`search_memories\` \`get_memory\` \`recall\` \`get_relationships\` \`memory_stats\` (READ); \`store_memory\` \`store_memories\` \`update_memory\` \`delete_memory\` \`delete_memories\` \`create_relationship\` \`delete_relationship\` (WRITE).
-
-## WORKFLOWS
-
-1. **Recall**: \`search_memories\` → \`recall\` → \`get_memory\`
-2. **Store**: \`store_memory\` or \`store_memories\` (batch ≤50)
-3. **Graph**: \`create_relationship\` → \`get_relationships\`
-
-## RESOURCES
-
-- \`internal://instructions\`: This document.
-- \`memory://memories/{hash}\`: Single memory by SHA-256 hash.
-`;
+const INSTRUCTIONS_CONTENT = loadInstructions();
 
 const HELP_MESSAGES: PromptMessage[] = [
   {

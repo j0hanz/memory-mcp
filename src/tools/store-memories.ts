@@ -15,6 +15,7 @@ import { BatchResultSchema } from '../schemas/outputs.js';
 import {
   logToolEvent,
   normalizeMemoryType,
+  notifyMemoryResourceUpdated,
   nowIso,
   summarizeBatch,
   withImmediateTransaction,
@@ -69,6 +70,11 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
             total: results.length,
             created,
           });
+          for (const item of results) {
+            if (item.created) {
+              await notifyMemoryResourceUpdated(server, item.hash);
+            }
+          }
 
           return createToolResponse({ items: results, succeeded, failed });
         } catch (err) {

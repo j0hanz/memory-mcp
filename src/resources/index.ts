@@ -2,41 +2,15 @@ import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Variables } from '@modelcontextprotocol/sdk/shared/uriTemplate.js';
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import { createHashCompletionCallback } from '../completions/index.js';
 import type { TypedDb } from '../db/typed.js';
+import { loadInstructions } from '../lib/instructions.js';
 import { parseMemoryRow } from '../lib/types.js';
 import type { MemoryRow } from '../lib/types.js';
 
-const BASE_DIR = fileURLToPath(new URL('.', import.meta.url));
-const FALLBACK_INSTRUCTIONS =
-  '# Memory instructions\n\nSee the README for usage details.';
 const HASH_REGEX = /^[a-f0-9]{64}$/;
 const INSTRUCTIONS_URI = 'internal://instructions';
 const MEMORY_RESOURCE_URI_TEMPLATE = 'memory://memories/{hash}';
-
-function getInstructionPaths(): string[] {
-  return [
-    join(BASE_DIR, 'instructions.md'),
-    join(BASE_DIR, '..', 'instructions.md'),
-    join(BASE_DIR, '..', '..', 'src', 'instructions.md'),
-  ];
-}
-
-function loadInstructions(): string {
-  const paths = getInstructionPaths();
-  for (const p of paths) {
-    try {
-      return readFileSync(p, 'utf8');
-    } catch {
-      // try next path
-    }
-  }
-  return FALLBACK_INSTRUCTIONS;
-}
 
 function createJsonContent(
   uri: string,
