@@ -60,7 +60,7 @@ const BOTH_SQL = `
   FROM relationships r
   JOIN memories m ON r.from_hash = m.hash
   WHERE r.to_hash = ?
-  ORDER BY created_at DESC`;
+  ORDER BY r.created_at DESC`;
 
 function memoryExists(db: TypedDb, hash: string): boolean {
   return (
