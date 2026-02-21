@@ -80,18 +80,18 @@ const EDGE_QUERY_SQL = `SELECT from_hash, to_hash, relation_type FROM relationsh
 const MEMORIES_BY_HASH_SQL =
   'SELECT * FROM memories WHERE hash IN (SELECT value FROM json_each(?))';
 
-function traverseGraph(
+async function traverseGraph(
   db: TypedDb,
   seeds: MemoryRow[],
   depth: number,
   signal?: AbortSignal,
   onHop?: ProgressNotifier
-): {
+): Promise<{
   edges: RelationshipEdge[];
   visited: Set<string>;
   depthReached: number;
   aborted: boolean;
-} {
+}> {
   const visited = new Set<string>();
   const frontier: string[] = [];
   for (const seed of seeds) {
@@ -105,6 +105,9 @@ function traverseGraph(
   let aborted = false;
 
   for (let hop = 0; hop < depth && frontier.length > 0; hop += 1) {
+    // Yield to event loop to allow progress notifications and cancellation
+    await new Promise((resolve) => setImmediate(resolve));
+
     if (signal?.aborted) {
       aborted = true;
       break;
@@ -237,7 +240,7 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
     {
       title: 'Recall (BFS Graph Traversal)',
       description:
-        'FTS search then BFS graph traversal up to `depth` hops. Returns all discovered memories and edges. Use when exploring memory relationships. Emits progress per hop. Returns `aborted: true` with partial results when safety limits are hit (env: RECALL_MAX_FRONTIER_SIZE, RECALL_MAX_EDGE_ROWS, RECALL_MAX_VISITED_NODES).',
+        'Search for memories and explore their connections (knowledge graph). FTS search then BFS graph traversal up to `depth` hops. Returns all discovered memories and edges. Use when exploring memory relationships or understanding context. Emits progress per hop. Returns `aborted: true` with partial results when safety limits are hit (env: RECALL_MAX_FRONTIER_SIZE, RECALL_MAX_EDGE_ROWS, RECALL_MAX_VISITED_NODES).',
       inputSchema: RecallInputSchema,
       outputSchema: RecallResultSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
@@ -283,7 +286,7 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
         const { page: pageSeeds, hasMore } = splitPage(seedRows, limit);
 
         // Step 2: BFS traversal up to `depth` hops
-        const traversal = traverseGraph(
+        const traversal = await traverseGraph(
           db,
           pageSeeds,
           depth,

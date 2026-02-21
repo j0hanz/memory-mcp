@@ -29,8 +29,12 @@ import {
 type RetrieveContextInput = z.infer<typeof RetrieveContextInputSchema>;
 type ContextStrategy = RetrieveContextInput['strategy'];
 
-const RETRIEVE_CONTEXT_LIMIT = 200;
+const MIN_CANDIDATE_ROWS = 200;
+const MAX_CANDIDATE_ROWS = 2000;
 const ESTIMATED_CHARS_PER_TOKEN = 4;
+// Assume average memory is ~20 tokens to set a reasonable upper bound for candidates
+const ESTIMATED_TOKENS_PER_MEMORY = 20;
+
 const RETRIEVE_CONTEXT_PROGRESS_MILESTONE = 25;
 
 const ORDER_BY_MAP = {
@@ -50,7 +54,8 @@ function estimateTokens(content: string): number {
 function loadContextRows(
   db: TypedDb,
   query: string,
-  orderBy: string
+  orderBy: string,
+  limit: number
 ): MemoryRow[] {
   const ftsQuery = sanitizeFtsQuery(query);
   return db
@@ -59,9 +64,9 @@ function loadContextRows(
        JOIN memories_fts ON memories_fts.rowid = m.rowid
        WHERE memories_fts MATCH ?
        ORDER BY ${orderBy}
-       LIMIT ${RETRIEVE_CONTEXT_LIMIT + 1}`
+       LIMIT ?`
     )
-    .all(ftsQuery);
+    .all(ftsQuery, limit + 1);
 }
 
 function reportSelectionProgress(
@@ -135,6 +140,15 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
       const contextLabel = `⊙ retrieve_context: ${query} [${strategy}]`;
       let completionCurrent = 1;
 
+      // Heuristic: Load enough candidates to likely fill the budget, but cap to avoid massive queries
+      const estimatedCandidates = Math.ceil(
+        tokenBudget / ESTIMATED_TOKENS_PER_MEMORY
+      );
+      const limit = Math.min(
+        Math.max(MIN_CANDIDATE_ROWS, estimatedCandidates),
+        MAX_CANDIDATE_ROWS
+      );
+
       await notifyProgress(extra, {
         current: 0,
         message: `${contextLabel} [budget ${tokenBudget}]`,
@@ -151,11 +165,9 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
       try {
         throwIfAborted(extra.signal);
         const orderBy = ORDER_BY_MAP[strategy];
-        const rows = loadContextRows(db, query, orderBy);
-        const rowCapExceeded = rows.length > RETRIEVE_CONTEXT_LIMIT;
-        const candidateCount = rowCapExceeded
-          ? RETRIEVE_CONTEXT_LIMIT
-          : rows.length;
+        const rows = loadContextRows(db, query, orderBy, limit);
+        const rowCapExceeded = rows.length > limit;
+        const candidateCount = rowCapExceeded ? limit : rows.length;
         completionCurrent = candidateCount + 1;
 
         let estimatedTokens = 0;

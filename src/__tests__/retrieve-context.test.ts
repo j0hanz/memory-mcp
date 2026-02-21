@@ -140,9 +140,12 @@ describe('retrieve_context tool', () => {
 
     const result = await callTool(server, 'retrieve_context', {
       query: 'row cap marker',
-      token_budget: 200000,
+      token_budget: 3000,
     });
     const data = result.structuredContent as RetrieveContextResult;
+    // With budget 3000, estimated candidates = 3000/20 = 150 < 200 (MIN).
+    // So limit is clamped to 200.
+    // We inserted 205 rows, so we expect to hit the 200 row limit.
     assert.equal(data.truncated, true);
     assert.equal(data.memories.length, 200);
   });
