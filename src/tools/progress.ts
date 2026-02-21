@@ -3,6 +3,8 @@ import type {
   ProgressNotification,
 } from '@modelcontextprotocol/sdk/types.js';
 
+import { E_CANCELLED } from '../lib/errors.js';
+
 type ProgressToken = string | number;
 
 interface ProgressMeta {
@@ -75,26 +77,32 @@ function toNotificationParams(
   return params;
 }
 
-function isFailedResult(result: CallToolResult): boolean {
+function getResultOutcome(
+  result: CallToolResult
+): 'completed' | 'failed' | 'cancelled' {
+  if (result.structuredContent?.error) {
+    const error = result.structuredContent.error as { code?: string };
+    if (error.code === E_CANCELLED) {
+      return 'cancelled';
+    }
+  }
+
   if (result.isError) {
-    return true;
+    return 'failed';
   }
 
-  if (
-    typeof result.structuredContent === 'object' &&
-    'ok' in result.structuredContent
-  ) {
-    return result.structuredContent.ok === false;
+  if (result.structuredContent?.ok === false) {
+    return 'failed';
   }
 
-  return false;
+  return 'completed';
 }
 
 function defaultCompletionMessage(
   startMessage: string,
   result: CallToolResult
 ): string {
-  return `${startMessage} • ${isFailedResult(result) ? 'failed' : 'completed'}`;
+  return `${startMessage} • ${getResultOutcome(result)}`;
 }
 
 export async function notifyProgress(
@@ -211,10 +219,12 @@ export function wrapToolHandler<TArgs>(
     try {
       result = await handler(args, extra);
     } catch (error) {
+      const isCancelled =
+        error instanceof Error && error.message === E_CANCELLED;
       await notifyProgress(extra, {
         current: 1,
         total: 1,
-        message: `${startMessage} • failed`,
+        message: `${startMessage} • ${isCancelled ? 'cancelled' : 'failed'}`,
       });
       throw error;
     }
