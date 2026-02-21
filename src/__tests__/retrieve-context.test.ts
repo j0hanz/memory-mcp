@@ -181,8 +181,12 @@ describe('retrieve_context tool', () => {
       { query: 'context retrieval' },
       { signal: controller.signal }
     );
-    assert.ok(outcome.error instanceof Error);
-    assert.match(outcome.error.message, /Request cancelled/);
+    assert.equal(outcome.error, undefined);
+    assert.ok((outcome.result as any).isError);
+    assert.equal(
+      (outcome.result as any).structuredContent.error.code,
+      'E_CANCELLED'
+    );
     assert.ok(outcome.notifications.length >= 2);
 
     const final =

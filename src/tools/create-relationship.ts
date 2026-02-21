@@ -10,12 +10,13 @@ import {
   rethrowMcpError,
 } from '../lib/errors.js';
 import { logToolEvent } from '../lib/mcp-utils.js';
+import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
-import { CreateRelationshipInputSchema } from '../schemas/inputs.js';
-import { CreateRelationshipResultSchema } from '../schemas/outputs.js';
+import { type CreateRelationshipInputSchema } from '../schemas/inputs.js';
+import { type CreateRelationshipResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 
 type CreateRelInput = z.infer<typeof CreateRelationshipInputSchema>;
@@ -52,15 +53,16 @@ export function registerCreateRelationship(
   server: McpServer,
   db: TypedDb
 ): void {
+  const contract = getToolContract('create_relationship');
   server.registerTool(
-    'create_relationship',
+    contract.name,
     {
-      title: 'Create Relationship',
-      description:
-        'Create a directed labeled edge between two memories. Idempotent — re-creating an existing relationship is a no-op and returns `created: false`. Both endpoint memories must already exist, otherwise returns E_NOT_FOUND for the missing endpoint.',
-      inputSchema: CreateRelationshipInputSchema,
-      outputSchema: CreateRelationshipResultSchema,
-      annotations: { idempotentHint: true, openWorldHint: false },
+      title: contract.title,
+      description: contract.description,
+      inputSchema: contract.inputSchema as typeof CreateRelationshipInputSchema,
+      outputSchema:
+        contract.outputSchema as typeof CreateRelationshipResultSchema,
+      annotations: contract.annotations,
     },
     wrapToolHandler(
       async (params: CreateRelInput) => {

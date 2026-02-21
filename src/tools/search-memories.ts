@@ -11,28 +11,29 @@ import {
   encodeSearchCursor,
 } from '../lib/search-cursor.js';
 import { loadRankedSearchRows, toMemoryFilters } from '../lib/search.js';
+import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
 import { parseMemoryRow } from '../lib/types.js';
 import type { Memory } from '../lib/types.js';
-import { SearchMemoriesInputSchema } from '../schemas/inputs.js';
-import { SearchResultSchema } from '../schemas/outputs.js';
+import { type SearchMemoriesInputSchema } from '../schemas/inputs.js';
+import { type SearchResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 
 type SearchInput = z.infer<typeof SearchMemoriesInputSchema>;
 
 export function registerSearchMemories(server: McpServer, db: TypedDb): void {
+  const contract = getToolContract('search_memories');
   server.registerTool(
-    'search_memories',
+    contract.name,
     {
-      title: 'Search Memories',
-      description:
-        'Full-text search over memory content and tags using FTS5. Returns ranked results with cursor pagination. Query terms are individually matched (all-OR logic; FTS5 phrase operators and negation are not supported). Use `recall` when you need to follow relationships between memories after the search.',
-      inputSchema: SearchMemoriesInputSchema,
-      outputSchema: SearchResultSchema,
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      title: contract.title,
+      description: contract.description,
+      inputSchema: contract.inputSchema as typeof SearchMemoriesInputSchema,
+      outputSchema: contract.outputSchema as typeof SearchResultSchema,
+      annotations: contract.annotations,
     },
     wrapToolHandler(
       (params: SearchInput) => {

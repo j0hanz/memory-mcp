@@ -10,14 +10,15 @@ import {
   rethrowMcpError,
 } from '../lib/errors.js';
 import { SELECT_MEMORY_HASH_SQL } from '../lib/sql.js';
+import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
 import { parseTags } from '../lib/types.js';
 import type { RelationshipRow, RelationshipWithMemory } from '../lib/types.js';
-import { GetRelationshipsInputSchema } from '../schemas/inputs.js';
-import { RelationshipResultSchema } from '../schemas/outputs.js';
+import { type GetRelationshipsInputSchema } from '../schemas/inputs.js';
+import { type RelationshipResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 
 type GetRelInput = z.infer<typeof GetRelationshipsInputSchema>;
@@ -95,15 +96,15 @@ function toRelationshipWithMemory(
 }
 
 export function registerGetRelationships(server: McpServer, db: TypedDb): void {
+  const contract = getToolContract('get_relationships');
   server.registerTool(
-    'get_relationships',
+    contract.name,
     {
-      title: 'Get Relationships',
-      description:
-        'Retrieve all relationships for a memory, with the related memory inlined. Filter by direction (outgoing | incoming | both). Returns E_NOT_FOUND if the source memory does not exist.',
-      inputSchema: GetRelationshipsInputSchema,
-      outputSchema: RelationshipResultSchema,
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      title: contract.title,
+      description: contract.description,
+      inputSchema: contract.inputSchema as typeof GetRelationshipsInputSchema,
+      outputSchema: contract.outputSchema as typeof RelationshipResultSchema,
+      annotations: contract.annotations,
     },
     wrapToolHandler(
       (params: GetRelInput) => {

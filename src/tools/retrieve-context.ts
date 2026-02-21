@@ -1,20 +1,26 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
-import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
+import {
+  E_CANCELLED,
+  E_UNKNOWN,
+  getErrorMessage,
+  rethrowMcpError,
+} from '../lib/errors.js';
 import { sanitizeFtsQuery } from '../lib/search.js';
+import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
 import { parseMemoryRow } from '../lib/types.js';
 import type { Memory, MemoryRow } from '../lib/types.js';
-import { RetrieveContextInputSchema } from '../schemas/inputs.js';
-import { RetrieveContextResultSchema } from '../schemas/outputs.js';
+import { type RetrieveContextInputSchema } from '../schemas/inputs.js';
+import { type RetrieveContextResultSchema } from '../schemas/outputs.js';
 import {
   createProgressReporter,
   notifyProgress,
@@ -120,19 +126,19 @@ function throwIfAborted(signal?: AbortSignal): void {
     return;
   }
 
-  throw new McpError(ErrorCode.RequestTimeout, 'Request cancelled');
+  throw new Error(E_CANCELLED);
 }
 
 export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
+  const contract = getToolContract('retrieve_context');
   server.registerTool(
-    'retrieve_context',
+    contract.name,
     {
-      title: 'Retrieve Context',
-      description:
-        'FTS search with automatic token-budget management. Returns relevance-ranked memories totalling at most `token_budget` tokens. `strategy` controls sort: `relevance` (FTS rank, default), `importance` (highest first), or `recency` (newest first). Returns `truncated: true` when budget was reached before all candidates were included.',
-      inputSchema: RetrieveContextInputSchema,
-      outputSchema: RetrieveContextResultSchema,
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      title: contract.title,
+      description: contract.description,
+      inputSchema: contract.inputSchema as typeof RetrieveContextInputSchema,
+      outputSchema: contract.outputSchema as typeof RetrieveContextResultSchema,
+      annotations: contract.annotations,
     },
     async (params: RetrieveContextInput, extra) => {
       const { query, strategy } = params;
@@ -206,7 +212,9 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
           truncated,
         });
       } catch (err) {
-        if (err instanceof McpError) {
+        if (err instanceof Error && err.message === E_CANCELLED) {
+          result = createErrorResponse(E_CANCELLED, 'Request cancelled');
+        } else if (err instanceof McpError) {
           thrownError = err;
         } else {
           rethrowMcpError(err);

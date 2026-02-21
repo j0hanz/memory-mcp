@@ -16,13 +16,14 @@ import {
   SELECT_MEMORY_BY_HASH_SQL,
   SELECT_MEMORY_HASH_SQL,
 } from '../lib/sql.js';
+import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
 import { type MemoryRow, parseTags } from '../lib/types.js';
-import { UpdateMemoryInputSchema } from '../schemas/inputs.js';
-import { UpdateResultSchema } from '../schemas/outputs.js';
+import { type UpdateMemoryInputSchema } from '../schemas/inputs.js';
+import { type UpdateResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 
 type UpdateInput = z.infer<typeof UpdateMemoryInputSchema>;
@@ -48,15 +49,15 @@ async function notifyUpdatedMemoryResources(
 }
 
 export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
+  const contract = getToolContract('update_memory');
   server.registerTool(
-    'update_memory',
+    contract.name,
     {
-      title: 'Update Memory',
-      description:
-        'Replace the content (and optionally tags) of an existing memory. Returns both old and new SHA-256 hashes, since content changes alter the hash. Returns E_NOT_FOUND if the memory does not exist; E_CONFLICT if the new content+tags already maps to an existing hash.',
-      inputSchema: UpdateMemoryInputSchema,
-      outputSchema: UpdateResultSchema,
-      annotations: { destructiveHint: true, openWorldHint: false },
+      title: contract.title,
+      description: contract.description,
+      inputSchema: contract.inputSchema as typeof UpdateMemoryInputSchema,
+      outputSchema: contract.outputSchema as typeof UpdateResultSchema,
+      annotations: contract.annotations,
     },
     wrapToolHandler(
       async (params: UpdateInput) => {

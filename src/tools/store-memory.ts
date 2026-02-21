@@ -7,12 +7,13 @@ import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
 import { computeMemoryHash } from '../lib/hash.js';
 import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
 import { INSERT_MEMORY_SQL } from '../lib/sql.js';
+import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
-import { StoreMemoryInputSchema } from '../schemas/inputs.js';
-import { StoreResultSchema } from '../schemas/outputs.js';
+import { type StoreMemoryInputSchema } from '../schemas/inputs.js';
+import { type StoreResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 
 type StoreInput = z.infer<typeof StoreMemoryInputSchema>;
@@ -48,15 +49,15 @@ function insertMemory(
 }
 
 export function registerStoreMemory(server: McpServer, db: TypedDb): void {
+  const contract = getToolContract('store_memory');
   server.registerTool(
-    'store_memory',
+    contract.name,
     {
-      title: 'Store Memory',
-      description:
-        'Store a single memory with content, tags, and optional type/importance. Returns the SHA-256 hash. Idempotent — storing the same content+tags returns the existing hash with `created: false`. For storing multiple memories at once, prefer `store_memories`.',
-      inputSchema: StoreMemoryInputSchema,
-      outputSchema: StoreResultSchema,
-      annotations: { idempotentHint: true, openWorldHint: false },
+      title: contract.title,
+      description: contract.description,
+      inputSchema: contract.inputSchema as typeof StoreMemoryInputSchema,
+      outputSchema: contract.outputSchema as typeof StoreResultSchema,
+      annotations: contract.annotations,
     },
     wrapToolHandler(
       async (params: StoreInput) => {

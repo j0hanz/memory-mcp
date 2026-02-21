@@ -18,6 +18,7 @@ import {
   encodeSearchCursor,
 } from '../lib/search-cursor.js';
 import { loadRankedSearchRows, toMemoryFilters } from '../lib/search.js';
+import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
@@ -29,8 +30,8 @@ import type {
   MemoryRow,
   RelationshipEdge,
 } from '../lib/types.js';
-import { RecallInputSchema } from '../schemas/inputs.js';
-import { RecallResultSchema } from '../schemas/outputs.js';
+import { type RecallInputSchema } from '../schemas/inputs.js';
+import { type RecallResultSchema } from '../schemas/outputs.js';
 import {
   createProgressReporter,
   notifyProgress,
@@ -235,15 +236,15 @@ function formatRecallCompletionMessage(
 }
 
 export function registerRecall(server: McpServer, db: TypedDb): void {
+  const contract = getToolContract('recall');
   server.registerTool(
-    'recall',
+    contract.name,
     {
-      title: 'Recall (BFS Graph Traversal)',
-      description:
-        'Search for memories and explore their connections (knowledge graph). FTS search then BFS graph traversal up to `depth` hops. Returns all discovered memories and edges. Use when exploring memory relationships or understanding context. Emits progress per hop. Returns `aborted: true` with partial results when safety limits are hit (env: RECALL_MAX_FRONTIER_SIZE, RECALL_MAX_EDGE_ROWS, RECALL_MAX_VISITED_NODES).',
-      inputSchema: RecallInputSchema,
-      outputSchema: RecallResultSchema,
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      title: contract.title,
+      description: contract.description,
+      inputSchema: contract.inputSchema as typeof RecallInputSchema,
+      outputSchema: contract.outputSchema as typeof RecallResultSchema,
+      annotations: contract.annotations,
     },
     async (params: RecallInput, extra) => {
       const { depth, limit, cursor } = params;

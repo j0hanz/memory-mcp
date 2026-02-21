@@ -9,12 +9,13 @@ import {
   getErrorMessage,
   rethrowMcpError,
 } from '../lib/errors.js';
+import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
-import { DeleteRelationshipInputSchema } from '../schemas/inputs.js';
-import { DeleteRelationshipResultSchema } from '../schemas/outputs.js';
+import { type DeleteRelationshipInputSchema } from '../schemas/inputs.js';
+import { type DeleteRelationshipResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 
 type DeleteRelInput = z.infer<typeof DeleteRelationshipInputSchema>;
@@ -50,15 +51,16 @@ export function registerDeleteRelationship(
   server: McpServer,
   db: TypedDb
 ): void {
+  const contract = getToolContract('delete_relationship');
   server.registerTool(
-    'delete_relationship',
+    contract.name,
     {
-      title: 'Delete Relationship',
-      description:
-        'Remove a single directed relationship edge between two memories. All three fields (from_hash, to_hash, relation_type) must match exactly. Returns E_NOT_FOUND if the exact relationship does not exist.',
-      inputSchema: DeleteRelationshipInputSchema,
-      outputSchema: DeleteRelationshipResultSchema,
-      annotations: { destructiveHint: true, openWorldHint: false },
+      title: contract.title,
+      description: contract.description,
+      inputSchema: contract.inputSchema as typeof DeleteRelationshipInputSchema,
+      outputSchema:
+        contract.outputSchema as typeof DeleteRelationshipResultSchema,
+      annotations: contract.annotations,
     },
     wrapToolHandler(
       (params: DeleteRelInput) => {

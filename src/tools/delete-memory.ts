@@ -11,12 +11,13 @@ import {
 } from '../lib/errors.js';
 import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
 import { DELETE_MEMORY_SQL } from '../lib/sql.js';
+import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
-import { DeleteMemoryInputSchema } from '../schemas/inputs.js';
-import { DeleteResultSchema } from '../schemas/outputs.js';
+import { type DeleteMemoryInputSchema } from '../schemas/inputs.js';
+import { type DeleteResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 
 type DeleteInput = z.infer<typeof DeleteMemoryInputSchema>;
@@ -26,15 +27,15 @@ function deleteByHash(db: TypedDb, hash: string): boolean {
 }
 
 export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
+  const contract = getToolContract('delete_memory');
   server.registerTool(
-    'delete_memory',
+    contract.name,
     {
-      title: 'Delete Memory',
-      description:
-        'Delete a single memory by its SHA-256 hash. Cascade-deletes all relationships involving it. Returns E_NOT_FOUND if the hash does not exist.',
-      inputSchema: DeleteMemoryInputSchema,
-      outputSchema: DeleteResultSchema,
-      annotations: { destructiveHint: true, openWorldHint: false },
+      title: contract.title,
+      description: contract.description,
+      inputSchema: contract.inputSchema as typeof DeleteMemoryInputSchema,
+      outputSchema: contract.outputSchema as typeof DeleteResultSchema,
+      annotations: contract.annotations,
     },
     wrapToolHandler(
       async (params: DeleteInput) => {

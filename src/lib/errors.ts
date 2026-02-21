@@ -4,6 +4,7 @@ export const E_NOT_FOUND = 'E_NOT_FOUND';
 export const E_INVALID_CURSOR = 'E_INVALID_CURSOR';
 export const E_DB_ERROR = 'E_DB_ERROR';
 export const E_CONFLICT = 'E_CONFLICT';
+export const E_CANCELLED = 'E_CANCELLED';
 export const E_UNKNOWN = 'E_UNKNOWN';
 const UNKNOWN_ERROR_MESSAGE = 'Unknown error occurred';
 

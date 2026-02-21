@@ -10,13 +10,14 @@ import {
   rethrowMcpError,
 } from '../lib/errors.js';
 import { SELECT_MEMORY_BY_HASH_SQL } from '../lib/sql.js';
+import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
 import { type MemoryRow, parseMemoryRow } from '../lib/types.js';
-import { GetMemoryInputSchema } from '../schemas/inputs.js';
-import { MemoryResultSchema } from '../schemas/outputs.js';
+import { type GetMemoryInputSchema } from '../schemas/inputs.js';
+import { type MemoryResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 
 type GetInput = z.infer<typeof GetMemoryInputSchema>;
@@ -30,15 +31,15 @@ function notFound(hash: string): ReturnType<typeof createErrorResponse> {
 }
 
 export function registerGetMemory(server: McpServer, db: TypedDb): void {
+  const contract = getToolContract('get_memory');
   server.registerTool(
-    'get_memory',
+    contract.name,
     {
-      title: 'Get Memory',
-      description:
-        'Retrieve a single memory by its exact SHA-256 hash. Returns the full memory object or E_NOT_FOUND. Use `search_memories` or `recall` when you do not know the exact hash.',
-      inputSchema: GetMemoryInputSchema,
-      outputSchema: MemoryResultSchema,
-      annotations: { readOnlyHint: true, openWorldHint: false },
+      title: contract.title,
+      description: contract.description,
+      inputSchema: contract.inputSchema as typeof GetMemoryInputSchema,
+      outputSchema: contract.outputSchema as typeof MemoryResultSchema,
+      annotations: contract.annotations,
     },
     wrapToolHandler(
       (params: GetInput) => {

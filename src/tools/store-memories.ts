@@ -7,13 +7,14 @@ import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
 import { computeMemoryHash } from '../lib/hash.js';
 import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
 import { INSERT_MEMORY_SQL } from '../lib/sql.js';
+import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
 import type { BatchItemResult } from '../lib/types.js';
-import { StoreMemoriesInputSchema } from '../schemas/inputs.js';
-import { BatchResultSchema } from '../schemas/outputs.js';
+import { type StoreMemoriesInputSchema } from '../schemas/inputs.js';
+import { type BatchResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 
 type StoreMemoriesInput = z.infer<typeof StoreMemoriesInputSchema>;
@@ -29,15 +30,15 @@ async function notifyCreatedResources(
 }
 
 export function registerStoreMemories(server: McpServer, db: TypedDb): void {
+  const contract = getToolContract('store_memories');
   server.registerTool(
-    'store_memories',
+    contract.name,
     {
-      title: 'Store Memories (Batch)',
-      description:
-        'Store up to 50 memories atomically. Each item is independently idempotent — same content+tags returns existing hash with `created: false`. Returns per-item results. Transaction rolls back entirely on unexpected error.',
-      inputSchema: StoreMemoriesInputSchema,
-      outputSchema: BatchResultSchema,
-      annotations: { idempotentHint: true, openWorldHint: false },
+      title: contract.title,
+      description: contract.description,
+      inputSchema: contract.inputSchema as typeof StoreMemoriesInputSchema,
+      outputSchema: contract.outputSchema as typeof BatchResultSchema,
+      annotations: contract.annotations,
     },
     wrapToolHandler(
       async (params: StoreMemoriesInput) => {
