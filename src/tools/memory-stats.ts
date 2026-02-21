@@ -3,26 +3,25 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { TypedDb } from '../db/typed.js';
 import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
 import {
+  MEMORY_AGGREGATE_SQL,
+  RELATIONSHIP_COUNT_SQL,
+  TYPE_COUNTS_SQL,
+} from '../lib/sql.js';
+import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
-import type { NewestRow, OldestRow, TotalRow, TypeRow } from '../lib/types.js';
+import type { TotalRow, TypeRow } from '../lib/types.js';
 import { MemoryStatsInputSchema } from '../schemas/inputs.js';
 import { StatsResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 
-interface AvgImportanceRow {
+interface MemoryAggregateRow {
+  total: number;
+  oldest: string | null;
+  newest: string | null;
   avg_importance: number | null;
 }
-
-const TOTAL_MEMORIES_SQL = 'SELECT COUNT(*) AS total FROM memories';
-const TOTAL_RELATIONSHIPS_SQL = 'SELECT COUNT(*) AS total FROM relationships';
-const TYPE_COUNTS_SQL =
-  'SELECT memory_type, COUNT(*) AS count FROM memories GROUP BY memory_type ORDER BY count DESC';
-const OLDEST_MEMORY_SQL = 'SELECT MIN(created_at) AS oldest FROM memories';
-const NEWEST_MEMORY_SQL = 'SELECT MAX(created_at) AS newest FROM memories';
-const AVG_IMPORTANCE_SQL =
-  'SELECT AVG(importance) AS avg_importance FROM memories';
 
 function toTypeCounts(rows: TypeRow[]): Record<string, number> {
   const byType: Record<string, number> = {};
@@ -32,29 +31,13 @@ function toTypeCounts(rows: TypeRow[]): Record<string, number> {
   return byType;
 }
 
-function getTotalCount(db: TypedDb, sql: string): number {
-  return db.prepareOnce<TotalRow>(sql).get()?.total ?? 0;
-}
-
-function getMemoryExtremes(db: TypedDb): {
-  oldest: string | null;
-  newest: string | null;
-} {
-  const oldestRow = db.prepareOnce<OldestRow>(OLDEST_MEMORY_SQL).get();
-  const newestRow = db.prepareOnce<NewestRow>(NEWEST_MEMORY_SQL).get();
-  return {
-    oldest: oldestRow?.oldest ?? null,
-    newest: newestRow?.newest ?? null,
-  };
-}
-
 export function registerMemoryStats(server: McpServer, db: TypedDb): void {
   server.registerTool(
     'memory_stats',
     {
       title: 'Memory Stats',
       description:
-        'Return aggregate statistics about the memory store (counts, oldest/newest timestamps, breakdown by type).',
+        'Return aggregate statistics: total memories, total relationships, oldest/newest timestamps, average importance, and per-type counts. No input required.',
       inputSchema: MemoryStatsInputSchema,
       outputSchema: StatsResultSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
@@ -62,24 +45,22 @@ export function registerMemoryStats(server: McpServer, db: TypedDb): void {
     wrapToolHandler(
       () => {
         try {
-          const totalMemories = getTotalCount(db, TOTAL_MEMORIES_SQL);
-          const totalRelationships = getTotalCount(db, TOTAL_RELATIONSHIPS_SQL);
-
-          const typeRows = db.prepareOnce<TypeRow>(TYPE_COUNTS_SQL).all();
-          const { oldest, newest } = getMemoryExtremes(db);
-
-          const avgImportanceRow = db
-            .prepareOnce<AvgImportanceRow>(AVG_IMPORTANCE_SQL)
+          const aggregate = db
+            .prepareOnce<MemoryAggregateRow>(MEMORY_AGGREGATE_SQL)
             .get();
 
+          const totalRelationships =
+            db.prepareOnce<TotalRow>(RELATIONSHIP_COUNT_SQL).get()?.total ?? 0;
+
+          const typeRows = db.prepareOnce<TypeRow>(TYPE_COUNTS_SQL).all();
           const byType = toTypeCounts(typeRows);
 
           return createToolResponse({
             memories: {
-              total: totalMemories,
-              oldest,
-              newest,
-              avg_importance: avgImportanceRow?.avg_importance ?? null,
+              total: aggregate?.total ?? 0,
+              oldest: aggregate?.oldest ?? null,
+              newest: aggregate?.newest ?? null,
+              avg_importance: aggregate?.avg_importance ?? null,
             },
             relationships: {
               total: totalRelationships,

@@ -20,3 +20,12 @@ export function getToolResultPayload(
 
   return structuredContent;
 }
+
+/** Count items in a named array field of a tool result payload. */
+export function countPayloadArrayItems(
+  payload: Record<string, unknown>,
+  key: string
+): number {
+  const value = payload[key];
+  return Array.isArray(value) ? value.length : 0;
+}

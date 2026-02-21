@@ -6,6 +6,7 @@ import type { TypedDb } from '../db/typed.js';
 import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
 import { computeMemoryHash } from '../lib/hash.js';
 import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
+import { INSERT_MEMORY_SQL } from '../lib/sql.js';
 import {
   createErrorResponse,
   createToolResponse,
@@ -16,12 +17,6 @@ import { BatchResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 
 type StoreMemoriesInput = z.infer<typeof StoreMemoriesInputSchema>;
-const INSERT_MEMORY_SQL = `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?)`;
-
-function countCreated(items: readonly BatchItemResult[]): number {
-  return items.reduce((count, item) => (item.created ? count + 1 : count), 0);
-}
 
 async function notifyCreatedResources(
   server: McpServer,
@@ -39,7 +34,7 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
     {
       title: 'Store Memories (Batch)',
       description:
-        'Store up to 50 memories in a single atomic transaction. Returns per-item results so callers can detect partial failures. All items succeed or the transaction rolls back.',
+        'Store up to 50 memories atomically. Each item is independently idempotent — same content+tags returns existing hash with `created: false`. Returns per-item results. Transaction rolls back entirely on unexpected error.',
       inputSchema: StoreMemoriesInputSchema,
       outputSchema: BatchResultSchema,
       annotations: { idempotentHint: true, openWorldHint: false },
@@ -75,11 +70,12 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
             return items;
           });
 
-          const created = countCreated(results);
-          const succeeded = results.reduce(
-            (count, item) => (item.ok ? count + 1 : count),
-            0
-          );
+          let created = 0;
+          let succeeded = 0;
+          for (const item of results) {
+            if (item.ok) succeeded += 1;
+            if (item.created) created += 1;
+          }
           const failed = results.length - succeeded;
 
           await logToolEvent(server, 'store_memories', {

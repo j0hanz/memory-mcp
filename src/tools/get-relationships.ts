@@ -9,6 +9,7 @@ import {
   getErrorMessage,
   rethrowMcpError,
 } from '../lib/errors.js';
+import { SELECT_MEMORY_HASH_SQL } from '../lib/sql.js';
 import {
   createErrorResponse,
   createToolResponse,
@@ -20,8 +21,45 @@ import { RelationshipResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 
 type GetRelInput = z.infer<typeof GetRelationshipsInputSchema>;
+type RelationshipDirectionMode = GetRelInput['direction'];
 
-const SELECT_MEMORY_HASH_SQL = 'SELECT hash FROM memories WHERE hash = ?';
+interface RelWithLinkedMemory extends RelationshipRow {
+  linked_hash: string;
+  linked_content: string;
+  linked_tags: string;
+}
+
+// Pre-defined SQL for each direction mode to maximise prepareOnce cache hits.
+const OUTGOING_SQL = `
+  SELECT r.from_hash, r.to_hash, r.relation_type, r.created_at,
+         m.hash AS linked_hash, m.content AS linked_content, m.tags AS linked_tags
+  FROM relationships r
+  JOIN memories m ON r.to_hash = m.hash
+  WHERE r.from_hash = ?
+  ORDER BY r.created_at DESC`;
+
+const INCOMING_SQL = `
+  SELECT r.from_hash, r.to_hash, r.relation_type, r.created_at,
+         m.hash AS linked_hash, m.content AS linked_content, m.tags AS linked_tags
+  FROM relationships r
+  JOIN memories m ON r.from_hash = m.hash
+  WHERE r.to_hash = ?
+  ORDER BY r.created_at DESC`;
+
+// UNION ALL for 'both': single round-trip instead of two separate queries.
+const BOTH_SQL = `
+  SELECT r.from_hash, r.to_hash, r.relation_type, r.created_at,
+         m.hash AS linked_hash, m.content AS linked_content, m.tags AS linked_tags
+  FROM relationships r
+  JOIN memories m ON r.to_hash = m.hash
+  WHERE r.from_hash = ?
+  UNION ALL
+  SELECT r.from_hash, r.to_hash, r.relation_type, r.created_at,
+         m.hash AS linked_hash, m.content AS linked_content, m.tags AS linked_tags
+  FROM relationships r
+  JOIN memories m ON r.from_hash = m.hash
+  WHERE r.to_hash = ?
+  ORDER BY created_at DESC`;
 
 function memoryExists(db: TypedDb, hash: string): boolean {
   return (
@@ -30,42 +68,16 @@ function memoryExists(db: TypedDb, hash: string): boolean {
   );
 }
 
-interface RelWithLinkedMemory extends RelationshipRow {
-  linked_hash: string;
-  linked_content: string;
-  linked_tags: string;
-}
-
-type RelationshipDirection = 'outgoing' | 'incoming';
-type RelationshipDirectionMode = RelationshipDirection | 'both';
-
-const DIRECTIONS_BY_MODE: Record<
-  RelationshipDirectionMode,
-  readonly RelationshipDirection[]
-> = {
-  outgoing: ['outgoing'],
-  incoming: ['incoming'],
-  both: ['outgoing', 'incoming'],
-};
-
 function loadRelationships(
   db: TypedDb,
   hash: string,
-  direction: RelationshipDirection
+  direction: RelationshipDirectionMode
 ): RelWithLinkedMemory[] {
-  const joinCondition =
-    direction === 'outgoing' ? 'r.to_hash = m.hash' : 'r.from_hash = m.hash';
-  const whereColumn = direction === 'outgoing' ? 'r.from_hash' : 'r.to_hash';
-  return db
-    .prepareOnce<RelWithLinkedMemory>(
-      `SELECT r.from_hash, r.to_hash, r.relation_type, r.created_at,
-              m.hash AS linked_hash, m.content AS linked_content, m.tags AS linked_tags
-       FROM relationships r
-       JOIN memories m ON ${joinCondition}
-       WHERE ${whereColumn} = ?
-       ORDER BY r.created_at DESC`
-    )
-    .all(hash);
+  if (direction === 'both') {
+    return db.prepareOnce<RelWithLinkedMemory>(BOTH_SQL).all(hash, hash);
+  }
+  const sql = direction === 'outgoing' ? OUTGOING_SQL : INCOMING_SQL;
+  return db.prepareOnce<RelWithLinkedMemory>(sql).all(hash);
 }
 
 function toRelationshipWithMemory(
@@ -88,7 +100,7 @@ export function registerGetRelationships(server: McpServer, db: TypedDb): void {
     {
       title: 'Get Relationships',
       description:
-        'Retrieve all relationships for a memory, with the related memory inlined. Filter by direction (outgoing | incoming | both).',
+        'Retrieve all relationships for a memory, with the related memory inlined. Filter by direction (outgoing | incoming | both). Returns E_NOT_FOUND if the source memory does not exist.',
       inputSchema: GetRelationshipsInputSchema,
       outputSchema: RelationshipResultSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
@@ -103,10 +115,7 @@ export function registerGetRelationships(server: McpServer, db: TypedDb): void {
             );
           }
 
-          const directions = DIRECTIONS_BY_MODE[params.direction];
-          const rows: RelWithLinkedMemory[] = directions.flatMap((direction) =>
-            loadRelationships(db, params.hash, direction)
-          );
+          const rows = loadRelationships(db, params.hash, params.direction);
           const relationships: RelationshipWithMemory[] = rows.map(
             toRelationshipWithMemory
           );

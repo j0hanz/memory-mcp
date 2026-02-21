@@ -5,6 +5,7 @@ import type { z } from 'zod/v4';
 import type { TypedDb } from '../db/typed.js';
 import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
 import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
+import { DELETE_MEMORY_SQL } from '../lib/sql.js';
 import {
   createErrorResponse,
   createToolResponse,
@@ -15,12 +16,6 @@ import { BatchResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 
 type DeleteMemoriesInput = z.infer<typeof DeleteMemoriesInputSchema>;
-
-const DELETE_MEMORY_SQL = 'DELETE FROM memories WHERE hash = ?';
-
-function countDeleted(items: readonly BatchItemResult[]): number {
-  return items.reduce((count, item) => (item.deleted ? count + 1 : count), 0);
-}
 
 async function notifyDeletedResources(
   server: McpServer,
@@ -38,7 +33,7 @@ export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
     {
       title: 'Delete Memories (Batch)',
       description:
-        'Delete multiple memories by hash in a single atomic transaction. Returns per-item results indicating which hashes were deleted.',
+        'Delete up to 50 memories atomically. Cascade-deletes all relationships for each hash. Per-item `deleted: false` means the hash was not found — not an error, the batch still succeeds. Transaction rolls back entirely on unexpected error.',
       inputSchema: DeleteMemoriesInputSchema,
       outputSchema: BatchResultSchema,
       annotations: { destructiveHint: true, openWorldHint: false },
@@ -54,18 +49,18 @@ export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
               items.push({
                 hash,
                 ok: true,
-                created: false,
                 deleted: result.changes > 0,
               });
             }
             return items;
           });
 
-          const deleted = countDeleted(results);
-          const succeeded = results.reduce(
-            (count, item) => (item.ok ? count + 1 : count),
-            0
-          );
+          let deleted = 0;
+          let succeeded = 0;
+          for (const item of results) {
+            if (item.ok) succeeded += 1;
+            if (item.deleted) deleted += 1;
+          }
           const failed = results.length - succeeded;
 
           await logToolEvent(server, 'delete_memories', {

@@ -11,7 +11,7 @@ function createHelpMessages(instructions: string): PromptMessage[] {
       role: 'user',
       content: {
         type: 'text',
-        text: 'Show me the memory usage instructions.',
+        text: 'How do I use the memory tools?',
       },
     },
     {
@@ -29,7 +29,7 @@ const HELP_MESSAGES = createHelpMessages(INSTRUCTIONS_CONTENT);
 const GET_HELP_PROMPT_CONFIG = {
   title: 'Get Help',
   description:
-    'Return the full usage instructions for all memory tools and workflows.',
+    'Return full usage instructions: tool inventory, routing decisions, error codes, data model limits, and workflow patterns.',
 } as const;
 const GET_HELP_PROMPT_NAME = 'get-help';
 

@@ -5,6 +5,10 @@ const HASH_MAX_LENGTH = 64;
 const HASH_COMPLETION_LIMIT = 101;
 const HASH_COMPLETION_SQL = `SELECT hash FROM memories WHERE hash LIKE ? ESCAPE '\\' ORDER BY hash LIMIT ${HASH_COMPLETION_LIMIT}`;
 
+function escapeLikePattern(value: string): string {
+  return value.replace(/[%_\\]/g, '\\$&');
+}
+
 function normalizeHashPrefix(value: string): string {
   return escapeLikePattern(value.slice(0, HASH_MAX_LENGTH));
 }
@@ -20,8 +24,4 @@ export function createHashCompletionCallback(
       .all(`${escapedPrefix}%`)
       .map((row) => row.hash);
   };
-}
-
-function escapeLikePattern(value: string): string {
-  return value.replace(/[%_\\]/g, '\\$&');
 }

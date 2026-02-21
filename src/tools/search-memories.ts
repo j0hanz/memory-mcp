@@ -29,7 +29,7 @@ export function registerSearchMemories(server: McpServer, db: TypedDb): void {
     {
       title: 'Search Memories',
       description:
-        'Full-text search over memory content and tags using FTS5. Returns ranked results with pagination support via cursor. Query terms are matched individually; FTS5 phrase operators and negation are not supported.',
+        'Full-text search over memory content and tags using FTS5. Returns ranked results with cursor pagination. Query terms are individually matched (all-OR logic; FTS5 phrase operators and negation are not supported). Use `recall` when you need to follow relationships between memories after the search.',
       inputSchema: SearchMemoriesInputSchema,
       outputSchema: SearchResultSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },

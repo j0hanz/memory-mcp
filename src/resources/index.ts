@@ -6,6 +6,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { createHashCompletionCallback } from '../completions/index.js';
 import type { TypedDb } from '../db/typed.js';
 import { loadInstructions } from '../lib/instructions.js';
+import { SELECT_MEMORY_BY_HASH_SQL } from '../lib/sql.js';
 import { parseMemoryRow } from '../lib/types.js';
 import type { MemoryRow } from '../lib/types.js';
 
@@ -44,9 +45,7 @@ function getSingleVariable(
 }
 
 function readMemoryByHash(db: TypedDb, hash: string): MemoryRow | undefined {
-  return db
-    .prepareOnce<MemoryRow>('SELECT * FROM memories WHERE hash = ?')
-    .get(hash);
+  return db.prepareOnce<MemoryRow>(SELECT_MEMORY_BY_HASH_SQL).get(hash);
 }
 
 const INSTRUCTIONS_CONTENT = loadInstructions();
@@ -57,7 +56,8 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
     INSTRUCTIONS_URI,
     {
       title: 'Memory Instructions',
-      description: 'Usage guide for all memory tools and workflows.',
+      description:
+        'Complete usage guide: tool inventory, routing decisions, error codes, data model, and workflow patterns. Read this first.',
       mimeType: 'text/markdown',
       annotations: { audience: ['assistant'], priority: 0.9 },
     },
@@ -82,7 +82,8 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
     }),
     {
       title: 'Memory',
-      description: 'Retrieve a memory by its SHA-256 hash.',
+      description:
+        'Fetch a single memory object by exact SHA-256 hash. Supports hash auto-completion. Returns { error } if the hash does not exist.',
       mimeType: 'application/json',
       annotations: { audience: ['assistant'], priority: 0.7 },
     },

@@ -13,6 +13,10 @@ import {
 import { computeMemoryHash } from '../lib/hash.js';
 import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
 import {
+  SELECT_MEMORY_BY_HASH_SQL,
+  SELECT_MEMORY_HASH_SQL,
+} from '../lib/sql.js';
+import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
@@ -22,11 +26,14 @@ import { UpdateResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 
 type UpdateInput = z.infer<typeof UpdateMemoryInputSchema>;
+
 const UPDATE_MEMORY_SQL = `UPDATE memories
   SET hash = ?, content = ?, tags = ?, updated_at = ?
   WHERE hash = ?`;
-const SELECT_MEMORY_BY_HASH_SQL = 'SELECT * FROM memories WHERE hash = ?';
-const SELECT_MEMORY_HASH_SQL = 'SELECT hash FROM memories WHERE hash = ?';
+
+type TransactionResult =
+  | { ok: true; oldHash: string; newHash: string }
+  | { ok: false; code: string; message: string };
 
 async function notifyUpdatedMemoryResources(
   server: McpServer,
@@ -46,7 +53,7 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
     {
       title: 'Update Memory',
       description:
-        'Replace the content of an existing memory identified by its hash. Tags may optionally be replaced. Returns the new hash.',
+        'Replace the content (and optionally tags) of an existing memory. Returns both old and new SHA-256 hashes, since content changes alter the hash. Returns E_NOT_FOUND if the memory does not exist; E_CONFLICT if the new content+tags already maps to an existing hash.',
       inputSchema: UpdateMemoryInputSchema,
       outputSchema: UpdateResultSchema,
       annotations: { destructiveHint: true, openWorldHint: false },
@@ -54,35 +61,38 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
     wrapToolHandler(
       async (params: UpdateInput) => {
         try {
-          const existing = db
-            .prepareOnce<MemoryRow>(SELECT_MEMORY_BY_HASH_SQL)
-            .get(params.hash);
+          // All reads and the write are inside a single IMMEDIATE transaction
+          // to prevent TOCTOU between existence/collision checks and UPDATE.
+          const txResult = db.transaction((): TransactionResult => {
+            const existing = db
+              .prepareOnce<MemoryRow>(SELECT_MEMORY_BY_HASH_SQL)
+              .get(params.hash);
 
-          if (!existing) {
-            return createErrorResponse(
-              E_NOT_FOUND,
-              `Memory not found: ${params.hash}`
-            );
-          }
-
-          const newTags = params.tags ?? parseTags(existing.tags);
-          const newHash = computeMemoryHash(params.content, newTags);
-
-          if (newHash !== params.hash) {
-            const collision = db
-              .prepareOnce(SELECT_MEMORY_HASH_SQL)
-              .get(newHash);
-            if (collision) {
-              return createErrorResponse(
-                E_CONFLICT,
-                `Memory already exists for target content/tags: ${newHash}`
-              );
+            if (!existing) {
+              return {
+                ok: false,
+                code: E_NOT_FOUND,
+                message: `Memory not found: ${params.hash}`,
+              };
             }
-          }
 
-          const now = new Date().toISOString();
+            const newTags = params.tags ?? parseTags(existing.tags);
+            const newHash = computeMemoryHash(params.content, newTags);
 
-          db.transaction(() => {
+            if (newHash !== params.hash) {
+              const collision = db
+                .prepareOnce(SELECT_MEMORY_HASH_SQL)
+                .get(newHash);
+              if (collision) {
+                return {
+                  ok: false,
+                  code: E_CONFLICT,
+                  message: `Memory already exists for target content/tags: ${newHash}`,
+                };
+              }
+            }
+
+            const now = new Date().toISOString();
             db.prepareOnce(UPDATE_MEMORY_SQL).run(
               newHash,
               params.content,
@@ -90,17 +100,27 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
               now,
               params.hash
             );
+
+            return { ok: true, oldHash: params.hash, newHash };
           });
+
+          if (!txResult.ok) {
+            return createErrorResponse(txResult.code, txResult.message);
+          }
 
           await logToolEvent(server, 'update', {
-            oldHash: params.hash,
-            newHash,
+            oldHash: txResult.oldHash,
+            newHash: txResult.newHash,
           });
-          await notifyUpdatedMemoryResources(server, params.hash, newHash);
+          await notifyUpdatedMemoryResources(
+            server,
+            txResult.oldHash,
+            txResult.newHash
+          );
 
           return createToolResponse({
-            old_hash: params.hash,
-            new_hash: newHash,
+            old_hash: txResult.oldHash,
+            new_hash: txResult.newHash,
           });
         } catch (err) {
           rethrowMcpError(err);

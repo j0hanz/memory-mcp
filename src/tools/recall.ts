@@ -36,18 +36,14 @@ import {
   notifyProgress,
   progressWithMessage,
 } from './progress.js';
-import { getToolResultPayload, isOkStructuredToolResult } from './result.js';
+import {
+  countPayloadArrayItems,
+  getToolResultPayload,
+  isOkStructuredToolResult,
+} from './result.js';
 
 type RecallInput = z.infer<typeof RecallInputSchema>;
 type ProgressNotifier = (hop: number, total: number) => void;
-
-function countPayloadArrayItems(
-  payload: Record<string, unknown>,
-  key: string
-): number {
-  const value = payload[key];
-  return Array.isArray(value) ? value.length : 0;
-}
 
 function parseEnvInt(
   name: string,
@@ -241,7 +237,7 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
     {
       title: 'Recall (BFS Graph Traversal)',
       description:
-        'Search memories by full-text query, then traverse the relationship graph up to `depth` hops via BFS. Returns all discovered memories and the edges connecting them. Query terms are matched individually; FTS5 phrase operators and negation are not supported.',
+        'FTS search then BFS graph traversal up to `depth` hops. Returns all discovered memories and edges. Use when exploring memory relationships. Emits progress per hop. Returns `aborted: true` with partial results when safety limits are hit (env: RECALL_MAX_FRONTIER_SIZE, RECALL_MAX_EDGE_ROWS, RECALL_MAX_VISITED_NODES).',
       inputSchema: RecallInputSchema,
       outputSchema: RecallResultSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },

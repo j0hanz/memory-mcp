@@ -20,7 +20,11 @@ import {
   notifyProgress,
   progressWithMessage,
 } from './progress.js';
-import { getToolResultPayload, isOkStructuredToolResult } from './result.js';
+import {
+  countPayloadArrayItems,
+  getToolResultPayload,
+  isOkStructuredToolResult,
+} from './result.js';
 
 type RetrieveContextInput = z.infer<typeof RetrieveContextInputSchema>;
 type ContextStrategy = RetrieveContextInput['strategy'];
@@ -35,12 +39,8 @@ const ORDER_BY_MAP = {
   relevance: 'memories_fts.rank',
 } as const satisfies Record<ContextStrategy, string>;
 
-function countPayloadArrayItems(
-  payload: Record<string, unknown>,
-  key: string
-): number {
-  const value = payload[key];
-  return Array.isArray(value) ? value.length : 0;
+function countPayloadMemories(payload: Record<string, unknown>): number {
+  return countPayloadArrayItems(payload, 'memories');
 }
 
 function estimateTokens(content: string): number {
@@ -98,7 +98,7 @@ function formatCompletionMessage(
     return `⊙ retrieve_context: ${query} • completed`;
   }
 
-  const memoriesCount = countPayloadArrayItems(payload, 'memories');
+  const memoriesCount = countPayloadMemories(payload);
   const estimatedTokens =
     'estimated_tokens' in payload &&
     typeof payload.estimated_tokens === 'number'
@@ -124,7 +124,7 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
     {
       title: 'Retrieve Context',
       description:
-        'Search memories and return relevance-ranked results that fit within a caller-specified token budget. Eliminates manual pagination and token counting for context window management.',
+        'FTS search with automatic token-budget management. Returns relevance-ranked memories totalling at most `token_budget` tokens. `strategy` controls sort: `relevance` (FTS rank, default), `importance` (highest first), or `recency` (newest first). Returns `truncated: true` when budget was reached before all candidates were included.',
       inputSchema: RetrieveContextInputSchema,
       outputSchema: RetrieveContextResultSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },

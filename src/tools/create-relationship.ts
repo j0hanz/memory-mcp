@@ -57,7 +57,7 @@ export function registerCreateRelationship(
     {
       title: 'Create Relationship',
       description:
-        'Create a directed labeled edge between two memories. Idempotent — re-creating an existing relationship is a no-op.',
+        'Create a directed labeled edge between two memories. Idempotent — re-creating an existing relationship is a no-op and returns `created: false`. Both endpoint memories must already exist, otherwise returns E_NOT_FOUND for the missing endpoint.',
       inputSchema: CreateRelationshipInputSchema,
       outputSchema: CreateRelationshipResultSchema,
       annotations: { idempotentHint: true, openWorldHint: false },

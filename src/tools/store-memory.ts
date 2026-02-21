@@ -6,6 +6,7 @@ import type { TypedDb } from '../db/typed.js';
 import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
 import { computeMemoryHash } from '../lib/hash.js';
 import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
+import { INSERT_MEMORY_SQL } from '../lib/sql.js';
 import {
   createErrorResponse,
   createToolResponse,
@@ -15,8 +16,6 @@ import { StoreResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 
 type StoreInput = z.infer<typeof StoreMemoryInputSchema>;
-const INSERT_MEMORY_SQL = `INSERT OR IGNORE INTO memories (hash, content, tags, memory_type, importance, created_at, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?)`;
 
 function toInsertParams(
   params: Pick<StoreInput, 'content' | 'tags' | 'importance'>,
@@ -54,7 +53,7 @@ export function registerStoreMemory(server: McpServer, db: TypedDb): void {
     {
       title: 'Store Memory',
       description:
-        'Store a new memory with content, tags, and optional type/importance. Returns the SHA-256 hash. Idempotent — storing the same content+tags returns the existing hash with created:false.',
+        'Store a single memory with content, tags, and optional type/importance. Returns the SHA-256 hash. Idempotent — storing the same content+tags returns the existing hash with `created: false`. For storing multiple memories at once, prefer `store_memories`.',
       inputSchema: StoreMemoryInputSchema,
       outputSchema: StoreResultSchema,
       annotations: { idempotentHint: true, openWorldHint: false },

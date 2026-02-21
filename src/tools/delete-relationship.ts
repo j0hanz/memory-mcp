@@ -54,7 +54,8 @@ export function registerDeleteRelationship(
     'delete_relationship',
     {
       title: 'Delete Relationship',
-      description: 'Remove a directed relationship between two memories.',
+      description:
+        'Remove a single directed relationship edge between two memories. All three fields (from_hash, to_hash, relation_type) must match exactly. Returns E_NOT_FOUND if the exact relationship does not exist.',
       inputSchema: DeleteRelationshipInputSchema,
       outputSchema: DeleteRelationshipResultSchema,
       annotations: { destructiveHint: true, openWorldHint: false },

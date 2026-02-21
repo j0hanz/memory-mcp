@@ -9,6 +9,7 @@ import {
   getErrorMessage,
   rethrowMcpError,
 } from '../lib/errors.js';
+import { SELECT_MEMORY_BY_HASH_SQL } from '../lib/sql.js';
 import {
   createErrorResponse,
   createToolResponse,
@@ -19,8 +20,6 @@ import { MemoryResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 
 type GetInput = z.infer<typeof GetMemoryInputSchema>;
-
-const SELECT_MEMORY_BY_HASH_SQL = 'SELECT * FROM memories WHERE hash = ?';
 
 function getMemoryRow(db: TypedDb, hash: string): MemoryRow | undefined {
   return db.prepareOnce<MemoryRow>(SELECT_MEMORY_BY_HASH_SQL).get(hash);
@@ -35,7 +34,8 @@ export function registerGetMemory(server: McpServer, db: TypedDb): void {
     'get_memory',
     {
       title: 'Get Memory',
-      description: 'Retrieve a single memory by its SHA-256 hash.',
+      description:
+        'Retrieve a single memory by its exact SHA-256 hash. Returns the full memory object or E_NOT_FOUND. Use `search_memories` or `recall` when you do not know the exact hash.',
       inputSchema: GetMemoryInputSchema,
       outputSchema: MemoryResultSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },

@@ -10,6 +10,7 @@ import {
   rethrowMcpError,
 } from '../lib/errors.js';
 import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
+import { DELETE_MEMORY_SQL } from '../lib/sql.js';
 import {
   createErrorResponse,
   createToolResponse,
@@ -19,8 +20,6 @@ import { DeleteResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 
 type DeleteInput = z.infer<typeof DeleteMemoryInputSchema>;
-
-const DELETE_MEMORY_SQL = 'DELETE FROM memories WHERE hash = ?';
 
 function deleteByHash(db: TypedDb, hash: string): boolean {
   return db.prepareOnce(DELETE_MEMORY_SQL).run(hash).changes > 0;
@@ -32,7 +31,7 @@ export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
     {
       title: 'Delete Memory',
       description:
-        'Delete a single memory by its SHA-256 hash. Also removes any relationships involving it.',
+        'Delete a single memory by its SHA-256 hash. Cascade-deletes all relationships involving it. Returns E_NOT_FOUND if the hash does not exist.',
       inputSchema: DeleteMemoryInputSchema,
       outputSchema: DeleteResultSchema,
       annotations: { destructiveHint: true, openWorldHint: false },
