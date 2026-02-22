@@ -23,26 +23,21 @@ function createStructuredError(
   };
 }
 
-function buildResponse(
-  structured: Record<string, unknown>,
-  isError = false
-): CallToolResult {
-  return {
-    content: [toTextContent(structured)],
-    structuredContent: structured,
-    ...(isError ? { isError: true } : {}),
-  };
-}
-
 export function createToolResponse(
   payload: Record<string, unknown>
 ): CallToolResult {
-  return buildResponse(payload);
+  return {
+    content: [toTextContent(payload)],
+    structuredContent: payload,
+  };
 }
 
 export function createErrorResponse(
   code: string,
   message: string
 ): CallToolResult {
-  return buildResponse(createStructuredError(code, message), true);
+  return {
+    content: [toTextContent(createStructuredError(code, message))],
+    isError: true,
+  };
 }

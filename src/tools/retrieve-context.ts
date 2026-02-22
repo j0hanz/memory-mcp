@@ -96,15 +96,13 @@ function formatCompletionMessage(
   query: string,
   result: CallToolResult
 ): string {
-  if (result.structuredContent?.error) {
-    const error = result.structuredContent.error as { code?: string };
-    if (error.code === E_CANCELLED) {
-      return `⊙ retrieve_context: ${query} • cancelled`;
-    }
-  }
-
   const failedMessage = `⊙ retrieve_context: ${query} • failed`;
   if (result.isError) {
+    const text =
+      result.content[0]?.type === 'text' ? result.content[0].text : '';
+    if (text.includes(E_CANCELLED)) {
+      return `⊙ retrieve_context: ${query} • cancelled`;
+    }
     return failedMessage;
   }
   if (!isOkStructuredToolResult(result)) {

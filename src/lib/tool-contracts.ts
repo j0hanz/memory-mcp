@@ -53,6 +53,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     inputSchema: StoreMemoryInputSchema,
     outputSchema: StoreResultSchema,
     annotations: {
+      readOnlyHint: false,
       idempotentHint: true,
       destructiveHint: false,
       openWorldHint: false,
@@ -66,6 +67,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     inputSchema: StoreMemoriesInputSchema,
     outputSchema: BatchResultSchema,
     annotations: {
+      readOnlyHint: false,
       idempotentHint: true,
       destructiveHint: false,
       openWorldHint: false,
@@ -130,7 +132,11 @@ export const TOOL_CONTRACTS: ToolContract[] = [
       'Replace the content (and optionally tags) of an existing memory. Returns both old and new SHA-256 hashes, since content changes alter the hash. Returns E_NOT_FOUND if the memory does not exist; E_CONFLICT if the new content+tags already maps to an existing hash.',
     inputSchema: UpdateMemoryInputSchema,
     outputSchema: UpdateResultSchema,
-    annotations: { destructiveHint: true, openWorldHint: false },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'delete_memory',
@@ -139,7 +145,11 @@ export const TOOL_CONTRACTS: ToolContract[] = [
       'Delete a single memory by its SHA-256 hash. Cascade-deletes all relationships involving it. Returns E_NOT_FOUND if the hash does not exist.',
     inputSchema: DeleteMemoryInputSchema,
     outputSchema: DeleteResultSchema,
-    annotations: { destructiveHint: true, openWorldHint: false },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'delete_memories',
@@ -148,7 +158,11 @@ export const TOOL_CONTRACTS: ToolContract[] = [
       'Delete up to 50 memories atomically. Cascade-deletes all relationships for each hash. Per-item `deleted: false` means the hash was not found — not an error, the batch still succeeds. Transaction rolls back entirely on unexpected error.',
     inputSchema: DeleteMemoriesInputSchema,
     outputSchema: BatchResultSchema,
-    annotations: { destructiveHint: true, openWorldHint: false },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'create_relationship',
@@ -158,6 +172,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     inputSchema: CreateRelationshipInputSchema,
     outputSchema: CreateRelationshipResultSchema,
     annotations: {
+      readOnlyHint: false,
       idempotentHint: true,
       destructiveHint: false,
       openWorldHint: false,
@@ -170,7 +185,11 @@ export const TOOL_CONTRACTS: ToolContract[] = [
       'Remove a single directed relationship edge between two memories. All three fields (from_hash, to_hash, relation_type) must match exactly. Returns E_NOT_FOUND if the exact relationship does not exist.',
     inputSchema: DeleteRelationshipInputSchema,
     outputSchema: DeleteRelationshipResultSchema,
-    annotations: { destructiveHint: true, openWorldHint: false },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: 'get_relationships',

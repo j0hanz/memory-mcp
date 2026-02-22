@@ -183,10 +183,11 @@ describe('retrieve_context tool', () => {
     );
     assert.equal(outcome.error, undefined);
     assert.ok((outcome.result as any).isError);
-    assert.equal(
-      (outcome.result as any).structuredContent.error.code,
-      'E_CANCELLED'
-    );
+    const parsed = JSON.parse((outcome.result as any).content[0].text) as {
+      ok: false;
+      error: { code: string };
+    };
+    assert.equal(parsed.error.code, 'E_CANCELLED');
     assert.ok(outcome.notifications.length >= 2);
 
     const final =

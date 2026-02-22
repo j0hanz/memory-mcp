@@ -1,16 +1,4 @@
-import { getToolContracts } from '../lib/tool-contracts.js';
 import { getSharedConstraints } from './tool-info.js';
-
-function buildToolReference(): string {
-  const contracts = getToolContracts();
-  const entries = contracts
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((c) => {
-      const purpose = c.description.split('.')[0] ?? '';
-      return `### \`${c.name}\`\n- Purpose: ${purpose}`;
-    });
-  return entries.join('\n\n');
-}
 
 const WORKFLOW_TRACKS = `## Workflow A: Store and Link
 
@@ -63,7 +51,6 @@ export function buildWorkflowGuide(): string {
       .map((c) => `- ${c}`)
       .join('\n'),
     '',
-    '## Tool Reference',
-    buildToolReference(),
+    '> See `internal://tool-catalog` for complete tool reference and cross-tool data flow.',
   ].join('\n');
 }

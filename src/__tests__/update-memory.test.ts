@@ -81,15 +81,19 @@ describe('update_memory tool', () => {
       tags: ['conflict', 'b'],
     })) as { structuredContent: StoreResult };
 
-    const result = await callTool(server, 'update_memory', {
+    const result = (await callTool(server, 'update_memory', {
       hash: a.structuredContent.hash,
       content: 'Conflict source B',
       tags: ['conflict', 'b'],
-    });
+    })) as {
+      isError?: boolean;
+      content?: Array<{ type: string; text: string }>;
+    };
 
-    const data = result.structuredContent as ErrorResult;
-    assert.equal(data.ok, false);
-    assert.equal(data.error.code, 'E_CONFLICT');
-    assert.match(data.error.message, new RegExp(b.structuredContent.hash));
+    assert.equal(result.isError, true);
+    const parsed = JSON.parse(result.content![0]!.text) as ErrorResult;
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.error.code, 'E_CONFLICT');
+    assert.match(parsed.error.message, new RegExp(b.structuredContent.hash));
   });
 });

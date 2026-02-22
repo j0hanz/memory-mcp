@@ -80,14 +80,12 @@ function toNotificationParams(
 function getResultOutcome(
   result: CallToolResult
 ): 'completed' | 'failed' | 'cancelled' {
-  if (result.structuredContent?.error) {
-    const error = result.structuredContent.error as { code?: string };
-    if (error.code === E_CANCELLED) {
+  if (result.isError) {
+    const text =
+      result.content[0]?.type === 'text' ? result.content[0].text : '';
+    if (text.includes(E_CANCELLED)) {
       return 'cancelled';
     }
-  }
-
-  if (result.isError) {
     return 'failed';
   }
 
