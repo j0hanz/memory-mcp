@@ -2,7 +2,7 @@ import type { TypedDb } from '../db/typed.js';
 import type { HashRow } from '../lib/types.js';
 
 const HASH_MAX_LENGTH = 64;
-const HASH_COMPLETION_LIMIT = 101;
+const HASH_COMPLETION_LIMIT = 100;
 const HASH_COMPLETION_SQL = `SELECT hash FROM memories WHERE hash LIKE ? ESCAPE '\\' ORDER BY hash LIMIT ${HASH_COMPLETION_LIMIT}`;
 
 function escapeLikePattern(value: string): string {

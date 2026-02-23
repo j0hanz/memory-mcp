@@ -8,7 +8,7 @@ import type { TypedDb } from '../db/typed.js';
 import { loadInstructions } from '../lib/instructions.js';
 import { SELECT_MEMORY_BY_HASH_SQL } from '../lib/sql.js';
 import { parseMemoryRow } from '../lib/types.js';
-import type { MemoryRow } from '../lib/types.js';
+import type { HashRow, MemoryRow } from '../lib/types.js';
 import { buildServerConfig } from './server-config.js';
 import { buildToolCatalog } from './tool-catalog.js';
 import { getToolInfo, getToolNames } from './tool-info.js';
@@ -22,6 +22,9 @@ const TOOL_INFO_URI_TEMPLATE = 'internal://tool-info/{toolName}';
 const WORKFLOWS_URI = 'internal://workflows';
 const SERVER_CONFIG_URI = 'internal://server-config';
 const MEMORY_RESOURCE_URI_TEMPLATE = 'memory://memories/{hash}';
+const MEMORY_RESOURCE_LIST_LIMIT = 100;
+const RECENT_MEMORY_HASHES_SQL = `SELECT hash FROM memories ORDER BY updated_at DESC LIMIT ${MEMORY_RESOURCE_LIST_LIMIT}`;
+const RESOURCE_LAST_MODIFIED = new Date().toISOString();
 
 interface MarkdownResourceContent {
   uri: string;
@@ -70,6 +73,43 @@ function readMemoryByHash(db: TypedDb, hash: string): MemoryRow | undefined {
   return db.prepareOnce<MemoryRow>(SELECT_MEMORY_BY_HASH_SQL).get(hash);
 }
 
+function listToolInfoResources(): {
+  resources: {
+    uri: string;
+    name: string;
+    title: string;
+    mimeType: 'text/markdown';
+  }[];
+} {
+  return {
+    resources: getToolNames().map((toolName) => ({
+      uri: `internal://tool-info/${toolName}`,
+      name: 'tool-info',
+      title: `Tool Info: ${toolName}`,
+      mimeType: 'text/markdown',
+    })),
+  };
+}
+
+function listMemoryResources(db: TypedDb): {
+  resources: {
+    uri: string;
+    name: string;
+    title: string;
+    mimeType: 'application/json';
+  }[];
+} {
+  const hashes = db.prepareOnce<HashRow>(RECENT_MEMORY_HASHES_SQL).all();
+  return {
+    resources: hashes.map((row) => ({
+      uri: `memory://memories/${row.hash}`,
+      name: 'memory',
+      title: `Memory: ${row.hash.slice(0, 12)}...`,
+      mimeType: 'application/json',
+    })),
+  };
+}
+
 // --- Pre-computed static content ---
 
 const INSTRUCTIONS_CONTENT = loadInstructions();
@@ -89,7 +129,11 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
       description:
         'Complete usage guide: tool inventory, routing decisions, error codes, data model, and workflow patterns. Read this first.',
       mimeType: 'text/markdown',
-      annotations: { audience: ['assistant'], priority: 0.9 },
+      annotations: {
+        audience: ['assistant'],
+        priority: 0.9,
+        lastModified: RESOURCE_LAST_MODIFIED,
+      },
     },
     () => ({
       contents: [createMarkdownContent(INSTRUCTIONS_URI, INSTRUCTIONS_CONTENT)],
@@ -105,7 +149,11 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
       description:
         'Tool reference table, optional parameter matrix, and cross-tool data flow.',
       mimeType: 'text/markdown',
-      annotations: { audience: ['assistant'], priority: 0.7 },
+      annotations: {
+        audience: ['assistant'],
+        priority: 0.7,
+        lastModified: RESOURCE_LAST_MODIFIED,
+      },
     },
     () => ({
       contents: [createMarkdownContent(TOOL_CATALOG_URI, TOOL_CATALOG_CONTENT)],
@@ -116,7 +164,7 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
   server.registerResource(
     'tool-info',
     new ResourceTemplate(TOOL_INFO_URI_TEMPLATE, {
-      list: undefined,
+      list: () => listToolInfoResources(),
       complete: {
         toolName: (value: string) =>
           getToolNames().filter((n) => n.startsWith(value)),
@@ -127,7 +175,11 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
       description:
         'Per-tool detail: parameters, behavior, and output shape. Supports toolName auto-completion.',
       mimeType: 'text/markdown',
-      annotations: { audience: ['assistant'], priority: 0.6 },
+      annotations: {
+        audience: ['assistant'],
+        priority: 0.6,
+        lastModified: RESOURCE_LAST_MODIFIED,
+      },
     },
     (uri: URL, variables: Variables) => {
       const toolName = getSingleVariable(variables['toolName']);
@@ -162,7 +214,11 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
       description:
         'Recommended multi-step workflow sequences with guardrails and tool reference.',
       mimeType: 'text/markdown',
-      annotations: { audience: ['assistant'], priority: 0.7 },
+      annotations: {
+        audience: ['assistant'],
+        priority: 0.7,
+        lastModified: RESOURCE_LAST_MODIFIED,
+      },
     },
     () => ({
       contents: [createMarkdownContent(WORKFLOWS_URI, WORKFLOW_GUIDE_CONTENT)],
@@ -178,7 +234,11 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
       description:
         'Runtime configuration, environment variables, capabilities, and data limits.',
       mimeType: 'text/markdown',
-      annotations: { audience: ['user', 'assistant'], priority: 0.5 },
+      annotations: {
+        audience: ['user', 'assistant'],
+        priority: 0.5,
+        lastModified: RESOURCE_LAST_MODIFIED,
+      },
     },
     () => ({
       contents: [
@@ -193,7 +253,7 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
   server.registerResource(
     'memory',
     new ResourceTemplate(MEMORY_RESOURCE_URI_TEMPLATE, {
-      list: undefined,
+      list: () => listMemoryResources(db),
       complete: { hash: hashCompletion },
     }),
     {
@@ -201,7 +261,11 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
       description:
         'Fetch a single memory object by exact SHA-256 hash. Supports hash auto-completion. Returns { error } if the hash does not exist.',
       mimeType: 'application/json',
-      annotations: { audience: ['assistant'], priority: 0.7 },
+      annotations: {
+        audience: ['assistant'],
+        priority: 0.7,
+        lastModified: RESOURCE_LAST_MODIFIED,
+      },
     },
     (uri: URL, variables: Variables) => {
       const rawHash = variables['hash'];
