@@ -21,6 +21,13 @@ const ERROR_CODES = [
   '| `E_UNKNOWN` | Unexpected internal error — retry once |',
 ];
 
+const ERROR_RESULT_CONVENTIONS = [
+  '- Tool failures return `isError: true` with JSON text in `content[0].text`.',
+  '- Error payload shape: `{ ok: false, error: { code, message } }`.',
+  '- On error, do not expect `structuredContent`; parse the JSON text payload instead.',
+  '- Successful responses include both `structuredContent` and JSON text in `content[0].text`.',
+];
+
 const DATA_MODEL = `Memory:
 - hash: SHA-256(content + sorted tags). Deterministic.
 - content: 1-100k chars.
@@ -83,6 +90,10 @@ export function buildServerInstructions(): string {
     '<error_codes>',
     ERROR_CODES.join('\n'),
     '</error_codes>',
+    '',
+    '<error_result_conventions>',
+    ERROR_RESULT_CONVENTIONS.join('\n'),
+    '</error_result_conventions>',
     '',
     '<data_model>',
     DATA_MODEL,
