@@ -13,106 +13,85 @@ export const ErrorResultSchema = z
 
 export const MemorySchema = z
   .strictObject({
-    hash: STRING_SCHEMA.describe('SHA-256 hash of the memory'),
-    content: STRING_SCHEMA.describe('Content of the memory'),
-    tags: z.array(STRING_SCHEMA).describe('Tags associated with the memory'),
-    memory_type: STRING_SCHEMA.describe('Type of the memory'),
-    importance: NUMBER_SCHEMA.describe('Importance score (0-10)'),
-    created_at: STRING_SCHEMA.describe('Creation timestamp'),
-    updated_at: STRING_SCHEMA.describe('Last update timestamp'),
-    relevance: NUMBER_SCHEMA.optional().describe(
-      'Relevance score (if applicable)'
-    ),
+    hash: STRING_SCHEMA.describe('SHA-256 hash'),
+    content: STRING_SCHEMA.describe('Memory content'),
+    tags: z.array(STRING_SCHEMA).describe('Memory tags'),
+    memory_type: STRING_SCHEMA.describe('Memory type'),
+    importance: NUMBER_SCHEMA.describe('Importance (0-10)'),
+    created_at: STRING_SCHEMA.describe('Created at'),
+    updated_at: STRING_SCHEMA.describe('Updated at'),
+    relevance: NUMBER_SCHEMA.optional().describe('Relevance score'),
   })
-  .describe('A single memory object');
+  .describe('Memory object');
 
 export const MemoryResultSchema = MemorySchema;
 
 export const StoreResultSchema = z
   .strictObject({
-    hash: STRING_SCHEMA.describe('SHA-256 hash of the stored memory'),
-    created: BOOLEAN_SCHEMA.describe(
-      'True if a new memory was created, false if it already existed'
-    ),
+    hash: STRING_SCHEMA.describe('SHA-256 hash'),
+    created: BOOLEAN_SCHEMA.describe('True if created, false if existed'),
   })
-  .describe('Result of storing a single memory');
+  .describe('Store memory result');
 
 export const UpdateResultSchema = z
   .strictObject({
     old_hash: STRING_SCHEMA.describe('Previous SHA-256 hash'),
-    new_hash: STRING_SCHEMA.describe('New SHA-256 hash after update'),
+    new_hash: STRING_SCHEMA.describe('New SHA-256 hash'),
   })
-  .describe('Result of updating a memory');
+  .describe('Update memory result');
 
 export const DeleteResultSchema = z
   .strictObject({
-    hash: STRING_SCHEMA.describe('SHA-256 hash of the deleted memory'),
-    deleted: BOOLEAN_SCHEMA.describe(
-      'True if the memory was deleted, false if it was not found'
-    ),
+    hash: STRING_SCHEMA.describe('SHA-256 hash'),
+    deleted: BOOLEAN_SCHEMA.describe('True if deleted, false if not found'),
   })
-  .describe('Result of deleting a single memory');
+  .describe('Delete memory result');
 
 export const BatchItemResultSchema = z
   .strictObject({
-    hash: STRING_SCHEMA.describe('SHA-256 hash of the memory'),
-    ok: BOOLEAN_SCHEMA.describe(
-      'True if the operation succeeded for this item'
-    ),
-    created: BOOLEAN_SCHEMA.optional().describe(
-      'True if a new memory was created'
-    ),
-    deleted: BOOLEAN_SCHEMA.optional().describe(
-      'True if the memory was deleted'
-    ),
-    error: STRING_SCHEMA.optional().describe(
-      'Error message if the operation failed'
-    ),
+    hash: STRING_SCHEMA.describe('SHA-256 hash'),
+    ok: BOOLEAN_SCHEMA.describe('True if succeeded'),
+    created: BOOLEAN_SCHEMA.optional().describe('True if created'),
+    deleted: BOOLEAN_SCHEMA.optional().describe('True if deleted'),
+    error: STRING_SCHEMA.optional().describe('Error message if failed'),
   })
-  .describe('Result of a batch operation for a single item');
+  .describe('Batch item result');
 
 export const BatchResultSchema = z
   .strictObject({
-    items: z
-      .array(BatchItemResultSchema)
-      .describe('Results for each item in the batch'),
-    succeeded: z.number().describe('Number of items that succeeded'),
-    failed: z.number().describe('Number of items that failed'),
+    items: z.array(BatchItemResultSchema).describe('Item results'),
+    succeeded: z.number().describe('Success count'),
+    failed: z.number().describe('Failure count'),
   })
-  .describe('Result of a batch operation');
+  .describe('Batch operation result');
 
 export const SearchResultSchema = z
   .strictObject({
-    memories: z.array(MemorySchema).describe('List of matching memories'),
-    nextCursor: z
-      .string()
-      .optional()
-      .describe('Cursor for the next page of results'),
-    total_returned: z
-      .number()
-      .describe('Number of memories returned in this page'),
+    memories: z.array(MemorySchema).describe('Matching memories'),
+    nextCursor: z.string().optional().describe('Next page cursor'),
+    total_returned: z.number().describe('Returned count'),
   })
-  .describe('Result of searching memories');
+  .describe('Search result');
 
 export const RelationshipEdgeSchema = z
   .strictObject({
-    from_hash: z.string().describe('Source memory hash'),
-    to_hash: z.string().describe('Target memory hash'),
-    relation_type: z.string().describe('Type of relationship'),
+    from_hash: z.string().describe('Source hash'),
+    to_hash: z.string().describe('Target hash'),
+    relation_type: z.string().describe('Relationship type'),
   })
-  .describe('A directed relationship edge between two memories');
+  .describe('Relationship edge');
 
 export const RelationshipWithMemorySchema = z
   .strictObject({
-    from_hash: z.string().describe('Source memory hash'),
-    to_hash: z.string().describe('Target memory hash'),
-    relation_type: z.string().describe('Type of relationship'),
-    created_at: z.string().describe('Creation timestamp of the relationship'),
-    linked_hash: z.string().describe('Hash of the linked memory'),
-    linked_content: z.string().describe('Content of the linked memory'),
-    linked_tags: z.array(z.string()).describe('Tags of the linked memory'),
+    from_hash: z.string().describe('Source hash'),
+    to_hash: z.string().describe('Target hash'),
+    relation_type: z.string().describe('Relationship type'),
+    created_at: z.string().describe('Created at'),
+    linked_hash: z.string().describe('Linked memory hash'),
+    linked_content: z.string().describe('Linked memory content'),
+    linked_tags: z.array(z.string()).describe('Linked memory tags'),
   })
-  .describe('A relationship edge with the linked memory data inlined');
+  .describe('Relationship edge with linked memory');
 
 export const RelationshipResultSchema = z
   .strictObject({
@@ -125,77 +104,49 @@ export const RelationshipResultSchema = z
 
 export const CreateRelationshipResultSchema = z
   .strictObject({
-    created: z
-      .boolean()
-      .describe(
-        'True if a new relationship was created, false if it already existed'
-      ),
+    created: z.boolean().describe('True if created, false if existed'),
   })
-  .describe('Result of creating a relationship');
+  .describe('Create relationship result');
 
 export const DeleteRelationshipResultSchema = z
   .strictObject({
-    deleted: z
-      .boolean()
-      .describe(
-        'True if the relationship was deleted, false if it was not found'
-      ),
+    deleted: z.boolean().describe('True if deleted, false if not found'),
   })
-  .describe('Result of deleting a relationship');
+  .describe('Delete relationship result');
 
 export const StatsResultSchema = z
   .strictObject({
     memories: z
       .strictObject({
-        total: NUMBER_SCHEMA.describe('Total number of memories'),
-        oldest: STRING_SCHEMA.nullable().describe(
-          'Timestamp of the oldest memory'
-        ),
-        newest: STRING_SCHEMA.nullable().describe(
-          'Timestamp of the newest memory'
-        ),
-        avg_importance: NUMBER_SCHEMA.nullable().describe(
-          'Average importance score'
-        ),
+        total: NUMBER_SCHEMA.describe('Total memories'),
+        oldest: STRING_SCHEMA.nullable().describe('Oldest timestamp'),
+        newest: STRING_SCHEMA.nullable().describe('Newest timestamp'),
+        avg_importance: NUMBER_SCHEMA.nullable().describe('Average importance'),
       })
-      .describe('Memory statistics'),
+      .describe('Memory stats'),
     relationships: z
       .strictObject({
-        total: NUMBER_SCHEMA.describe('Total number of relationships'),
+        total: NUMBER_SCHEMA.describe('Total relationships'),
       })
-      .describe('Relationship statistics'),
-    by_type: z
-      .record(STRING_SCHEMA, NUMBER_SCHEMA)
-      .describe('Count of memories by type'),
+      .describe('Relationship stats'),
+    by_type: z.record(STRING_SCHEMA, NUMBER_SCHEMA).describe('Count by type'),
   })
-  .describe('Result of retrieving memory statistics');
+  .describe('Memory statistics result');
 
 export const RecallResultSchema = z
   .strictObject({
-    memories: z.array(MemorySchema).describe('List of discovered memories'),
-    graph: z
-      .array(RelationshipEdgeSchema)
-      .describe('List of discovered relationship edges'),
-    depth_reached: NUMBER_SCHEMA.describe(
-      'Maximum depth reached during traversal'
-    ),
-    aborted: BOOLEAN_SCHEMA.optional().describe(
-      'True if traversal was aborted due to safety limits'
-    ),
-    nextCursor: STRING_SCHEMA.optional().describe(
-      'Cursor for the next page of seed results'
-    ),
+    memories: z.array(MemorySchema).describe('Discovered memories'),
+    graph: z.array(RelationshipEdgeSchema).describe('Discovered edges'),
+    depth_reached: NUMBER_SCHEMA.describe('Max depth reached'),
+    aborted: BOOLEAN_SCHEMA.optional().describe('True if aborted by limits'),
+    nextCursor: STRING_SCHEMA.optional().describe('Next page cursor'),
   })
-  .describe('Result of exploring memory relationships via graph traversal');
+  .describe('Recall result');
 
 export const RetrieveContextResultSchema = z
   .strictObject({
-    memories: z.array(MemorySchema).describe('List of relevant memories'),
-    estimated_tokens: NUMBER_SCHEMA.describe(
-      'Estimated total tokens of the returned memories'
-    ),
-    truncated: BOOLEAN_SCHEMA.describe(
-      'True if the results were truncated to fit the token budget'
-    ),
+    memories: z.array(MemorySchema).describe('Relevant memories'),
+    estimated_tokens: NUMBER_SCHEMA.describe('Estimated tokens'),
+    truncated: BOOLEAN_SCHEMA.describe('True if truncated by budget'),
   })
-  .describe('Result of retrieving context within a token budget');
+  .describe('Retrieve context result');

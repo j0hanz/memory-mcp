@@ -11,7 +11,7 @@ function createHelpMessages(instructions: string): PromptMessage[] {
       role: 'user',
       content: {
         type: 'text',
-        text: 'How do I use the memory tools?',
+        text: 'Provide the Memory MCP usage guide, including tool routing, constraints, error codes, data model, and workflows.',
       },
     },
     {
@@ -28,8 +28,7 @@ const HELP_MESSAGES = createHelpMessages(INSTRUCTIONS_CONTENT);
 
 const GET_HELP_PROMPT_CONFIG = {
   title: 'Get Help',
-  description:
-    'Return full usage instructions: tool inventory, routing decisions, error codes, data model limits, and workflow patterns.',
+  description: 'Return full usage instructions.',
 } as const;
 const GET_HELP_PROMPT_NAME = 'get-help';
 

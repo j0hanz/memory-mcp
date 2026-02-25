@@ -1,15 +1,15 @@
 import { getToolContracts } from '../lib/tool-contracts.js';
 import { getSharedConstraints } from './tool-info.js';
 
-const PROMPTS_INVENTORY = ['- `get-help` — Return full usage instructions.'];
+const PROMPTS_INVENTORY = ['- `get-help` — Full usage instructions.'];
 
 const RESOURCES_INVENTORY = [
-  '- `internal://instructions` — This document. Read for tool routing, error codes, and workflows.',
-  '- `internal://tool-catalog` — Tool reference table, optional parameter matrix, and cross-tool data flow.',
-  '- `internal://tool-info/{toolName}` — Per-tool detail: parameters, behavior, and output shape.',
-  '- `internal://workflows` — Recommended multi-step workflow sequences.',
-  '- `internal://server-config` — Runtime configuration, limits, and capabilities.',
-  '- `memory://memories/{hash}` — Fetch a single memory by URI with hash auto-completion.',
+  '- `internal://instructions` — This document (routing, errors, workflows).',
+  '- `internal://tool-catalog` — Tool reference, parameters, data flow.',
+  '- `internal://tool-info/{toolName}` — Tool details (params, behavior, output).',
+  '- `internal://workflows` — Multi-step workflow sequences.',
+  '- `internal://server-config` — Runtime config, limits, capabilities.',
+  '- `memory://memories/{hash}` — Fetch memory by URI.',
 ];
 
 const ERROR_CODES = [

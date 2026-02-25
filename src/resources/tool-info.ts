@@ -5,11 +5,11 @@ import { getToolContracts, type ToolContract } from '../lib/tool-contracts.js';
 // --- Shared Constraints (Single Source of Truth) ---
 
 const SHARED_CONSTRAINTS: readonly string[] = [
-  'Idempotence: `store_memory` and `store_memories` return `created: false` if content+tags already exist.',
-  'Atomic Transactions: `store_memories` and `delete_memories` roll back entirely on unexpected errors.',
-  'Hash Changes: `update_memory` changes the hash when content or tags change. Relationships survive via CASCADE.',
-  'FTS Search Limits: Query terms matched individually (all-OR logic). Phrase operators and negation not supported.',
-  'Recall Limits: BFS traversal is bounded by env vars (RECALL_MAX_FRONTIER_SIZE, RECALL_MAX_EDGE_ROWS, RECALL_MAX_VISITED_NODES). Returns `aborted: true` with partial results when limits are hit.',
+  'Idempotence: `store_memory` and `store_memories` return `created: false` if content+tags exist.',
+  'Atomic Transactions: `store_memories` and `delete_memories` roll back on error.',
+  'Hash Changes: `update_memory` changes hash on content/tags change. Relationships survive via CASCADE.',
+  'FTS Search Limits: Query terms matched individually (all-OR). No phrase/negation support.',
+  'Recall Limits: BFS traversal bounded by env vars. Returns `aborted: true` with partial results if hit.',
 ];
 
 export function getSharedConstraints(): readonly string[] {
@@ -98,7 +98,8 @@ function formatParam(
   const desc =
     typeof prop['description'] === 'string' ? prop['description'] : '';
   const constraints = formatParamConstraints(prop);
-  return `- \`${name}\` (${type}, ${required ? 'required' : 'optional'}${constraints}) — ${desc}`;
+  const reqStr = required ? 'req' : 'opt';
+  return `- \`${name}\` (${type}, ${reqStr}): ${desc}${constraints}`;
 }
 
 function formatOutputShape(schema: z.ZodType): string {
@@ -148,20 +149,13 @@ export function getToolInfo(name: string): string | undefined {
   const outputShape = formatOutputShape(contract.outputSchema);
 
   return [
-    `# \`${contract.name}\``,
-    '',
-    `**${contract.title}**`,
-    '',
+    `### ${contract.name} (${behaviorLine})`,
     contract.description,
     '',
-    '## Parameters',
-    paramLines.length > 0 ? paramLines.join('\n') : '_No parameters._',
+    '**Params:**',
+    paramLines.length > 0 ? paramLines.join('\n') : 'None',
     '',
-    '## Behavior',
-    behaviorLine,
-    '',
-    '## Output Shape',
-    `\`${outputShape}\``,
+    `**Output:** \`${outputShape}\``,
   ].join('\n');
 }
 
