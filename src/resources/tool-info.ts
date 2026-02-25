@@ -54,11 +54,11 @@ export function buildCoreContextPack(): string {
   );
 
   return [
-    '# Core Context Pack',
-    '',
+    '<core_tools>',
     '| Tool | Purpose | Behavior |',
     '|------|---------|----------|',
     ...rows,
+    '</core_tools>',
   ].join('\n');
 }
 
@@ -143,13 +143,14 @@ export function getToolInfo(name: string): string | undefined {
   const outputShape = formatOutputShape(contract.outputSchema);
 
   return [
-    `### ${contract.name} (${behaviorLine})`,
-    contract.description,
-    '',
-    '**Params:**',
+    `<tool_info name="${contract.name}">`,
+    `<description>${contract.description}</description>`,
+    `<behavior>${behaviorLine}</behavior>`,
+    '<params>',
     paramLines.length > 0 ? paramLines.join('\n') : 'None',
-    '',
-    `**Output:** \`${outputShape}\``,
+    '</params>',
+    `<output>${outputShape}</output>`,
+    '</tool_info>',
   ].join('\n');
 }
 

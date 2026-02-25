@@ -21,52 +21,35 @@ const ERROR_CODES = [
   '| `E_UNKNOWN` | Unexpected internal error — retry once |',
 ];
 
-const DATA_MODEL = `### Memory
-- \`hash\` — SHA-256 of \`(content + sorted tags)\`; deterministic; changes when content or tags change
-- \`content\` — Text; 1–100,000 chars
-- \`tags\` — Array; 1–100 tags; each 1–50 chars, no whitespace; minimum 1 required
-- \`memory_type\` — \`general\` | \`fact\` | \`plan\` | \`decision\` | \`reflection\` | \`lesson\` | \`error\` | \`gradient\` (default \`general\`)
-- \`importance\` — Integer 0–10 (default 0; 10 = critical)
-- \`created_at\`, \`updated_at\` — ISO 8601 timestamps
+const DATA_MODEL = `Memory:
+- hash: SHA-256(content + sorted tags). Deterministic.
+- content: 1-100k chars.
+- tags: 1-100 items, 1-50 chars each.
+- type: general|fact|plan|decision|reflection|lesson|error|gradient.
+- importance: 0-10.
 
-### Relationship
-- Directed edge: \`from_hash -[relation_type]-> to_hash\`
-- \`relation_type\` — Free-form string, 1–50 chars, no whitespace
-- Suggested types: \`related_to\`, \`causes\`, \`depends_on\`, \`parent_of\`, \`child_of\`, \`supersedes\`, \`contradicts\`, \`supports\`, \`references\`
-- Both endpoints must exist before creating a relationship
-- Cascade-deleted when either endpoint memory is deleted
-- Cascade-updated when either endpoint hash changes (ON UPDATE CASCADE)`;
+Relationship:
+- Edge: from_hash -[relation_type]-> to_hash.
+- type: 1-50 chars.
+- Constraint: Endpoints must exist. Cascade delete/update.`;
 
-const WORKFLOWS = `### Store and Link
-\`\`\`
-store_memories({ items: [...] })         → { items[].hash, succeeded, failed }
-create_relationship({ from_hash, to_hash, relation_type })  × N
-\`\`\`
+const WORKFLOWS = `
+1. Store and Link:
+   store_memories({ items: [...] }) -> { items[].hash }
+   create_relationship({ from_hash, to_hash, relation_type })
 
-### Search and Read
-\`\`\`
-search_memories({ query, limit })        → { memories[], nextCursor }
-# or, for relationship navigation:
-recall({ query, depth: 1 })             → { memories[], graph[] }
-\`\`\`
+2. Search and Read:
+   search_memories({ query, limit }) -> { memories[], nextCursor }
+   recall({ query, depth: 1 }) -> { memories[], graph[] }
 
-### Fill Context Window
-\`\`\`
-retrieve_context({ query, token_budget: 4000, strategy: 'relevance' })
-  → { memories[], estimated_tokens, truncated }
-\`\`\`
+3. Fill Context:
+   retrieve_context({ query, token_budget: 4000 }) -> { memories[], truncated }
 
-### Update a Memory
-\`\`\`
-update_memory({ hash, content })         → { old_hash, new_hash }
-# Existing relationships auto-update to new_hash via CASCADE
-\`\`\`
+4. Update:
+   update_memory({ hash, content }) -> { new_hash }
 
-### Batch Delete
-\`\`\`
-delete_memories({ hashes: [...] })       → { items[].{ hash, deleted }, succeeded, failed }
-# deleted: false means hash not found — not an error
-\`\`\``;
+5. Delete:
+   delete_memories({ hashes: [...] }) -> { items[].deleted }`;
 
 function buildToolRouting(): string {
   const rows = getToolContracts().map((c) => {
@@ -74,13 +57,7 @@ function buildToolRouting(): string {
     return `| \`${c.name}\` | ${purpose} |`;
   });
 
-  return [
-    '## Tool Routing',
-    '',
-    '| Tool | Purpose |',
-    '| --- | --- |',
-    ...rows,
-  ].join('\n');
+  return ['| Tool | Purpose |', '| --- | --- |', ...rows].join('\n');
 }
 
 function renderSharedConstraints(): string {
@@ -91,26 +68,36 @@ function renderSharedConstraints(): string {
 
 export function buildServerInstructions(): string {
   return [
-    '# Memory MCP — Usage Guide',
+    '<role>',
+    'Memory MCP: Persistent memory storage, full-text retrieval, and relationship graph traversal.',
+    '</role>',
     '',
+    '<capabilities>',
     buildToolRouting(),
+    '</capabilities>',
     '',
-    '## Shared Constraints',
+    '<constraints>',
     renderSharedConstraints(),
+    '</constraints>',
     '',
-    '## Error Codes',
+    '<error_codes>',
     ERROR_CODES.join('\n'),
+    '</error_codes>',
     '',
-    '## Data Model',
+    '<data_model>',
     DATA_MODEL,
+    '</data_model>',
     '',
-    '## Common Workflows',
+    '<workflows>',
     WORKFLOWS,
+    '</workflows>',
     '',
-    '## Prompts',
+    '<prompts>',
     PROMPTS_INVENTORY.join('\n'),
+    '</prompts>',
     '',
-    '## Resources',
+    '<resources>',
     RESOURCES_INVENTORY.join('\n'),
+    '</resources>',
   ].join('\n');
 }

@@ -34,10 +34,7 @@ function extractOptionalParams(toolName: string, schema: z.ZodType): string[] {
   return rows;
 }
 
-const CROSS_TOOL_DATA_FLOW = `## Cross-Tool Data Flow
-
-\`\`\`
-store_memory.hash ──→ get_memory.hash
+const CROSS_TOOL_DATA_FLOW = `store_memory.hash ──→ get_memory.hash
 store_memory.hash ──→ create_relationship.from_hash / to_hash
 store_memory.hash ──→ update_memory.hash
 store_memory.hash ──→ delete_memory.hash
@@ -47,8 +44,7 @@ search_memories.nextCursor ──→ search_memories.cursor
 recall.memories[].hash ──→ get_memory.hash
 recall.nextCursor ──→ recall.cursor
 update_memory.new_hash ──→ get_memory.hash
-get_relationships.relationships[].linked_hash ──→ get_memory.hash
-\`\`\``;
+get_relationships.relationships[].linked_hash ──→ get_memory.hash`;
 
 export function buildToolCatalog(): string {
   const contracts = getToolContracts();
@@ -59,11 +55,11 @@ export function buildToolCatalog(): string {
   const optionalParamSection =
     optionalRows.length > 0
       ? [
-          '## Optional Parameter Matrix',
-          '',
+          '<optional_params>',
           '| Tool | Parameter | Default | Purpose |',
           '|------|-----------|---------|---------|',
           ...optionalRows,
+          '</optional_params>',
         ].join('\n')
       : '';
 
@@ -72,6 +68,8 @@ export function buildToolCatalog(): string {
     '',
     optionalParamSection,
     '',
+    '<data_flow>',
     CROSS_TOOL_DATA_FLOW,
+    '</data_flow>',
   ].join('\n');
 }

@@ -49,7 +49,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     name: 'store_memory',
     title: 'Store Memory',
     description:
-      'Store a single memory. Returns SHA-256 hash. Idempotent: existing content+tags returns `created: false`. Prefer `store_memories` for batch.',
+      'Store single memory. Returns hash. Idempotent (created: false if exists). Prefer store_memories.',
     inputSchema: StoreMemoryInputSchema,
     outputSchema: StoreResultSchema,
     annotations: {
@@ -63,7 +63,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     name: 'store_memories',
     title: 'Store Memories (Batch)',
     description:
-      'Store up to 50 memories atomically. Idempotent per item. Returns per-item results. Rolls back entirely on error.',
+      'Store 1-50 memories atomically. Idempotent. Rolls back on error.',
     inputSchema: StoreMemoriesInputSchema,
     outputSchema: BatchResultSchema,
     annotations: {
@@ -77,7 +77,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     name: 'get_memory',
     title: 'Get Memory',
     description:
-      'Retrieve a single memory by exact SHA-256 hash. Returns memory object or E_NOT_FOUND. Use `search_memories` or `recall` if hash is unknown.',
+      'Retrieve memory by SHA-256 hash. Returns E_NOT_FOUND if missing.',
     inputSchema: GetMemoryInputSchema,
     outputSchema: MemoryResultSchema,
     annotations: {
@@ -90,7 +90,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     name: 'search_memories',
     title: 'Search Memories',
     description:
-      'FTS5 full-text search over content and tags. Returns ranked results with cursor pagination. Matches alphanumeric/underscore tokens with implicit AND semantics. Use `recall` to follow relationships.',
+      'Full-text search (content+tags). Ranked, paginated. Alphanumeric/underscore only. Implicit AND.',
     inputSchema: SearchMemoriesInputSchema,
     outputSchema: SearchResultSchema,
     annotations: {
@@ -103,7 +103,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     name: 'retrieve_context',
     title: 'Retrieve Context',
     description:
-      'FTS search with token-budget management. Returns memories up to `token_budget`. Sort `strategy`: `relevance` (default), `importance`, or `recency`. Returns `truncated: true` if budget reached. Matches alphanumeric/underscore only.',
+      'FTS search within token budget. Sorts by relevance/importance/recency. Returns truncated: true if limit hit.',
     inputSchema: RetrieveContextInputSchema,
     outputSchema: RetrieveContextResultSchema,
     annotations: {
@@ -116,7 +116,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     name: 'recall',
     title: 'Recall (BFS Graph Traversal)',
     description:
-      'FTS search then BFS graph traversal up to `depth` hops. Returns discovered memories and edges. Emits progress. Returns `aborted: true` only if safety limits hit; cancellation returns E_CANCELLED.',
+      'FTS search + BFS traversal (depth hops). Returns memories+edges. Emits progress. Aborts on limit.',
     inputSchema: RecallInputSchema,
     outputSchema: RecallResultSchema,
     annotations: {
@@ -129,7 +129,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     name: 'update_memory',
     title: 'Update Memory',
     description:
-      'Replace content/tags of an existing memory. Returns old and new SHA-256 hashes. Returns E_NOT_FOUND if missing, E_CONFLICT if new content+tags already exists.',
+      'Update content/tags. Returns old+new hash. Cascade updates relationships.',
     inputSchema: UpdateMemoryInputSchema,
     outputSchema: UpdateResultSchema,
     annotations: {
@@ -142,7 +142,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     name: 'delete_memory',
     title: 'Delete Memory',
     description:
-      'Delete a single memory by SHA-256 hash. Cascade-deletes relationships. Returns `{deleted: false}` if not found (idempotent).',
+      'Delete memory by hash. Cascade deletes relationships. Idempotent.',
     inputSchema: DeleteMemoryInputSchema,
     outputSchema: DeleteResultSchema,
     annotations: {
@@ -156,7 +156,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     name: 'delete_memories',
     title: 'Delete Memories (Batch)',
     description:
-      'Delete up to 50 memories atomically. Cascade-deletes relationships. Per-item `deleted: false` if not found. Rolls back entirely on error.',
+      'Delete 1-50 memories atomically. Cascade deletes. Rolls back on error.',
     inputSchema: DeleteMemoriesInputSchema,
     outputSchema: BatchResultSchema,
     annotations: {
@@ -169,7 +169,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     name: 'create_relationship',
     title: 'Create Relationship',
     description:
-      'Create directed labeled edge between two memories. Idempotent: existing edge returns `created: false`. Returns E_NOT_FOUND if endpoints missing.',
+      'Create directed edge. Idempotent. Errors if endpoints missing.',
     inputSchema: CreateRelationshipInputSchema,
     outputSchema: CreateRelationshipResultSchema,
     annotations: {
@@ -182,8 +182,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
   {
     name: 'delete_relationship',
     title: 'Delete Relationship',
-    description:
-      'Remove a single directed relationship edge. Exact match required (from_hash, to_hash, relation_type). Returns E_NOT_FOUND if missing.',
+    description: 'Delete edge. Exact match required. Errors if missing.',
     inputSchema: DeleteRelationshipInputSchema,
     outputSchema: DeleteRelationshipResultSchema,
     annotations: {
@@ -196,7 +195,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     name: 'get_relationships',
     title: 'Get Relationships',
     description:
-      'Retrieve all relationships for a memory, with related memory inlined. Filter by direction (outgoing|incoming|both). Returns E_NOT_FOUND if source missing.',
+      'Get relationships for memory. Filter direction. Inlines related memory.',
     inputSchema: GetRelationshipsInputSchema,
     outputSchema: RelationshipResultSchema,
     annotations: {
@@ -208,8 +207,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
   {
     name: 'memory_stats',
     title: 'Memory Stats',
-    description:
-      'Return aggregate statistics: total memories, relationships, oldest/newest timestamps, average importance, and per-type counts.',
+    description: 'Get global stats: counts, timestamps, importance.',
     inputSchema: MemoryStatsInputSchema,
     outputSchema: StatsResultSchema,
     annotations: {
