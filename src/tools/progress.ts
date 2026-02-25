@@ -4,6 +4,7 @@ import type {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { E_CANCELLED } from '../lib/errors.js';
+import { getToolResultText } from './result.js';
 
 type ProgressToken = string | number;
 
@@ -11,8 +12,9 @@ interface ProgressMeta {
   progressToken?: unknown;
 }
 
-interface ProgressContext {
+export interface ProgressContext {
   _meta?: ProgressMeta;
+  signal?: AbortSignal;
   sendNotification?: (notification: ProgressNotification) => Promise<void>;
 }
 
@@ -81,8 +83,7 @@ function getResultOutcome(
   result: CallToolResult
 ): 'completed' | 'failed' | 'cancelled' {
   if (result.isError) {
-    const text =
-      result.content[0]?.type === 'text' ? result.content[0].text : '';
+    const text = getToolResultText(result);
     if (text.includes(E_CANCELLED)) {
       return 'cancelled';
     }

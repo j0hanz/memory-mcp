@@ -46,14 +46,18 @@ const CAPABILITIES = [
   { capability: 'logging', status: 'enabled' },
 ] as const;
 
+function toEnvVarRow(v: (typeof ENV_VARS)[number]): string {
+  return `| \`${v.name}\` | ${v.default} | ${v.range} | ${v.purpose} |`;
+}
+
+function toRangeRow(label: string, range: string): string {
+  return `| ${label} | ${range} |`;
+}
+
 export function buildServerConfig(): string {
-  const envRows = ENV_VARS.map(
-    (v) => `| \`${v.name}\` | ${v.default} | ${v.range} | ${v.purpose} |`
-  );
-
-  const limitRows = DATA_LIMITS.map((l) => `| ${l.dimension} | ${l.range} |`);
-
-  const capRows = CAPABILITIES.map((c) => `| ${c.capability} | ${c.status} |`);
+  const envRows = ENV_VARS.map(toEnvVarRow);
+  const limitRows = DATA_LIMITS.map((l) => toRangeRow(l.dimension, l.range));
+  const capRows = CAPABILITIES.map((c) => toRangeRow(c.capability, c.status));
 
   return [
     '# Server Configuration',

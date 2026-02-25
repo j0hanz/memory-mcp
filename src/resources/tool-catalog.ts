@@ -1,17 +1,11 @@
-import { z } from 'zod/v4';
+import type { z } from 'zod/v4';
 
+import {
+  extractJsonSchema,
+  type JsonSchemaObject,
+} from '../lib/json-schema.js';
 import { getToolContracts } from '../lib/tool-contracts.js';
 import { buildCoreContextPack } from './tool-info.js';
-
-type JsonSchemaObject = Record<string, unknown>;
-
-function extractJsonSchema(schema: z.ZodType): JsonSchemaObject {
-  try {
-    return z.toJSONSchema(schema) as JsonSchemaObject;
-  } catch {
-    return {};
-  }
-}
 
 function extractOptionalParams(toolName: string, schema: z.ZodType): string[] {
   const jsonSchema = extractJsonSchema(schema);

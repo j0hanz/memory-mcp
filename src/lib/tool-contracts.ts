@@ -219,13 +219,16 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     },
   },
 ];
+const TOOL_CONTRACTS_BY_NAME = new Map(
+  TOOL_CONTRACTS.map((contract) => [contract.name, contract] as const)
+);
 
 export function getToolContracts(): ToolContract[] {
   return TOOL_CONTRACTS;
 }
 
 export function getToolContract(name: string): ToolContract {
-  const contract = TOOL_CONTRACTS.find((c) => c.name === name);
+  const contract = TOOL_CONTRACTS_BY_NAME.get(name);
   if (!contract) {
     throw new Error(`Tool contract not found: ${name}`);
   }

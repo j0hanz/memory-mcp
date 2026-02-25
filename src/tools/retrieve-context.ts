@@ -12,23 +12,25 @@ import {
   rethrowMcpError,
 } from '../lib/errors.js';
 import { sanitizeFtsQuery } from '../lib/search.js';
-import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
 import { parseMemoryRow } from '../lib/types.js';
 import type { Memory, MemoryRow } from '../lib/types.js';
-import { type RetrieveContextInputSchema } from '../schemas/inputs.js';
-import { type RetrieveContextResultSchema } from '../schemas/outputs.js';
+import { RetrieveContextInputSchema } from '../schemas/inputs.js';
+import { RetrieveContextResultSchema } from '../schemas/outputs.js';
 import {
   createProgressReporter,
   notifyProgress,
+  type ProgressContext,
   progressWithMessage,
 } from './progress.js';
+import { registerToolWithContract } from './register-contract.js';
 import {
   countPayloadArrayItems,
   getToolResultPayload,
+  getToolResultText,
   isOkStructuredToolResult,
 } from './result.js';
 
@@ -98,8 +100,7 @@ function formatCompletionMessage(
 ): string {
   const failedMessage = `⊙ retrieve_context: ${query} • failed`;
   if (result.isError) {
-    const text =
-      result.content[0]?.type === 'text' ? result.content[0].text : '';
+    const text = getToolResultText(result);
     if (text.includes(E_CANCELLED)) {
       return `⊙ retrieve_context: ${query} • cancelled`;
     }
@@ -135,17 +136,12 @@ function throwIfAborted(signal?: AbortSignal): void {
 }
 
 export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
-  const contract = getToolContract('retrieve_context');
-  server.registerTool(
-    contract.name,
-    {
-      title: contract.title,
-      description: contract.description,
-      inputSchema: contract.inputSchema as typeof RetrieveContextInputSchema,
-      outputSchema: contract.outputSchema as typeof RetrieveContextResultSchema,
-      annotations: contract.annotations,
-    },
-    async (params: RetrieveContextInput, extra) => {
+  registerToolWithContract(
+    server,
+    'retrieve_context',
+    RetrieveContextInputSchema,
+    RetrieveContextResultSchema,
+    async (params: RetrieveContextInput, extra: ProgressContext) => {
       const { query, strategy } = params;
       const tokenBudget = params.token_budget;
       const contextLabel = `⊙ retrieve_context: ${query} [${strategy}]`;

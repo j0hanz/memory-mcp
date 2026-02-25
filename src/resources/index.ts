@@ -25,6 +25,7 @@ const MEMORY_RESOURCE_URI_TEMPLATE = 'memory://memories/{hash}';
 const MEMORY_RESOURCE_LIST_LIMIT = 100;
 const RECENT_MEMORY_HASHES_SQL = `SELECT hash FROM memories ORDER BY updated_at DESC LIMIT ${MEMORY_RESOURCE_LIST_LIMIT}`;
 const RESOURCE_LAST_MODIFIED = new Date().toISOString();
+const TOOL_NAMES = getToolNames();
 
 interface MarkdownResourceContent {
   uri: string;
@@ -36,6 +37,18 @@ interface JsonResourceContent {
   uri: string;
   mimeType: 'application/json';
   text: string;
+}
+
+type ResourceAudience = 'assistant' | 'user';
+
+interface StaticMarkdownResourceConfig {
+  name: string;
+  uri: string;
+  title: string;
+  description: string;
+  audience: readonly ResourceAudience[];
+  priority: number;
+  content: string;
 }
 
 function createMarkdownContent(
@@ -63,10 +76,56 @@ function createErrorResourceContents(
   };
 }
 
+function createResourceAnnotations(
+  audience: readonly ResourceAudience[],
+  priority: number
+): {
+  audience: ResourceAudience[];
+  priority: number;
+  lastModified: string;
+} {
+  return {
+    audience: [...audience],
+    priority,
+    lastModified: RESOURCE_LAST_MODIFIED,
+  };
+}
+
 function getSingleVariable(
   value: string | string[] | undefined
 ): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function requireSingleVariable(
+  variables: Variables,
+  key: string,
+  errorMessage: string
+): string {
+  const value = getSingleVariable(variables[key]);
+  if (!value) {
+    throw new McpError(ErrorCode.InvalidParams, errorMessage);
+  }
+  return value;
+}
+
+function registerStaticMarkdownResource(
+  server: McpServer,
+  config: StaticMarkdownResourceConfig
+): void {
+  server.registerResource(
+    config.name,
+    config.uri,
+    {
+      title: config.title,
+      description: config.description,
+      mimeType: 'text/markdown',
+      annotations: createResourceAnnotations(config.audience, config.priority),
+    },
+    () => ({
+      contents: [createMarkdownContent(config.uri, config.content)],
+    })
+  );
 }
 
 function readMemoryByHash(db: TypedDb, hash: string): MemoryRow | undefined {
@@ -82,7 +141,7 @@ function listToolInfoResources(): {
   }[];
 } {
   return {
-    resources: getToolNames().map((toolName) => ({
+    resources: TOOL_NAMES.map((toolName) => ({
       uri: `internal://tool-info/${toolName}`,
       name: 'tool-info',
       title: `Tool Info: ${toolName}`,
@@ -121,44 +180,28 @@ const SERVER_CONFIG_CONTENT = buildServerConfig();
 
 export function registerAllResources(server: McpServer, db: TypedDb): void {
   // internal://instructions
-  server.registerResource(
-    'instructions',
-    INSTRUCTIONS_URI,
-    {
-      title: 'Memory Instructions',
-      description:
-        'Complete usage guide: tool inventory, routing decisions, error codes, data model, and workflow patterns. Read this first.',
-      mimeType: 'text/markdown',
-      annotations: {
-        audience: ['assistant'],
-        priority: 0.9,
-        lastModified: RESOURCE_LAST_MODIFIED,
-      },
-    },
-    () => ({
-      contents: [createMarkdownContent(INSTRUCTIONS_URI, INSTRUCTIONS_CONTENT)],
-    })
-  );
+  registerStaticMarkdownResource(server, {
+    name: 'instructions',
+    uri: INSTRUCTIONS_URI,
+    title: 'Memory Instructions',
+    description:
+      'Complete usage guide: tool inventory, routing decisions, error codes, data model, and workflow patterns. Read this first.',
+    audience: ['assistant'],
+    priority: 0.9,
+    content: INSTRUCTIONS_CONTENT,
+  });
 
   // internal://tool-catalog
-  server.registerResource(
-    'tool-catalog',
-    TOOL_CATALOG_URI,
-    {
-      title: 'Tool Catalog',
-      description:
-        'Tool reference table, optional parameter matrix, and cross-tool data flow.',
-      mimeType: 'text/markdown',
-      annotations: {
-        audience: ['assistant'],
-        priority: 0.7,
-        lastModified: RESOURCE_LAST_MODIFIED,
-      },
-    },
-    () => ({
-      contents: [createMarkdownContent(TOOL_CATALOG_URI, TOOL_CATALOG_CONTENT)],
-    })
-  );
+  registerStaticMarkdownResource(server, {
+    name: 'tool-catalog',
+    uri: TOOL_CATALOG_URI,
+    title: 'Tool Catalog',
+    description:
+      'Tool reference table, optional parameter matrix, and cross-tool data flow.',
+    audience: ['assistant'],
+    priority: 0.7,
+    content: TOOL_CATALOG_CONTENT,
+  });
 
   // internal://tool-info/{toolName}
   server.registerResource(
@@ -167,7 +210,7 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
       list: () => listToolInfoResources(),
       complete: {
         toolName: (value: string) =>
-          getToolNames().filter((n) => n.startsWith(value)),
+          TOOL_NAMES.filter((n) => n.startsWith(value)),
       },
     }),
     {
@@ -175,21 +218,14 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
       description:
         'Per-tool detail: parameters, behavior, and output shape. Supports toolName auto-completion.',
       mimeType: 'text/markdown',
-      annotations: {
-        audience: ['assistant'],
-        priority: 0.6,
-        lastModified: RESOURCE_LAST_MODIFIED,
-      },
+      annotations: createResourceAnnotations(['assistant'], 0.6),
     },
     (uri: URL, variables: Variables) => {
-      const toolName = getSingleVariable(variables['toolName']);
-
-      if (!toolName) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          'Missing toolName parameter'
-        );
-      }
+      const toolName = requireSingleVariable(
+        variables,
+        'toolName',
+        'Missing toolName parameter'
+      );
 
       const info = getToolInfo(toolName);
       if (!info) {
@@ -206,46 +242,28 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
   );
 
   // internal://workflows
-  server.registerResource(
-    'workflows',
-    WORKFLOWS_URI,
-    {
-      title: 'Workflow Guide',
-      description:
-        'Recommended multi-step workflow sequences with guardrails and tool reference.',
-      mimeType: 'text/markdown',
-      annotations: {
-        audience: ['assistant'],
-        priority: 0.7,
-        lastModified: RESOURCE_LAST_MODIFIED,
-      },
-    },
-    () => ({
-      contents: [createMarkdownContent(WORKFLOWS_URI, WORKFLOW_GUIDE_CONTENT)],
-    })
-  );
+  registerStaticMarkdownResource(server, {
+    name: 'workflows',
+    uri: WORKFLOWS_URI,
+    title: 'Workflow Guide',
+    description:
+      'Recommended multi-step workflow sequences with guardrails and tool reference.',
+    audience: ['assistant'],
+    priority: 0.7,
+    content: WORKFLOW_GUIDE_CONTENT,
+  });
 
   // internal://server-config
-  server.registerResource(
-    'server-config',
-    SERVER_CONFIG_URI,
-    {
-      title: 'Server Configuration',
-      description:
-        'Runtime configuration, environment variables, capabilities, and data limits.',
-      mimeType: 'text/markdown',
-      annotations: {
-        audience: ['user', 'assistant'],
-        priority: 0.5,
-        lastModified: RESOURCE_LAST_MODIFIED,
-      },
-    },
-    () => ({
-      contents: [
-        createMarkdownContent(SERVER_CONFIG_URI, SERVER_CONFIG_CONTENT),
-      ],
-    })
-  );
+  registerStaticMarkdownResource(server, {
+    name: 'server-config',
+    uri: SERVER_CONFIG_URI,
+    title: 'Server Configuration',
+    description:
+      'Runtime configuration, environment variables, capabilities, and data limits.',
+    audience: ['user', 'assistant'],
+    priority: 0.5,
+    content: SERVER_CONFIG_CONTENT,
+  });
 
   // memory://memories/{hash}
   const hashCompletion = createHashCompletionCallback(db);
@@ -261,15 +279,10 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
       description:
         'Fetch a single memory object by exact SHA-256 hash. Supports hash auto-completion. Returns { error } if the hash does not exist.',
       mimeType: 'application/json',
-      annotations: {
-        audience: ['assistant'],
-        priority: 0.7,
-        lastModified: RESOURCE_LAST_MODIFIED,
-      },
+      annotations: createResourceAnnotations(['assistant'], 0.7),
     },
     (uri: URL, variables: Variables) => {
-      const rawHash = variables['hash'];
-      const hash = getSingleVariable(rawHash);
+      const hash = getSingleVariable(variables['hash']);
 
       if (!hash || !HASH_REGEX.test(hash)) {
         throw new McpError(

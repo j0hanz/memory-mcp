@@ -23,7 +23,6 @@ import {
   encodeSearchCursor,
 } from '../lib/search-cursor.js';
 import { loadRankedSearchRows, toMemoryFilters } from '../lib/search.js';
-import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
@@ -35,16 +34,19 @@ import type {
   MemoryRow,
   RelationshipEdge,
 } from '../lib/types.js';
-import { type RecallInputSchema } from '../schemas/inputs.js';
-import { type RecallResultSchema } from '../schemas/outputs.js';
+import { RecallInputSchema } from '../schemas/inputs.js';
+import { RecallResultSchema } from '../schemas/outputs.js';
 import {
   createProgressReporter,
   notifyProgress,
+  type ProgressContext,
   progressWithMessage,
 } from './progress.js';
+import { registerToolWithContract } from './register-contract.js';
 import {
   countPayloadArrayItems,
   getToolResultPayload,
+  getToolResultText,
   isOkStructuredToolResult,
 } from './result.js';
 
@@ -57,6 +59,10 @@ function throwIfAborted(signal?: AbortSignal): void {
   }
 
   throw new Error(E_CANCELLED);
+}
+
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
 }
 
 function parseEnvInt(
@@ -117,10 +123,11 @@ async function traverseGraph(
   const seenEdges = new Set<string>();
   let depthReached = 0;
   let aborted = false;
+  const edgeStmt = db.prepareOnce<EdgeRow>(EDGE_QUERY_SQL);
 
   for (let hop = 0; hop < depth && frontier.length > 0; hop += 1) {
     // Yield to event loop to allow progress notifications and cancellation
-    await new Promise((resolve) => setImmediate(resolve));
+    await yieldToEventLoop();
 
     throwIfAborted(signal);
 
@@ -140,9 +147,11 @@ async function traverseGraph(
     }
 
     const frontierJson = JSON.stringify(frontier);
-    const edgeRows = db
-      .prepareOnce<EdgeRow>(EDGE_QUERY_SQL)
-      .all(frontierJson, frontierJson, remainingEdgeBudget + 1);
+    const edgeRows = edgeStmt.all(
+      frontierJson,
+      frontierJson,
+      remainingEdgeBudget + 1
+    );
     const rowsToProcess =
       edgeRows.length > remainingEdgeBudget
         ? remainingEdgeBudget
@@ -152,6 +161,25 @@ async function traverseGraph(
     }
 
     const nextHashes: string[] = [];
+    const queueVisitedHash = (hash: string): void => {
+      if (visited.has(hash)) {
+        return;
+      }
+
+      if (visited.size >= MAX_VISITED_NODES) {
+        aborted = true;
+        return;
+      }
+
+      visited.add(hash);
+      if (nextHashes.length < MAX_FRONTIER_SIZE) {
+        nextHashes.push(hash);
+        return;
+      }
+
+      aborted = true;
+    };
+
     for (let i = 0; i < rowsToProcess; i += 1) {
       const edge = edgeRows[i];
       if (edge === undefined) {
@@ -167,33 +195,8 @@ async function traverseGraph(
         });
       }
 
-      if (!visited.has(edge.from_hash)) {
-        if (visited.size >= MAX_VISITED_NODES) {
-          aborted = true;
-          break;
-        }
-
-        visited.add(edge.from_hash);
-        if (nextHashes.length < MAX_FRONTIER_SIZE) {
-          nextHashes.push(edge.from_hash);
-        } else {
-          aborted = true;
-        }
-      }
-
-      if (!visited.has(edge.to_hash)) {
-        if (visited.size >= MAX_VISITED_NODES) {
-          aborted = true;
-          break;
-        }
-
-        visited.add(edge.to_hash);
-        if (nextHashes.length < MAX_FRONTIER_SIZE) {
-          nextHashes.push(edge.to_hash);
-        } else {
-          aborted = true;
-        }
-      }
+      queueVisitedHash(edge.from_hash);
+      queueVisitedHash(edge.to_hash);
 
       if (
         aborted &&
@@ -227,8 +230,7 @@ function formatRecallCompletionMessage(
 ): string {
   const failedMessage = `⊙ recall: ${query} • failed`;
   if (result.isError) {
-    const text =
-      result.content[0]?.type === 'text' ? result.content[0].text : '';
+    const text = getToolResultText(result);
     if (text.includes(E_CANCELLED)) {
       return `⊙ recall: ${query} • cancelled`;
     }
@@ -251,17 +253,12 @@ function formatRecallCompletionMessage(
 }
 
 export function registerRecall(server: McpServer, db: TypedDb): void {
-  const contract = getToolContract('recall');
-  server.registerTool(
-    contract.name,
-    {
-      title: contract.title,
-      description: contract.description,
-      inputSchema: contract.inputSchema as typeof RecallInputSchema,
-      outputSchema: contract.outputSchema as typeof RecallResultSchema,
-      annotations: contract.annotations,
-    },
-    async (params: RecallInput, extra) => {
+  registerToolWithContract(
+    server,
+    'recall',
+    RecallInputSchema,
+    RecallResultSchema,
+    async (params: RecallInput, extra: ProgressContext) => {
       const { depth, limit, cursor } = params;
       const filters = toMemoryFilters(params);
       const scope = buildSearchCursorScope(params.query, filters);

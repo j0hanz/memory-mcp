@@ -9,6 +9,7 @@ const CURSOR_ENCODING = 'base64url';
 const CURSOR_VERSION = 2;
 const CURSOR_KIND = 'fts-keyset';
 const CURSOR_SCOPE_HASH_LENGTH = 24;
+const HASH_64_REGEX = /^[a-f0-9]{64}$/;
 
 interface KeysetCursorPayload {
   v: typeof CURSOR_VERSION;
@@ -56,7 +57,7 @@ function isKeysetCursorPayload(value: unknown): value is KeysetCursorPayload {
     typeof value['rank'] === 'number' &&
     Number.isFinite(value['rank']) &&
     typeof value['hash'] === 'string' &&
-    /^[a-f0-9]{64}$/.test(value['hash'])
+    HASH_64_REGEX.test(value['hash'])
   );
 }
 

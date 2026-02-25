@@ -14,6 +14,10 @@ export function getErrorMessage(err: unknown): string {
   return UNKNOWN_ERROR_MESSAGE;
 }
 
+export function isMcpError(err: unknown): err is McpError {
+  return err instanceof McpError;
+}
+
 export function rethrowMcpError(err: unknown): void {
-  if (err instanceof McpError) throw err;
+  if (isMcpError(err)) throw err;
 }

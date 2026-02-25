@@ -104,10 +104,11 @@ export function parseTags(tagsJson: string): string[] {
 
 export function parseMemoryRow(row: MemoryRow): Memory {
   const relevance = row.rank != null ? -row.rank : undefined;
+  const tags = parseTags(row.tags);
   return {
     hash: row.hash,
     content: row.content,
-    tags: parseTags(row.tags),
+    tags,
     memory_type: row.memory_type,
     importance: row.importance,
     created_at: row.created_at,

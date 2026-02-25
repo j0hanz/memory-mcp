@@ -10,14 +10,14 @@ import {
   rethrowMcpError,
 } from '../lib/errors.js';
 import { logToolEvent } from '../lib/mcp-utils.js';
-import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
-import { type CreateRelationshipInputSchema } from '../schemas/inputs.js';
-import { type CreateRelationshipResultSchema } from '../schemas/outputs.js';
+import { CreateRelationshipInputSchema } from '../schemas/inputs.js';
+import { CreateRelationshipResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
+import { registerToolWithContract } from './register-contract.js';
 
 type CreateRelInput = z.infer<typeof CreateRelationshipInputSchema>;
 const INSERT_RELATIONSHIP_SQL = `INSERT OR IGNORE INTO relationships (from_hash, to_hash, relation_type, created_at)
@@ -56,7 +56,7 @@ function createRelationshipTx(
   db: TypedDb,
   params: CreateRelInput
 ): CreateRelationshipTxResult {
-  return db.transaction(() => {
+  return db.transaction<CreateRelationshipTxResult>(() => {
     const missing = getMissingEndpoint(db, params);
     if (missing) {
       return {
@@ -79,17 +79,11 @@ export function registerCreateRelationship(
   server: McpServer,
   db: TypedDb
 ): void {
-  const contract = getToolContract('create_relationship');
-  server.registerTool(
-    contract.name,
-    {
-      title: contract.title,
-      description: contract.description,
-      inputSchema: contract.inputSchema as typeof CreateRelationshipInputSchema,
-      outputSchema:
-        contract.outputSchema as typeof CreateRelationshipResultSchema,
-      annotations: contract.annotations,
-    },
+  registerToolWithContract(
+    server,
+    'create_relationship',
+    CreateRelationshipInputSchema,
+    CreateRelationshipResultSchema,
     wrapToolHandler(
       async (params: CreateRelInput) => {
         try {

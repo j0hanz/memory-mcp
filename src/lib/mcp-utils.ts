@@ -1,6 +1,11 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 type LogLevel = 'debug' | 'info' | 'notice' | 'warning' | 'error';
+type ConnectedServer = McpServer;
+
+function isConnected(server: McpServer): server is ConnectedServer {
+  return server.isConnected();
+}
 
 export async function logToolEvent(
   server: McpServer,
@@ -8,7 +13,7 @@ export async function logToolEvent(
   data: unknown,
   level: LogLevel = 'info'
 ): Promise<void> {
-  if (!server.isConnected()) {
+  if (!isConnected(server)) {
     return;
   }
 
@@ -25,7 +30,7 @@ export async function notifyMemoryResourceUpdated(
   server: McpServer,
   hash: string
 ): Promise<void> {
-  if (!server.isConnected()) {
+  if (!isConnected(server)) {
     return;
   }
 

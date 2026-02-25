@@ -10,15 +10,15 @@ import {
   rethrowMcpError,
 } from '../lib/errors.js';
 import { SELECT_MEMORY_BY_HASH_SQL } from '../lib/sql.js';
-import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
 import { type MemoryRow, parseMemoryRow } from '../lib/types.js';
-import { type GetMemoryInputSchema } from '../schemas/inputs.js';
-import { type MemoryResultSchema } from '../schemas/outputs.js';
+import { GetMemoryInputSchema } from '../schemas/inputs.js';
+import { MemoryResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
+import { registerToolWithContract } from './register-contract.js';
 
 type GetInput = z.infer<typeof GetMemoryInputSchema>;
 
@@ -31,16 +31,11 @@ function notFound(hash: string): ReturnType<typeof createErrorResponse> {
 }
 
 export function registerGetMemory(server: McpServer, db: TypedDb): void {
-  const contract = getToolContract('get_memory');
-  server.registerTool(
-    contract.name,
-    {
-      title: contract.title,
-      description: contract.description,
-      inputSchema: contract.inputSchema as typeof GetMemoryInputSchema,
-      outputSchema: contract.outputSchema as typeof MemoryResultSchema,
-      annotations: contract.annotations,
-    },
+  registerToolWithContract(
+    server,
+    'get_memory',
+    GetMemoryInputSchema,
+    MemoryResultSchema,
     wrapToolHandler(
       (params: GetInput) => {
         try {

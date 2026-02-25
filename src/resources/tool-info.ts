@@ -1,5 +1,9 @@
-import { z } from 'zod/v4';
+import type { z } from 'zod/v4';
 
+import {
+  extractJsonSchema,
+  type JsonSchemaObject,
+} from '../lib/json-schema.js';
 import { getToolContracts, type ToolContract } from '../lib/tool-contracts.js';
 
 // --- Shared Constraints (Single Source of Truth) ---
@@ -23,8 +27,6 @@ interface ToolEntry {
   purpose: string;
   behavior: string;
 }
-
-type JsonSchemaObject = Record<string, unknown>;
 
 function formatBehavior(annotations: ToolContract['annotations']): string {
   const hints: string[] = [];
@@ -61,14 +63,6 @@ export function buildCoreContextPack(): string {
 }
 
 // --- Per-Tool Info ---
-
-function extractJsonSchema(schema: z.ZodType): JsonSchemaObject {
-  try {
-    return z.toJSONSchema(schema) as JsonSchemaObject;
-  } catch {
-    return {};
-  }
-}
 
 function formatParamConstraints(prop: JsonSchemaObject): string {
   const parts: string[] = [];

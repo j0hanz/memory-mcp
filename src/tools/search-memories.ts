@@ -11,30 +11,25 @@ import {
   encodeSearchCursor,
 } from '../lib/search-cursor.js';
 import { loadRankedSearchRows, toMemoryFilters } from '../lib/search.js';
-import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
 import { parseMemoryRow } from '../lib/types.js';
 import type { Memory } from '../lib/types.js';
-import { type SearchMemoriesInputSchema } from '../schemas/inputs.js';
-import { type SearchResultSchema } from '../schemas/outputs.js';
+import { SearchMemoriesInputSchema } from '../schemas/inputs.js';
+import { SearchResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
+import { registerToolWithContract } from './register-contract.js';
 
 type SearchInput = z.infer<typeof SearchMemoriesInputSchema>;
 
 export function registerSearchMemories(server: McpServer, db: TypedDb): void {
-  const contract = getToolContract('search_memories');
-  server.registerTool(
-    contract.name,
-    {
-      title: contract.title,
-      description: contract.description,
-      inputSchema: contract.inputSchema as typeof SearchMemoriesInputSchema,
-      outputSchema: contract.outputSchema as typeof SearchResultSchema,
-      annotations: contract.annotations,
-    },
+  registerToolWithContract(
+    server,
+    'search_memories',
+    SearchMemoriesInputSchema,
+    SearchResultSchema,
     wrapToolHandler(
       (params: SearchInput) => {
         try {

@@ -85,6 +85,33 @@ function describeImportanceFilter(
   return IMPORTANCE_FILTER_SCHEMA.clone().describe(description);
 }
 
+function createSearchFilterFields(descriptions: {
+  min: string;
+  max: string;
+  type: string;
+}): {
+  min_importance: z.ZodOptional<z.ZodNumber>;
+  max_importance: z.ZodOptional<z.ZodNumber>;
+  memory_type: z.ZodOptional<typeof MEMORY_TYPE_SCHEMA>;
+} {
+  return {
+    min_importance: describeImportanceFilter(descriptions.min),
+    max_importance: describeImportanceFilter(descriptions.max),
+    memory_type: MEMORY_TYPE_SCHEMA.optional().describe(descriptions.type),
+  };
+}
+
+const SEARCH_FILTER_FIELDS = createSearchFilterFields({
+  min: SEARCH_MIN_IMPORTANCE_DESCRIPTION,
+  max: SEARCH_MAX_IMPORTANCE_DESCRIPTION,
+  type: SEARCH_MEMORY_TYPE_DESCRIPTION,
+});
+const RECALL_FILTER_FIELDS = createSearchFilterFields({
+  min: RECALL_MIN_IMPORTANCE_DESCRIPTION,
+  max: RECALL_MAX_IMPORTANCE_DESCRIPTION,
+  type: RECALL_MEMORY_TYPE_DESCRIPTION,
+});
+
 const STORE_MEMORY_SHAPE = {
   content: CONTENT_SCHEMA,
   tags: TAGS_ARRAY_SCHEMA,
@@ -155,11 +182,7 @@ export const SearchMemoriesInputSchema = z
       .prefault(20)
       .describe('Max results (default 20)'),
     cursor: CURSOR_SCHEMA.optional().describe(CURSOR_DESCRIPTION),
-    min_importance: describeImportanceFilter(SEARCH_MIN_IMPORTANCE_DESCRIPTION),
-    max_importance: describeImportanceFilter(SEARCH_MAX_IMPORTANCE_DESCRIPTION),
-    memory_type: MEMORY_TYPE_SCHEMA.optional().describe(
-      SEARCH_MEMORY_TYPE_DESCRIPTION
-    ),
+    ...SEARCH_FILTER_FIELDS,
   })
   .describe('Search memories');
 
@@ -181,11 +204,7 @@ export const RecallInputSchema = z
       .prefault(10)
       .describe('Max seed memories (default 10)'),
     cursor: CURSOR_SCHEMA.optional().describe(CURSOR_DESCRIPTION),
-    min_importance: describeImportanceFilter(RECALL_MIN_IMPORTANCE_DESCRIPTION),
-    max_importance: describeImportanceFilter(RECALL_MAX_IMPORTANCE_DESCRIPTION),
-    memory_type: MEMORY_TYPE_SCHEMA.optional().describe(
-      RECALL_MEMORY_TYPE_DESCRIPTION
-    ),
+    ...RECALL_FILTER_FIELDS,
   })
   .describe('Recall memories via graph traversal');
 

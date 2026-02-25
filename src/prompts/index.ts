@@ -26,11 +26,11 @@ function createHelpMessages(instructions: string): PromptMessage[] {
 
 const HELP_MESSAGES = createHelpMessages(INSTRUCTIONS_CONTENT);
 
+const GET_HELP_PROMPT_NAME = 'get-help';
 const GET_HELP_PROMPT_CONFIG = {
   title: 'Get Help',
   description: 'Return full usage instructions.',
 } as const;
-const GET_HELP_PROMPT_NAME = 'get-help';
 
 export function registerAllPrompts(server: McpServer): void {
   server.registerPrompt(GET_HELP_PROMPT_NAME, GET_HELP_PROMPT_CONFIG, () => ({

@@ -44,6 +44,13 @@ function parseCursorPayload(cursor: string): CursorPayload {
   return parsed;
 }
 
+function invalidCursor(): McpError {
+  return new McpError(
+    ErrorCode.InvalidParams,
+    `${E_INVALID_CURSOR}: malformed cursor`
+  );
+}
+
 export function encodeCursor(offset: number): string {
   const payload: CursorPayload = { offset };
   return Buffer.from(JSON.stringify(payload)).toString(CURSOR_ENCODING);
@@ -53,10 +60,7 @@ export function decodeCursor(cursor: string): number {
   try {
     return parseCursorPayload(cursor).offset;
   } catch {
-    throw new McpError(
-      ErrorCode.InvalidParams,
-      `${E_INVALID_CURSOR}: malformed cursor`
-    );
+    throw invalidCursor();
   }
 }
 

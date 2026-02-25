@@ -40,6 +40,12 @@ const WORKFLOW_TRACKS = `## Workflow A: Store and Link
 
 > BFS traversal emits progress per hop. Use \`depth: 0\` to skip traversal.`;
 
+function renderSharedConstraintsSection(): string {
+  return getSharedConstraints()
+    .map((c) => `- ${c}`)
+    .join('\n');
+}
+
 export function buildWorkflowGuide(): string {
   return [
     '# Workflow Reference',
@@ -47,9 +53,7 @@ export function buildWorkflowGuide(): string {
     WORKFLOW_TRACKS,
     '',
     '## Shared Constraints',
-    getSharedConstraints()
-      .map((c) => `- ${c}`)
-      .join('\n'),
+    renderSharedConstraintsSection(),
     '',
     '> See `internal://tool-catalog` for complete tool reference and cross-tool data flow.',
   ].join('\n');

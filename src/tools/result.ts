@@ -21,6 +21,11 @@ export function getToolResultPayload(
   return structuredContent;
 }
 
+export function getToolResultText(result: CallToolResult): string {
+  const first = result.content[0];
+  return first?.type === 'text' ? first.text : '';
+}
+
 /** Count items in a named array field of a tool result payload. */
 export function countPayloadArrayItems(
   payload: Record<string, unknown>,

@@ -11,7 +11,8 @@ function normalizeTags(tags: readonly string[]): readonly string[] {
 }
 
 function stableTagsJson(tags: readonly string[]): string {
-  return JSON.stringify(normalizeTags(tags));
+  const normalizedTags = normalizeTags(tags);
+  return JSON.stringify(normalizedTags);
 }
 
 export function computeMemoryHash(

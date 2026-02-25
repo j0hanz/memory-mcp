@@ -69,8 +69,7 @@ delete_memories({ hashes: [...] })       → { items[].{ hash, deleted }, succee
 \`\`\``;
 
 function buildToolRouting(): string {
-  const contracts = getToolContracts();
-  const rows = contracts.map((c) => {
+  const rows = getToolContracts().map((c) => {
     const purpose = c.description.split('.')[0] ?? '';
     return `| \`${c.name}\` | ${purpose} |`;
   });
@@ -84,6 +83,12 @@ function buildToolRouting(): string {
   ].join('\n');
 }
 
+function renderSharedConstraints(): string {
+  return getSharedConstraints()
+    .map((c) => `- ${c}`)
+    .join('\n');
+}
+
 export function buildServerInstructions(): string {
   return [
     '# Memory MCP — Usage Guide',
@@ -91,9 +96,7 @@ export function buildServerInstructions(): string {
     buildToolRouting(),
     '',
     '## Shared Constraints',
-    getSharedConstraints()
-      .map((c) => `- ${c}`)
-      .join('\n'),
+    renderSharedConstraints(),
     '',
     '## Error Codes',
     ERROR_CODES.join('\n'),

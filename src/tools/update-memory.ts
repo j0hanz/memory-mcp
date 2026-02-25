@@ -16,15 +16,15 @@ import {
   SELECT_MEMORY_BY_HASH_SQL,
   SELECT_MEMORY_HASH_SQL,
 } from '../lib/sql.js';
-import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
 import { type MemoryRow, parseTags } from '../lib/types.js';
-import { type UpdateMemoryInputSchema } from '../schemas/inputs.js';
-import { type UpdateResultSchema } from '../schemas/outputs.js';
+import { UpdateMemoryInputSchema } from '../schemas/inputs.js';
+import { UpdateResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
+import { registerToolWithContract } from './register-contract.js';
 
 type UpdateInput = z.infer<typeof UpdateMemoryInputSchema>;
 
@@ -49,16 +49,11 @@ async function notifyUpdatedMemoryResources(
 }
 
 export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
-  const contract = getToolContract('update_memory');
-  server.registerTool(
-    contract.name,
-    {
-      title: contract.title,
-      description: contract.description,
-      inputSchema: contract.inputSchema as typeof UpdateMemoryInputSchema,
-      outputSchema: contract.outputSchema as typeof UpdateResultSchema,
-      annotations: contract.annotations,
-    },
+  registerToolWithContract(
+    server,
+    'update_memory',
+    UpdateMemoryInputSchema,
+    UpdateResultSchema,
     wrapToolHandler(
       async (params: UpdateInput) => {
         try {

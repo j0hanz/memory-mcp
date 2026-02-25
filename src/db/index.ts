@@ -79,6 +79,18 @@ interface ForeignKeyRow {
   on_update: string;
 }
 
+function runImmediateTransaction<T>(db: DatabaseSync, action: () => T): T {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const result = action();
+    db.exec('COMMIT');
+    return result;
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
+
 function assertFts5Available(db: DatabaseSync): void {
   try {
     db.exec(FTS5_CHECK_SQL);
@@ -131,8 +143,7 @@ function needsRelationshipsCascadeUpdateMigration(db: DatabaseSync): boolean {
 }
 
 function migrateRelationshipsCascadeUpdate(db: DatabaseSync): void {
-  db.exec('BEGIN IMMEDIATE');
-  try {
+  runImmediateTransaction(db, () => {
     db.exec('ALTER TABLE relationships RENAME TO relationships_old');
     db.exec(RELATIONSHIPS_TABLE_SQL.replace(' IF NOT EXISTS', ''));
     db.exec(`
@@ -147,11 +158,7 @@ function migrateRelationshipsCascadeUpdate(db: DatabaseSync): void {
     db.exec(
       'CREATE INDEX IF NOT EXISTS idx_relationships_to ON relationships(to_hash)'
     );
-    db.exec('COMMIT');
-  } catch (err) {
-    db.exec('ROLLBACK');
-    throw err;
-  }
+  });
 }
 
 function applyMigrations(db: DatabaseSync): void {

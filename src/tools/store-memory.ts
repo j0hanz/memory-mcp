@@ -7,14 +7,14 @@ import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
 import { computeMemoryHash } from '../lib/hash.js';
 import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
 import { INSERT_MEMORY_SQL } from '../lib/sql.js';
-import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
-import { type StoreMemoryInputSchema } from '../schemas/inputs.js';
-import { type StoreResultSchema } from '../schemas/outputs.js';
+import { StoreMemoryInputSchema } from '../schemas/inputs.js';
+import { StoreResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
+import { registerToolWithContract } from './register-contract.js';
 
 type StoreInput = z.infer<typeof StoreMemoryInputSchema>;
 
@@ -49,16 +49,11 @@ function insertMemory(
 }
 
 export function registerStoreMemory(server: McpServer, db: TypedDb): void {
-  const contract = getToolContract('store_memory');
-  server.registerTool(
-    contract.name,
-    {
-      title: contract.title,
-      description: contract.description,
-      inputSchema: contract.inputSchema as typeof StoreMemoryInputSchema,
-      outputSchema: contract.outputSchema as typeof StoreResultSchema,
-      annotations: contract.annotations,
-    },
+  registerToolWithContract(
+    server,
+    'store_memory',
+    StoreMemoryInputSchema,
+    StoreResultSchema,
     wrapToolHandler(
       async (params: StoreInput) => {
         try {

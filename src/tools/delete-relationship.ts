@@ -9,14 +9,14 @@ import {
   getErrorMessage,
   rethrowMcpError,
 } from '../lib/errors.js';
-import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
-import { type DeleteRelationshipInputSchema } from '../schemas/inputs.js';
-import { type DeleteRelationshipResultSchema } from '../schemas/outputs.js';
+import { DeleteRelationshipInputSchema } from '../schemas/inputs.js';
+import { DeleteRelationshipResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
+import { registerToolWithContract } from './register-contract.js';
 
 type DeleteRelInput = z.infer<typeof DeleteRelationshipInputSchema>;
 
@@ -51,17 +51,11 @@ export function registerDeleteRelationship(
   server: McpServer,
   db: TypedDb
 ): void {
-  const contract = getToolContract('delete_relationship');
-  server.registerTool(
-    contract.name,
-    {
-      title: contract.title,
-      description: contract.description,
-      inputSchema: contract.inputSchema as typeof DeleteRelationshipInputSchema,
-      outputSchema:
-        contract.outputSchema as typeof DeleteRelationshipResultSchema,
-      annotations: contract.annotations,
-    },
+  registerToolWithContract(
+    server,
+    'delete_relationship',
+    DeleteRelationshipInputSchema,
+    DeleteRelationshipResultSchema,
     wrapToolHandler(
       (params: DeleteRelInput) => {
         try {

@@ -15,6 +15,8 @@ const SHUTDOWN_SIGNALS: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
 const SHUTDOWN_TIMEOUT_MS = 3000;
 const FORCED_EXIT_CODE = 1;
 const CLEAN_EXIT_CODE = 0;
+const LEGACY_DB_BASENAME = 'memory.db';
+const DEFAULT_DB_DIR = 'memory_db';
 
 function registerShutdownHandlers(shutdown: () => void): void {
   for (const signal of SHUTDOWN_SIGNALS) {
@@ -71,17 +73,20 @@ function createShutdownHandler(
 function migrateLegacyDatabase(): void {
   if (process.env['MEMORY_DB_PATH']) return;
 
-  const legacyPath = 'memory.db';
-  if (!existsSync(legacyPath) || existsSync(DEFAULT_DB_PATH)) return;
+  if (!existsSync(LEGACY_DB_BASENAME) || existsSync(DEFAULT_DB_PATH)) return;
 
   try {
     mkdirSync(dirname(DEFAULT_DB_PATH), { recursive: true });
 
-    const filesToMove = [legacyPath, `${legacyPath}-shm`, `${legacyPath}-wal`];
+    const filesToMove = [
+      LEGACY_DB_BASENAME,
+      `${LEGACY_DB_BASENAME}-shm`,
+      `${LEGACY_DB_BASENAME}-wal`,
+    ];
 
     for (const file of filesToMove) {
       if (existsSync(file)) {
-        renameSync(file, `memory_db/${file}`);
+        renameSync(file, `${DEFAULT_DB_DIR}/${file}`);
       }
     }
   } catch (err) {

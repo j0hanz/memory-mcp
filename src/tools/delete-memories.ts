@@ -6,15 +6,15 @@ import type { TypedDb } from '../db/typed.js';
 import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
 import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
 import { DELETE_MEMORY_SQL } from '../lib/sql.js';
-import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
 import type { BatchItemResult } from '../lib/types.js';
-import { type DeleteMemoriesInputSchema } from '../schemas/inputs.js';
-import { type BatchResultSchema } from '../schemas/outputs.js';
+import { DeleteMemoriesInputSchema } from '../schemas/inputs.js';
+import { BatchResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
+import { registerToolWithContract } from './register-contract.js';
 
 type DeleteMemoriesInput = z.infer<typeof DeleteMemoriesInputSchema>;
 
@@ -29,16 +29,11 @@ async function notifyDeletedResources(
 }
 
 export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
-  const contract = getToolContract('delete_memories');
-  server.registerTool(
-    contract.name,
-    {
-      title: contract.title,
-      description: contract.description,
-      inputSchema: contract.inputSchema as typeof DeleteMemoriesInputSchema,
-      outputSchema: contract.outputSchema as typeof BatchResultSchema,
-      annotations: contract.annotations,
-    },
+  registerToolWithContract(
+    server,
+    'delete_memories',
+    DeleteMemoriesInputSchema,
+    BatchResultSchema,
     wrapToolHandler(
       async (params: DeleteMemoriesInput) => {
         try {

@@ -26,8 +26,9 @@ function createStructuredError(
 export function createToolResponse(
   payload: Record<string, unknown>
 ): CallToolResult {
+  const textContent = toTextContent(payload);
   return {
-    content: [toTextContent(payload)],
+    content: [textContent],
     structuredContent: payload,
   };
 }
@@ -36,8 +37,9 @@ export function createErrorResponse(
   code: string,
   message: string
 ): CallToolResult {
+  const errorPayload = createStructuredError(code, message);
   return {
-    content: [toTextContent(createStructuredError(code, message))],
+    content: [toTextContent(errorPayload)],
     isError: true,
   };
 }

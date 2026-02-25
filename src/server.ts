@@ -34,6 +34,21 @@ interface IconDescriptor {
   theme?: 'light' | 'dark';
 }
 
+function getIconAssetCandidates(): URL[] {
+  return [
+    new URL(`../assets/${ICON_ASSET}`, import.meta.url),
+    new URL(`./assets/${ICON_ASSET}`, import.meta.url),
+  ];
+}
+
+function isOversizedIcon(byteLength: number): boolean {
+  return byteLength >= MAX_ICON_BYTES;
+}
+
+function toIconDataUri(bytes: Buffer): string {
+  return `data:${ICON_MIME};base64,${bytes.toString('base64')}`;
+}
+
 function parsePackageManifest(contents: string): PackageManifest {
   return JSON.parse(contents) as PackageManifest;
 }
@@ -48,24 +63,19 @@ function loadPackageManifest(): PackageManifest {
 }
 
 function getLocalIconData(): string | undefined {
-  const candidates = [
-    new URL(`../assets/${ICON_ASSET}`, import.meta.url),
-    new URL(`./assets/${ICON_ASSET}`, import.meta.url),
-  ];
-
-  for (const candidate of candidates) {
+  for (const candidate of getIconAssetCandidates()) {
     try {
       const filePath = fileURLToPath(candidate);
       const buf = readFileSync(filePath);
 
-      if (buf.byteLength >= MAX_ICON_BYTES) {
+      if (isOversizedIcon(buf.byteLength)) {
         console.warn(
           `Icon asset exceeds 2 MB (${buf.byteLength} bytes), skipping.`
         );
         return undefined;
       }
 
-      return `data:${ICON_MIME};base64,${buf.toString('base64')}`;
+      return toIconDataUri(buf);
     } catch {
       // try next candidate
     }

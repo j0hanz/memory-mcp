@@ -13,15 +13,18 @@ function normalizeHashPrefix(value: string): string {
   return escapeLikePattern(value.slice(0, HASH_MAX_LENGTH));
 }
 
+function toHashPrefixLikePattern(value: string): string {
+  return `${normalizeHashPrefix(value)}%`;
+}
+
 // Returns a completion callback for the `hash` URI variable.
 export function createHashCompletionCallback(
   db: TypedDb
 ): (value: string) => string[] {
   return (value: string): string[] => {
-    const escapedPrefix = normalizeHashPrefix(value);
     return db
       .prepareOnce<HashRow>(HASH_COMPLETION_SQL)
-      .all(`${escapedPrefix}%`)
+      .all(toHashPrefixLikePattern(value))
       .map((row) => row.hash);
   };
 }

@@ -19,15 +19,13 @@ export class TypedDb {
 
   private makeStatement<T>(sql: string): TypedStatement<T> {
     const stmt = this.db.prepare(sql);
-    const materializeParams = (...params: SqlParams): SQLInputValue[] => [
-      ...params,
-    ];
     return {
       all: (...params: SqlParams) =>
-        stmt.all(...materializeParams(...params)) as T[],
+        stmt.all(...(params as unknown as SQLInputValue[])) as T[],
       get: (...params: SqlParams) =>
-        stmt.get(...materializeParams(...params)) as T | undefined,
-      run: (...params: SqlParams) => stmt.run(...materializeParams(...params)),
+        stmt.get(...(params as unknown as SQLInputValue[])) as T | undefined,
+      run: (...params: SqlParams) =>
+        stmt.run(...(params as unknown as SQLInputValue[])),
     };
   }
 

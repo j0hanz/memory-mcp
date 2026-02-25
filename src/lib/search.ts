@@ -72,7 +72,7 @@ export function buildAndWhereClause(clauses: readonly string[]): string {
     return '';
   }
 
-  return clauses.map((clause) => ` AND ${clause}`).join('');
+  return ` AND ${clauses.join(' AND ')}`;
 }
 
 function buildRankedSearchSql(
@@ -129,13 +129,17 @@ export function toMemoryFilters(params: {
   max_importance?: number | undefined;
   memory_type?: string | undefined;
 }): MemoryFilters {
-  return {
-    ...(params.min_importance != null
-      ? { min_importance: params.min_importance }
-      : {}),
-    ...(params.max_importance != null
-      ? { max_importance: params.max_importance }
-      : {}),
-    ...(params.memory_type != null ? { memory_type: params.memory_type } : {}),
-  };
+  const filters: MemoryFilters = {};
+
+  if (params.min_importance != null) {
+    filters.min_importance = params.min_importance;
+  }
+  if (params.max_importance != null) {
+    filters.max_importance = params.max_importance;
+  }
+  if (params.memory_type != null) {
+    filters.memory_type = params.memory_type;
+  }
+
+  return filters;
 }

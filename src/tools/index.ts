@@ -34,7 +34,7 @@ export const TOOL_REGISTRARS: readonly ToolRegistrar[] = [
 ];
 
 export function registerAllTools(server: McpServer, db: TypedDb): void {
-  for (const registerTool of TOOL_REGISTRARS) {
-    registerTool(server, db);
+  for (const register of TOOL_REGISTRARS) {
+    register(server, db);
   }
 }

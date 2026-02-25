@@ -10,16 +10,16 @@ import {
   rethrowMcpError,
 } from '../lib/errors.js';
 import { SELECT_MEMORY_HASH_SQL } from '../lib/sql.js';
-import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
 import { parseTags } from '../lib/types.js';
 import type { RelationshipRow, RelationshipWithMemory } from '../lib/types.js';
-import { type GetRelationshipsInputSchema } from '../schemas/inputs.js';
-import { type RelationshipResultSchema } from '../schemas/outputs.js';
+import { GetRelationshipsInputSchema } from '../schemas/inputs.js';
+import { RelationshipResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
+import { registerToolWithContract } from './register-contract.js';
 
 type GetRelInput = z.infer<typeof GetRelationshipsInputSchema>;
 type RelationshipDirectionMode = GetRelInput['direction'];
@@ -98,16 +98,11 @@ function toRelationshipWithMemory(
 }
 
 export function registerGetRelationships(server: McpServer, db: TypedDb): void {
-  const contract = getToolContract('get_relationships');
-  server.registerTool(
-    contract.name,
-    {
-      title: contract.title,
-      description: contract.description,
-      inputSchema: contract.inputSchema as typeof GetRelationshipsInputSchema,
-      outputSchema: contract.outputSchema as typeof RelationshipResultSchema,
-      annotations: contract.annotations,
-    },
+  registerToolWithContract(
+    server,
+    'get_relationships',
+    GetRelationshipsInputSchema,
+    RelationshipResultSchema,
     wrapToolHandler(
       (params: GetRelInput) => {
         try {

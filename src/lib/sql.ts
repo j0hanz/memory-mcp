@@ -17,8 +17,11 @@ export const SELECT_MEMORY_HASH_SQL =
   'SELECT hash FROM memories WHERE hash = ?';
 
 /** Aggregate memory store stats in a single scan. */
-export const MEMORY_AGGREGATE_SQL =
-  'SELECT COUNT(*) AS total, MIN(created_at) AS oldest, MAX(created_at) AS newest, AVG(importance) AS avg_importance FROM memories';
+export const MEMORY_AGGREGATE_SQL = `SELECT COUNT(*) AS total,
+          MIN(created_at) AS oldest,
+          MAX(created_at) AS newest,
+          AVG(importance) AS avg_importance
+   FROM memories`;
 
 /** Total relationship count. */
 export const RELATIONSHIP_COUNT_SQL =

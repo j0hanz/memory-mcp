@@ -7,15 +7,15 @@ import {
   RELATIONSHIP_COUNT_SQL,
   TYPE_COUNTS_SQL,
 } from '../lib/sql.js';
-import { getToolContract } from '../lib/tool-contracts.js';
 import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
 import type { TotalRow, TypeRow } from '../lib/types.js';
-import { type MemoryStatsInputSchema } from '../schemas/inputs.js';
-import { type StatsResultSchema } from '../schemas/outputs.js';
+import { MemoryStatsInputSchema } from '../schemas/inputs.js';
+import { StatsResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
+import { registerToolWithContract } from './register-contract.js';
 
 interface MemoryAggregateRow {
   total: number;
@@ -33,16 +33,11 @@ function toTypeCounts(rows: TypeRow[]): Record<string, number> {
 }
 
 export function registerMemoryStats(server: McpServer, db: TypedDb): void {
-  const contract = getToolContract('memory_stats');
-  server.registerTool(
-    contract.name,
-    {
-      title: contract.title,
-      description: contract.description,
-      inputSchema: contract.inputSchema as typeof MemoryStatsInputSchema,
-      outputSchema: contract.outputSchema as typeof StatsResultSchema,
-      annotations: contract.annotations,
-    },
+  registerToolWithContract(
+    server,
+    'memory_stats',
+    MemoryStatsInputSchema,
+    StatsResultSchema,
     wrapToolHandler(
       () => {
         try {

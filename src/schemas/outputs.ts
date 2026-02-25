@@ -3,6 +3,7 @@ import { z } from 'zod/v4';
 const STRING_SCHEMA = z.string();
 const NUMBER_SCHEMA = z.number();
 const BOOLEAN_SCHEMA = z.boolean();
+const STRING_ARRAY_SCHEMA = z.array(STRING_SCHEMA);
 
 export const ErrorResultSchema = z
   .strictObject({
@@ -15,7 +16,7 @@ export const MemorySchema = z
   .strictObject({
     hash: STRING_SCHEMA.describe('SHA-256 hash'),
     content: STRING_SCHEMA.describe('Memory content'),
-    tags: z.array(STRING_SCHEMA).describe('Memory tags'),
+    tags: STRING_ARRAY_SCHEMA.describe('Memory tags'),
     memory_type: STRING_SCHEMA.describe('Memory type'),
     importance: NUMBER_SCHEMA.describe('Importance (0-10)'),
     created_at: STRING_SCHEMA.describe('Created at'),
@@ -89,7 +90,7 @@ export const RelationshipWithMemorySchema = z
     created_at: z.string().describe('Created at'),
     linked_hash: z.string().describe('Linked memory hash'),
     linked_content: z.string().describe('Linked memory content'),
-    linked_tags: z.array(z.string()).describe('Linked memory tags'),
+    linked_tags: STRING_ARRAY_SCHEMA.describe('Linked memory tags'),
   })
   .describe('Relationship edge with linked memory');
 
