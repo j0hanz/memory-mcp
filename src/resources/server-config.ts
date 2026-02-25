@@ -1,7 +1,7 @@
 const ENV_VARS = [
   {
     name: 'MEMORY_DB_PATH',
-    default: 'memory.db',
+    default: 'memory_db/memory.db',
     range: '—',
     purpose: 'SQLite database file path',
   },

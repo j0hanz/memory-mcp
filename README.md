@@ -445,18 +445,18 @@ Returns:
 
 ### Environment Variables
 
-| Variable                   | Description                                             | Default     | Required |
-| -------------------------- | ------------------------------------------------------- | ----------- | -------- |
-| `MEMORY_DB_PATH`           | SQLite database file path                               | `memory.db` | No       |
-| `RECALL_MAX_FRONTIER_SIZE` | Max BFS frontier nodes per hop (100–50000)              | `1000`      | No       |
-| `RECALL_MAX_EDGE_ROWS`     | Max relationship rows fetched per traversal (100–50000) | `5000`      | No       |
-| `RECALL_MAX_VISITED_NODES` | Max visited nodes across entire traversal (100–50000)   | `5000`      | No       |
+| Variable                   | Description                                             | Default               | Required |
+| -------------------------- | ------------------------------------------------------- | --------------------- | -------- |
+| `MEMORY_DB_PATH`           | SQLite database file path                               | `memory_db/memory.db` | No       |
+| `RECALL_MAX_FRONTIER_SIZE` | Max BFS frontier nodes per hop (100–50000)              | `1000`                | No       |
+| `RECALL_MAX_EDGE_ROWS`     | Max relationship rows fetched per traversal (100–50000) | `5000`                | No       |
+| `RECALL_MAX_VISITED_NODES` | Max visited nodes across entire traversal (100–50000)   | `5000`                | No       |
 
 > [!IMPORTANT]
-> If `MEMORY_DB_PATH` is relative (including the default `memory.db`), it resolves from the process working directory.
+> If `MEMORY_DB_PATH` is relative (including the default `memory_db/memory.db`), it resolves from the process working directory.
 
 > [!TIP]
-> Add `memory.db` to your `.gitignore` to keep the database out of version control — it contains local session data and should not be shared or committed.
+> Add `memory_db/` to your `.gitignore` to keep the database out of version control — it contains local session data and should not be shared or committed.
 
 ### Limits and Constraints
 

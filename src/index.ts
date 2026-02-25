@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
+import { existsSync, mkdirSync, renameSync } from 'node:fs';
+import { dirname } from 'node:path';
 import process from 'node:process';
 
 import { initTypedDatabase } from './db/index.js';
 import { getErrorMessage } from './lib/errors.js';
 import { createServer } from './server.js';
 
-const MEMORY_DB_PATH = process.env['MEMORY_DB_PATH'] ?? 'memory.db';
+const DEFAULT_DB_PATH = 'memory_db/memory.db';
+const MEMORY_DB_PATH = process.env['MEMORY_DB_PATH'] ?? DEFAULT_DB_PATH;
 const SHUTDOWN_SIGNALS: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
 const SHUTDOWN_TIMEOUT_MS = 3000;
 const FORCED_EXIT_CODE = 1;
@@ -65,7 +68,31 @@ function createShutdownHandler(
   };
 }
 
+function migrateLegacyDatabase(): void {
+  if (process.env['MEMORY_DB_PATH']) return;
+
+  const legacyPath = 'memory.db';
+  if (!existsSync(legacyPath) || existsSync(DEFAULT_DB_PATH)) return;
+
+  try {
+    mkdirSync(dirname(DEFAULT_DB_PATH), { recursive: true });
+
+    const filesToMove = [legacyPath, `${legacyPath}-shm`, `${legacyPath}-wal`];
+
+    for (const file of filesToMove) {
+      if (existsSync(file)) {
+        renameSync(file, `memory_db/${file}`);
+      }
+    }
+  } catch (err) {
+    process.stderr.write(
+      `Warning: Failed to migrate legacy database: ${getErrorMessage(err)}\n`
+    );
+  }
+}
+
 async function main(): Promise<void> {
+  migrateLegacyDatabase();
   const db = initTypedDatabase(MEMORY_DB_PATH);
   const server = createServer(db);
   const transport = new StdioServerTransport();

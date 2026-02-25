@@ -31,7 +31,7 @@ TypeScript MCP server for persistent SQLite-backed memory storage, retrieval, an
 
 - Dependency changes (`npm install`, `package.json` / `package-lock.json` updates).
 - Release/versioning edits (`server.json`, `.github/workflows/release.yml`, publish flow).
-- Database behavior changes that can affect compatibility or existing `memory.db` data.
+- Database behavior changes that can affect compatibility or existing `memory_db/memory.db` data.
 - Running heavy or long tasks repeatedly (`npm run test`, `npm run inspector`).
 
 ### Never
