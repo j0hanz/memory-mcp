@@ -40,7 +40,7 @@ const DATA_LIMITS = [
 
 const CAPABILITIES = [
   { capability: 'tools', status: 'enabled' },
-  { capability: 'resources', status: 'enabled (subscribe supported)' },
+  { capability: 'resources', status: 'enabled (list/read + listChanged)' },
   { capability: 'prompts', status: 'enabled' },
   { capability: 'completions', status: 'enabled' },
   { capability: 'logging', status: 'enabled' },

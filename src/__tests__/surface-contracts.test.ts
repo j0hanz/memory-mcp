@@ -1,3 +1,5 @@
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import assert from 'node:assert/strict';
@@ -123,5 +125,50 @@ describe('resources, prompts, completions, and task-surface contracts', () => {
 
     const escaped = completeHash('%_\\');
     assert.deepEqual(escaped, []);
+  });
+});
+
+describe('transport-level MCP surface contracts', () => {
+  it('does not advertise resources.subscribe and exposes on-wire JSON schemas', async () => {
+    const db = initTypedDatabase(':memory:');
+    const server = createServer(db);
+    const client = new Client(
+      { name: 'surface-contract-test-client', version: '0.0.0' },
+      { capabilities: {} }
+    );
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+
+    try {
+      await Promise.all([
+        server.connect(serverTransport),
+        client.connect(clientTransport),
+      ]);
+
+      const capabilities = client.getServerCapabilities();
+      assert.equal(capabilities?.resources?.subscribe, undefined);
+      assert.equal(capabilities?.resources?.listChanged, true);
+
+      const tools = await client.listTools();
+      assert.equal(tools.tools.length > 0, true);
+
+      const storeMemory = tools.tools.find(
+        (tool) => tool.name === 'store_memory'
+      );
+      assert.equal(storeMemory?.inputSchema?.type, 'object');
+      assert.equal(storeMemory?.outputSchema?.type, 'object');
+
+      const resources = await client.listResources();
+      assert.equal(
+        resources.resources.some(
+          (resource) => resource.uri === 'internal://instructions'
+        ),
+        true
+      );
+    } finally {
+      await client.close();
+      await server.close();
+      db.close();
+    }
   });
 });

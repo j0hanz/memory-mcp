@@ -18,7 +18,7 @@ const SERVER_NAME = 'memory-mcp';
 const SERVER_CAPABILITIES = {
   logging: {},
   completions: {},
-  resources: { subscribe: true },
+  resources: {},
   prompts: {},
   tools: {},
 } as const;
