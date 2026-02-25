@@ -9,7 +9,7 @@
     "url": "https://github.com/j0hanz/memory-mcp.git"
   },
   "homepage": "https://github.com/j0hanz/memory-mcp#readme",
-  "description": "A memory-based implementation of the Model Context Protocol (MCP) for storing and retrieving contextual information.",
+  "description": "SQLite-backed MCP server for persistent memory, full-text retrieval, and graph traversal.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
