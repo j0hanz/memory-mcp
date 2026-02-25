@@ -15,6 +15,10 @@ export default defineConfig(
       '.tmp/**',
       '*.config.mjs',
       '*.config.js',
+      'src/__tests__/**',
+      'tests/**',
+      '**/*.test.ts',
+      '**/*.spec.ts',
     ],
   },
   eslint.configs.recommended,
@@ -22,6 +26,7 @@ export default defineConfig(
   depend.configs['flat/recommended'],
   {
     files: ['src/**/*.ts'],
+    ignores: ['src/__tests__/**', '**/*.test.ts'],
     ignores: ['src/__tests__/**', '**/*.test.ts'],
     extends: [
       tseslint.configs.strictTypeChecked,
