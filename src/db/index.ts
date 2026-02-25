@@ -1,11 +1,10 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { DatabaseSync, type SQLTagStore } from 'node:sqlite';
+import { DatabaseSync } from 'node:sqlite';
 
 import { createTypedDb, type TypedDb } from './typed.js';
 
 const SQLITE_TIMEOUT_MS = 5000;
-const STATEMENT_CACHE_SIZE = 1000;
 const TARGET_SCHEMA_VERSION = 2;
 const FTS5_CHECK_SQL =
   'CREATE VIRTUAL TABLE IF NOT EXISTS __fts5_check USING fts5(x); DROP TABLE __fts5_check;';
@@ -172,6 +171,9 @@ function configureDatabase(db: DatabaseSync): void {
   // Enable defensive mode (SQLite v3.39+ / Node 24.12+: prevents deliberate DB corruption)
   db.exec(DEFENSIVE_PRAGMA_SQL);
 
+  // WAL mode: allows concurrent readers without blocking writers. Persists in DB file.
+  db.exec('PRAGMA journal_mode = WAL');
+
   // Verify FTS5 support
   assertFts5Available(db);
 
@@ -195,8 +197,4 @@ export function initDatabase(path: string): DatabaseSync {
 export function initTypedDatabase(path: string): TypedDb {
   const db = initDatabase(path);
   return createTypedDb(db);
-}
-
-export function createStatementCache(db: DatabaseSync): SQLTagStore {
-  return db.createTagStore(STATEMENT_CACHE_SIZE);
 }

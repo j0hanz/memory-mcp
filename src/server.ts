@@ -24,9 +24,6 @@ const SERVER_CAPABILITIES = {
   tasks: {
     list: {},
     cancel: {},
-    requests: {
-      tools: { call: {} },
-    },
   },
 } as const;
 

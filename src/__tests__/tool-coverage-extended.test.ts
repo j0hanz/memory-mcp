@@ -162,6 +162,20 @@ describe('extended tool coverage', () => {
     assert.equal(missing?.deleted, false);
   });
 
+  it('delete_memory returns deleted:false (not an error) when hash does not exist', async () => {
+    const nonExistentHash = 'a'.repeat(64);
+    const result = (await callTool(server, 'delete_memory', {
+      hash: nonExistentHash,
+    })) as {
+      isError?: boolean;
+      structuredContent: { hash: string; deleted: boolean };
+    };
+
+    assert.equal(result.isError, undefined);
+    assert.equal(result.structuredContent.hash, nonExistentHash);
+    assert.equal(result.structuredContent.deleted, false);
+  });
+
   it('get_relationships returns linked memories and memory_stats reflects totals', async () => {
     const source = (await callTool(server, 'store_memory', {
       content: 'relationship source',

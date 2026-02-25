@@ -3,12 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
-import {
-  E_NOT_FOUND,
-  E_UNKNOWN,
-  getErrorMessage,
-  rethrowMcpError,
-} from '../lib/errors.js';
+import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
 import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
 import { DELETE_MEMORY_SQL } from '../lib/sql.js';
 import { getToolContract } from '../lib/tool-contracts.js';
@@ -40,17 +35,14 @@ export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
     wrapToolHandler(
       async (params: DeleteInput) => {
         try {
-          if (!deleteByHash(db, params.hash)) {
-            return createErrorResponse(
-              E_NOT_FOUND,
-              `Memory not found: ${params.hash}`
-            );
+          const deleted = deleteByHash(db, params.hash);
+
+          if (deleted) {
+            await logToolEvent(server, 'delete', { hash: params.hash });
+            await notifyMemoryResourceUpdated(server, params.hash);
           }
 
-          await logToolEvent(server, 'delete', { hash: params.hash });
-          await notifyMemoryResourceUpdated(server, params.hash);
-
-          return createToolResponse({ deleted: true, hash: params.hash });
+          return createToolResponse({ deleted, hash: params.hash });
         } catch (err) {
           rethrowMcpError(err);
           return createErrorResponse(E_UNKNOWN, getErrorMessage(err));

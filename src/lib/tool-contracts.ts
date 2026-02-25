@@ -90,7 +90,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     name: 'search_memories',
     title: 'Search Memories',
     description:
-      'Full-text search over memory content and tags using FTS5. Returns ranked results with cursor pagination. Query terms are individually matched (all-OR logic; FTS5 phrase operators and negation are not supported). Use `recall` when you need to follow relationships between memories after the search.',
+      'Full-text search over memory content and tags using FTS5. Returns ranked results with cursor pagination. Query terms are individually matched (all-OR logic; FTS5 phrase operators and negation are not supported). Note: only alphanumeric and underscore characters are matched — hyphens, dots, and other special characters are stripped from query terms. Use `recall` when you need to follow relationships between memories after the search.',
     inputSchema: SearchMemoriesInputSchema,
     outputSchema: SearchResultSchema,
     annotations: {
@@ -103,7 +103,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     name: 'retrieve_context',
     title: 'Retrieve Context',
     description:
-      'FTS search with automatic token-budget management. Returns relevance-ranked memories totalling at most `token_budget` tokens. `strategy` controls sort: `relevance` (FTS rank, default), `importance` (highest first), or `recency` (newest first). Returns `truncated: true` when budget was reached before all candidates were included.',
+      'FTS search with automatic token-budget management. Returns relevance-ranked memories totalling at most `token_budget` tokens. `strategy` controls sort: `relevance` (FTS rank, default), `importance` (highest first), or `recency` (newest first). Returns `truncated: true` when budget was reached before all candidates were included. Note: only alphanumeric and underscore characters are matched — hyphens, dots, and other special characters are stripped from query terms.',
     inputSchema: RetrieveContextInputSchema,
     outputSchema: RetrieveContextResultSchema,
     annotations: {
@@ -142,11 +142,12 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     name: 'delete_memory',
     title: 'Delete Memory',
     description:
-      'Delete a single memory by its SHA-256 hash. Cascade-deletes all relationships involving it. Returns E_NOT_FOUND if the hash does not exist.',
+      'Delete a single memory by its SHA-256 hash. Cascade-deletes all relationships involving it. Returns `{deleted: false}` if the hash does not exist — idempotent, not an error.',
     inputSchema: DeleteMemoryInputSchema,
     outputSchema: DeleteResultSchema,
     annotations: {
       readOnlyHint: false,
+      idempotentHint: true,
       destructiveHint: true,
       openWorldHint: false,
     },
