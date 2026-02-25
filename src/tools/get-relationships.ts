@@ -48,6 +48,7 @@ const INCOMING_SQL = `
   ORDER BY r.created_at DESC`;
 
 // UNION ALL for 'both': single round-trip instead of two separate queries.
+// Exclude self-loops from the second branch to avoid duplicate rows.
 const BOTH_SQL = `
   SELECT r.from_hash, r.to_hash, r.relation_type, r.created_at,
          m.hash AS linked_hash, m.content AS linked_content, m.tags AS linked_tags
@@ -60,6 +61,7 @@ const BOTH_SQL = `
   FROM relationships r
   JOIN memories m ON r.from_hash = m.hash
   WHERE r.to_hash = ?
+    AND r.from_hash != ?
   ORDER BY 4 DESC`;
 
 function memoryExists(db: TypedDb, hash: string): boolean {
@@ -75,7 +77,7 @@ function loadRelationships(
   direction: RelationshipDirectionMode
 ): RelWithLinkedMemory[] {
   if (direction === 'both') {
-    return db.prepareOnce<RelWithLinkedMemory>(BOTH_SQL).all(hash, hash);
+    return db.prepareOnce<RelWithLinkedMemory>(BOTH_SQL).all(hash, hash, hash);
   }
   const sql = direction === 'outgoing' ? OUTGOING_SQL : INCOMING_SQL;
   return db.prepareOnce<RelWithLinkedMemory>(sql).all(hash);

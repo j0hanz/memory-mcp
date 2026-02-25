@@ -8,8 +8,8 @@ const SHARED_CONSTRAINTS: readonly string[] = [
   'Idempotence: `store_memory` and `store_memories` return `created: false` if content+tags exist.',
   'Atomic Transactions: `store_memories` and `delete_memories` roll back on error.',
   'Hash Changes: `update_memory` changes hash on content/tags change. Relationships survive via CASCADE.',
-  'FTS Search Limits: Query terms matched individually (all-OR). No phrase/negation support.',
-  'Recall Limits: BFS traversal bounded by env vars. Returns `aborted: true` with partial results if hit.',
+  'FTS Search Limits: Query is tokenized to alphanumeric/underscore terms and uses implicit AND matching. No phrase/negation support.',
+  'Recall Limits: BFS traversal bounded by env vars. Returns `aborted: true` with partial results only when limits are hit.',
 ];
 
 export function getSharedConstraints(): readonly string[] {

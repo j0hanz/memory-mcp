@@ -24,6 +24,9 @@ const INSERT_RELATIONSHIP_SQL = `INSERT OR IGNORE INTO relationships (from_hash,
   VALUES (?, ?, ?, ?)`;
 const SELECT_HASHES_SQL =
   'SELECT hash FROM memories WHERE hash IN (?, ?) LIMIT 2';
+type CreateRelationshipTxResult =
+  | { ok: true; created: boolean }
+  | { ok: false; code: string; message: string };
 
 function formatMemoryNotFound(kind: 'Source' | 'Target', hash: string): string {
   return `${kind} memory not found: ${hash}`;
@@ -49,6 +52,29 @@ function getMissingEndpoint(
   return undefined;
 }
 
+function createRelationshipTx(
+  db: TypedDb,
+  params: CreateRelInput
+): CreateRelationshipTxResult {
+  return db.transaction(() => {
+    const missing = getMissingEndpoint(db, params);
+    if (missing) {
+      return {
+        ok: false,
+        code: E_NOT_FOUND,
+        message: formatMemoryNotFound(missing.kind, missing.hash),
+      };
+    }
+
+    const now = new Date().toISOString();
+    const result = db
+      .prepareOnce(INSERT_RELATIONSHIP_SQL)
+      .run(params.from_hash, params.to_hash, params.relation_type, now);
+
+    return { ok: true, created: result.changes > 0 };
+  });
+}
+
 export function registerCreateRelationship(
   server: McpServer,
   db: TypedDb
@@ -67,29 +93,19 @@ export function registerCreateRelationship(
     wrapToolHandler(
       async (params: CreateRelInput) => {
         try {
-          const missing = getMissingEndpoint(db, params);
-          if (missing) {
-            return createErrorResponse(
-              E_NOT_FOUND,
-              formatMemoryNotFound(missing.kind, missing.hash)
-            );
+          const txResult = createRelationshipTx(db, params);
+          if (!txResult.ok) {
+            return createErrorResponse(txResult.code, txResult.message);
           }
-
-          const now = new Date().toISOString();
-          const result = db
-            .prepareOnce(INSERT_RELATIONSHIP_SQL)
-            .run(params.from_hash, params.to_hash, params.relation_type, now);
-
-          const created = result.changes > 0;
 
           await logToolEvent(server, 'create_relationship', {
             fromHash: params.from_hash,
             toHash: params.to_hash,
             relationType: params.relation_type,
-            created,
+            created: txResult.created,
           });
 
-          return createToolResponse({ created });
+          return createToolResponse({ created: txResult.created });
         } catch (err) {
           rethrowMcpError(err);
           return createErrorResponse(E_UNKNOWN, getErrorMessage(err));

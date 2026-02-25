@@ -229,4 +229,38 @@ describe('extended tool coverage', () => {
     assert.equal((stats.structuredContent.by_type['fact'] ?? 0) >= 1, true);
     assert.equal(stats.structuredContent.memories.newest !== null, true);
   });
+
+  it('get_relationships direction=both does not duplicate self-loop edges', async () => {
+    const stored = (await callTool(server, 'store_memory', {
+      content: 'self loop coverage case',
+      tags: ['self-loop', 'coverage'],
+    })) as { structuredContent: StoreResult };
+
+    await callTool(server, 'create_relationship', {
+      from_hash: stored.structuredContent.hash,
+      to_hash: stored.structuredContent.hash,
+      relation_type: 'related_to',
+    });
+
+    const both = (await callTool(server, 'get_relationships', {
+      hash: stored.structuredContent.hash,
+      direction: 'both',
+    })) as {
+      structuredContent: {
+        count: number;
+        relationships: Array<{ from_hash: string; to_hash: string }>;
+      };
+    };
+
+    assert.equal(both.structuredContent.count, 1);
+    assert.equal(both.structuredContent.relationships.length, 1);
+    assert.equal(
+      both.structuredContent.relationships[0]?.from_hash,
+      stored.structuredContent.hash
+    );
+    assert.equal(
+      both.structuredContent.relationships[0]?.to_hash,
+      stored.structuredContent.hash
+    );
+  });
 });

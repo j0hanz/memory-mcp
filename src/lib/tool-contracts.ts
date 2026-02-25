@@ -90,7 +90,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     name: 'search_memories',
     title: 'Search Memories',
     description:
-      'FTS5 full-text search over content and tags. Returns ranked results with cursor pagination. Matches alphanumeric/underscore only (all-OR logic). Use `recall` to follow relationships.',
+      'FTS5 full-text search over content and tags. Returns ranked results with cursor pagination. Matches alphanumeric/underscore tokens with implicit AND semantics. Use `recall` to follow relationships.',
     inputSchema: SearchMemoriesInputSchema,
     outputSchema: SearchResultSchema,
     annotations: {
@@ -116,7 +116,7 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     name: 'recall',
     title: 'Recall (BFS Graph Traversal)',
     description:
-      'FTS search then BFS graph traversal up to `depth` hops. Returns discovered memories and edges. Emits progress. Returns `aborted: true` if safety limits hit.',
+      'FTS search then BFS graph traversal up to `depth` hops. Returns discovered memories and edges. Emits progress. Returns `aborted: true` only if safety limits hit; cancellation returns E_CANCELLED.',
     inputSchema: RecallInputSchema,
     outputSchema: RecallResultSchema,
     annotations: {

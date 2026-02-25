@@ -44,7 +44,6 @@ const CAPABILITIES = [
   { capability: 'prompts', status: 'enabled' },
   { capability: 'completions', status: 'enabled' },
   { capability: 'logging', status: 'enabled' },
-  { capability: 'tasks', status: 'enabled' },
 ] as const;
 
 export function buildServerConfig(): string {

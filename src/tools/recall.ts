@@ -9,7 +9,12 @@ import process from 'node:process';
 import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
-import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
+import {
+  E_CANCELLED,
+  E_UNKNOWN,
+  getErrorMessage,
+  rethrowMcpError,
+} from '../lib/errors.js';
 import { logToolEvent } from '../lib/mcp-utils.js';
 import { splitPage } from '../lib/pagination.js';
 import {
@@ -45,6 +50,14 @@ import {
 
 type RecallInput = z.infer<typeof RecallInputSchema>;
 type ProgressNotifier = (hop: number, total: number) => void;
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) {
+    return;
+  }
+
+  throw new Error(E_CANCELLED);
+}
 
 function parseEnvInt(
   name: string,
@@ -109,10 +122,7 @@ async function traverseGraph(
     // Yield to event loop to allow progress notifications and cancellation
     await new Promise((resolve) => setImmediate(resolve));
 
-    if (signal?.aborted) {
-      aborted = true;
-      break;
-    }
+    throwIfAborted(signal);
 
     depthReached = hop + 1;
     onHop?.(hop, depth);
@@ -217,6 +227,11 @@ function formatRecallCompletionMessage(
 ): string {
   const failedMessage = `⊙ recall: ${query} • failed`;
   if (result.isError) {
+    const text =
+      result.content[0]?.type === 'text' ? result.content[0].text : '';
+    if (text.includes(E_CANCELLED)) {
+      return `⊙ recall: ${query} • cancelled`;
+    }
     return failedMessage;
   }
   if (!isOkStructuredToolResult(result)) {
@@ -272,6 +287,7 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
       let result: CallToolResult | undefined;
       let thrownError: McpError | undefined;
       try {
+        throwIfAborted(extra.signal);
         const decodedCursor = cursor
           ? decodeSearchCursor(cursor, scope)
           : undefined;
@@ -284,6 +300,7 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
           decodedCursor,
           filters
         );
+        throwIfAborted(extra.signal);
         const { page: pageSeeds, hasMore } = splitPage(seedRows, limit);
 
         // Step 2: BFS traversal up to `depth` hops
@@ -294,6 +311,7 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
           extra.signal,
           onHop
         );
+        throwIfAborted(extra.signal);
 
         // Step 3: Load all discovered memory rows
         const allHashes = Array.from(traversal.visited);
@@ -337,7 +355,9 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
           ...(nextCursor ? { nextCursor } : {}),
         });
       } catch (err) {
-        if (err instanceof McpError) {
+        if (err instanceof Error && err.message === E_CANCELLED) {
+          result = createErrorResponse(E_CANCELLED, 'Request cancelled');
+        } else if (err instanceof McpError) {
           thrownError = err;
         } else {
           rethrowMcpError(err);

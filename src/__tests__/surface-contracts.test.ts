@@ -43,6 +43,14 @@ describe('resources, prompts, completions, and task-surface contracts', () => {
     }
   });
 
+  it('does not advertise tasks capability when no task handlers are registered', () => {
+    const capabilities =
+      (server.server as unknown as { _capabilities?: { tasks?: unknown } })
+        ._capabilities ?? {};
+
+    assert.equal(capabilities.tasks, undefined);
+  });
+
   it('static and template resources return expected payloads', async () => {
     const instructions = (await readStaticResource(
       server,

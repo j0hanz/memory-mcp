@@ -27,6 +27,24 @@ interface StoreResult {
   created: boolean;
 }
 
+interface ErrorPayload {
+  ok: false;
+  error: {
+    code: string;
+    message: string;
+  };
+}
+
+function parseErrorPayload(result: {
+  content?: Array<{ type: string; text?: string }>;
+}): ErrorPayload {
+  const text = result.content?.[0]?.text;
+  if (!text) {
+    throw new Error('Expected text error payload');
+  }
+  return JSON.parse(text) as ErrorPayload;
+}
+
 describe('recall tool', () => {
   let server: McpServer;
   let db: TypedDb;
@@ -213,6 +231,33 @@ describe('recall tool', () => {
         `Expected monotonic progress: ${progress[i - 1]!.current} -> ${progress[i]!.current}`
       );
     }
+  });
+
+  it('returns E_CANCELLED on cancellation (not aborted partial success)', async () => {
+    const ac = new AbortController();
+    ac.abort();
+
+    const outcome = await callToolWithProgress(
+      server,
+      'recall',
+      {
+        query: 'machine learning',
+        depth: 1,
+      },
+      { signal: ac.signal }
+    );
+
+    assert.equal(outcome.error, undefined);
+    assert.ok(outcome.result);
+    assert.equal(outcome.result?.isError, true);
+
+    const parsed = parseErrorPayload(outcome.result!);
+    assert.equal(parsed.error.code, 'E_CANCELLED');
+
+    const finalMessage =
+      outcome.notifications[outcome.notifications.length - 1]?.params.message ??
+      '';
+    assert.match(finalMessage, / • cancelled$/);
   });
 
   it('emits completion progress when cursor decode throws', async () => {

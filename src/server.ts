@@ -21,10 +21,6 @@ const SERVER_CAPABILITIES = {
   resources: { subscribe: true },
   prompts: {},
   tools: {},
-  tasks: {
-    list: {},
-    cancel: {},
-  },
 } as const;
 
 interface PackageManifest {
