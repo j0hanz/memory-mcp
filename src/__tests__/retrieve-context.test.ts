@@ -182,8 +182,10 @@ describe('retrieve_context tool', () => {
       { signal: controller.signal }
     );
     assert.equal(outcome.error, undefined);
-    assert.ok((outcome.result as any).isError);
-    const parsed = JSON.parse((outcome.result as any).content[0].text) as {
+    assert.ok(outcome.result?.isError);
+    const text = outcome.result?.content?.[0]?.text;
+    assert.ok(text !== undefined);
+    const parsed = JSON.parse(text) as {
       ok: false;
       error: { code: string };
     };

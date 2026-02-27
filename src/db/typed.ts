@@ -21,11 +21,10 @@ export class TypedDb {
     const stmt = this.db.prepare(sql);
     return {
       all: (...params: SqlParams) =>
-        stmt.all(...(params as unknown as SQLInputValue[])) as T[],
+        stmt.all(...(params as SQLInputValue[])) as T[],
       get: (...params: SqlParams) =>
-        stmt.get(...(params as unknown as SQLInputValue[])) as T | undefined,
-      run: (...params: SqlParams) =>
-        stmt.run(...(params as unknown as SQLInputValue[])),
+        stmt.get(...(params as SQLInputValue[])) as T | undefined,
+      run: (...params: SqlParams) => stmt.run(...(params as SQLInputValue[])),
     };
   }
 
