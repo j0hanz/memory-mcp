@@ -7,17 +7,28 @@ import {
 import { getToolContracts } from '../lib/tool-contracts.js';
 import { buildCoreContextPack } from './tool-info.js';
 
-function extractOptionalParams(toolName: string, schema: z.ZodType): string[] {
+interface SchemaMeta {
+  properties: Record<string, JsonSchemaObject>;
+  requiredFields: Set<string>;
+}
+
+function getSchemaMeta(schema: z.ZodType): SchemaMeta {
   const jsonSchema = extractJsonSchema(schema);
-  const properties = (jsonSchema['properties'] ?? {}) as Record<
-    string,
-    JsonSchemaObject
-  >;
-  const requiredFields = new Set(
-    Array.isArray(jsonSchema['required'])
-      ? (jsonSchema['required'] as string[])
-      : []
-  );
+  return {
+    properties: (jsonSchema['properties'] ?? {}) as Record<
+      string,
+      JsonSchemaObject
+    >,
+    requiredFields: new Set(
+      Array.isArray(jsonSchema['required'])
+        ? (jsonSchema['required'] as string[])
+        : []
+    ),
+  };
+}
+
+function extractOptionalParams(toolName: string, schema: z.ZodType): string[] {
+  const { properties, requiredFields } = getSchemaMeta(schema);
 
   const rows: string[] = [];
   for (const [name, prop] of Object.entries(properties).sort(([a], [b]) =>

@@ -51,6 +51,10 @@ interface StaticMarkdownResourceConfig {
   content: string;
 }
 
+type StaticResourceSeed = Omit<StaticMarkdownResourceConfig, 'content'> & {
+  contentKey: 'instructions' | 'toolCatalog' | 'workflows' | 'serverConfig';
+};
+
 function createMarkdownContent(
   uri: string,
   text: string
@@ -97,6 +101,17 @@ function getSingleVariable(
   return Array.isArray(value) ? value[0] : value;
 }
 
+function requireValidMemoryHash(variables: Variables): string {
+  const hash = getSingleVariable(variables['hash']);
+  if (!hash || !HASH_REGEX.test(hash)) {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      'Invalid hash: must be a 64-character hex string'
+    );
+  }
+  return hash;
+}
+
 function requireSingleVariable(
   variables: Variables,
   key: string,
@@ -107,6 +122,14 @@ function requireSingleVariable(
     throw new McpError(ErrorCode.InvalidParams, errorMessage);
   }
   return value;
+}
+
+function requireKnownToolInfo(toolName: string): string {
+  const info = getToolInfo(toolName);
+  if (!info) {
+    throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${toolName}`);
+  }
+  return info;
 }
 
 function registerStaticMarkdownResource(
@@ -176,11 +199,8 @@ const TOOL_CATALOG_CONTENT = buildToolCatalog();
 const WORKFLOW_GUIDE_CONTENT = buildWorkflowGuide();
 const SERVER_CONFIG_CONTENT = buildServerConfig();
 
-// --- Registration ---
-
-export function registerAllResources(server: McpServer, db: TypedDb): void {
-  // internal://instructions
-  registerStaticMarkdownResource(server, {
+const STATIC_RESOURCE_SEEDS: readonly StaticResourceSeed[] = [
+  {
     name: 'instructions',
     uri: INSTRUCTIONS_URI,
     title: 'Memory Instructions',
@@ -188,11 +208,9 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
       'Complete usage guide: tool inventory, routing decisions, error codes, data model, and workflow patterns. Read this first.',
     audience: ['assistant'],
     priority: 0.9,
-    content: INSTRUCTIONS_CONTENT,
-  });
-
-  // internal://tool-catalog
-  registerStaticMarkdownResource(server, {
+    contentKey: 'instructions',
+  },
+  {
     name: 'tool-catalog',
     uri: TOOL_CATALOG_URI,
     title: 'Tool Catalog',
@@ -200,8 +218,58 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
       'Tool reference table, optional parameter matrix, and cross-tool data flow.',
     audience: ['assistant'],
     priority: 0.7,
-    content: TOOL_CATALOG_CONTENT,
-  });
+    contentKey: 'toolCatalog',
+  },
+  {
+    name: 'workflows',
+    uri: WORKFLOWS_URI,
+    title: 'Workflow Guide',
+    description:
+      'Recommended multi-step workflow sequences with guardrails and tool reference.',
+    audience: ['assistant'],
+    priority: 0.7,
+    contentKey: 'workflows',
+  },
+  {
+    name: 'server-config',
+    uri: SERVER_CONFIG_URI,
+    title: 'Server Configuration',
+    description:
+      'Runtime configuration, environment variables, capabilities, and data limits.',
+    audience: ['user', 'assistant'],
+    priority: 0.5,
+    contentKey: 'serverConfig',
+  },
+] as const;
+
+function resolveStaticResourceContent(
+  contentKey: StaticResourceSeed['contentKey']
+): string {
+  switch (contentKey) {
+    case 'instructions':
+      return INSTRUCTIONS_CONTENT;
+    case 'toolCatalog':
+      return TOOL_CATALOG_CONTENT;
+    case 'workflows':
+      return WORKFLOW_GUIDE_CONTENT;
+    case 'serverConfig':
+      return SERVER_CONFIG_CONTENT;
+  }
+}
+
+function getStaticMarkdownResources(): StaticMarkdownResourceConfig[] {
+  return STATIC_RESOURCE_SEEDS.map((seed) => ({
+    ...seed,
+    content: resolveStaticResourceContent(seed.contentKey),
+  }));
+}
+
+// --- Registration ---
+
+export function registerAllResources(server: McpServer, db: TypedDb): void {
+  for (const config of getStaticMarkdownResources()) {
+    registerStaticMarkdownResource(server, config);
+  }
 
   // internal://tool-info/{toolName}
   server.registerResource(
@@ -226,44 +294,13 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
         'toolName',
         'Missing toolName parameter'
       );
-
-      const info = getToolInfo(toolName);
-      if (!info) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          `Unknown tool: ${toolName}`
-        );
-      }
+      const info = requireKnownToolInfo(toolName);
 
       return {
         contents: [createMarkdownContent(uri.href, info)],
       };
     }
   );
-
-  // internal://workflows
-  registerStaticMarkdownResource(server, {
-    name: 'workflows',
-    uri: WORKFLOWS_URI,
-    title: 'Workflow Guide',
-    description:
-      'Recommended multi-step workflow sequences with guardrails and tool reference.',
-    audience: ['assistant'],
-    priority: 0.7,
-    content: WORKFLOW_GUIDE_CONTENT,
-  });
-
-  // internal://server-config
-  registerStaticMarkdownResource(server, {
-    name: 'server-config',
-    uri: SERVER_CONFIG_URI,
-    title: 'Server Configuration',
-    description:
-      'Runtime configuration, environment variables, capabilities, and data limits.',
-    audience: ['user', 'assistant'],
-    priority: 0.5,
-    content: SERVER_CONFIG_CONTENT,
-  });
 
   // memory://memories/{hash}
   const hashCompletion = createHashCompletionCallback(db);
@@ -282,14 +319,7 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
       annotations: createResourceAnnotations(['assistant'], 0.7),
     },
     (uri: URL, variables: Variables) => {
-      const hash = getSingleVariable(variables['hash']);
-
-      if (!hash || !HASH_REGEX.test(hash)) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          'Invalid hash: must be a 64-character hex string'
-        );
-      }
+      const hash = requireValidMemoryHash(variables);
 
       const row = readMemoryByHash(db, hash);
 

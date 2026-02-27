@@ -5,6 +5,12 @@ import { loadInstructions } from '../lib/instructions.js';
 
 const INSTRUCTIONS_CONTENT = loadInstructions();
 
+const GET_HELP_PROMPT = {
+  name: 'get-help',
+  title: 'Get Help',
+  description: 'Return full usage instructions.',
+} as const;
+
 function createHelpMessages(instructions: string): PromptMessage[] {
   return [
     {
@@ -26,14 +32,17 @@ function createHelpMessages(instructions: string): PromptMessage[] {
 
 const HELP_MESSAGES = createHelpMessages(INSTRUCTIONS_CONTENT);
 
-const GET_HELP_PROMPT_NAME = 'get-help';
-const GET_HELP_PROMPT_CONFIG = {
-  title: 'Get Help',
-  description: 'Return full usage instructions.',
-} as const;
+function createGetHelpPromptResult(): { messages: PromptMessage[] } {
+  return { messages: HELP_MESSAGES };
+}
 
 export function registerAllPrompts(server: McpServer): void {
-  server.registerPrompt(GET_HELP_PROMPT_NAME, GET_HELP_PROMPT_CONFIG, () => ({
-    messages: HELP_MESSAGES,
-  }));
+  server.registerPrompt(
+    GET_HELP_PROMPT.name,
+    {
+      title: GET_HELP_PROMPT.title,
+      description: GET_HELP_PROMPT.description,
+    },
+    createGetHelpPromptResult
+  );
 }

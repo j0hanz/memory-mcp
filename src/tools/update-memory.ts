@@ -3,19 +3,14 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
-import {
-  E_CONFLICT,
-  E_NOT_FOUND,
-  E_UNKNOWN,
-  getErrorMessage,
-  rethrowMcpError,
-} from '../lib/errors.js';
+import { E_CONFLICT, E_NOT_FOUND } from '../lib/errors.js';
 import { computeMemoryHash } from '../lib/hash.js';
 import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
 import {
   SELECT_MEMORY_BY_HASH_SQL,
   SELECT_MEMORY_HASH_SQL,
 } from '../lib/sql.js';
+import { executeToolSafely } from '../lib/tool-execution.js';
 import {
   createErrorResponse,
   createToolResponse,
@@ -55,8 +50,8 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
     UpdateMemoryInputSchema,
     UpdateResultSchema,
     wrapToolHandler(
-      async (params: UpdateInput) => {
-        try {
+      async (params: UpdateInput) =>
+        executeToolSafely(async () => {
           // All reads and the write are inside a single IMMEDIATE transaction
           // to prevent TOCTOU between existence/collision checks and UPDATE.
           const txResult = db.transaction((): TransactionResult => {
@@ -118,11 +113,7 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
             old_hash: txResult.oldHash,
             new_hash: txResult.newHash,
           });
-        } catch (err) {
-          rethrowMcpError(err);
-          return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
-        }
-      },
+        }),
       {
         progressMessage: (params: UpdateInput) =>
           `⊜ update_memory: ${params.hash.slice(0, 12)}... [replace content]`,

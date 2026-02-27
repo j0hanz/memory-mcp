@@ -79,6 +79,10 @@ const RECALL_MIN_IMPORTANCE_DESCRIPTION = 'Min importance filter';
 const RECALL_MAX_IMPORTANCE_DESCRIPTION = 'Max importance filter';
 const RECALL_MEMORY_TYPE_DESCRIPTION = 'Memory type filter';
 
+function describeHash(label: string): typeof HASH_SCHEMA {
+  return HASH_SCHEMA.describe(label);
+}
+
 function describeImportanceFilter(
   description: string
 ): z.ZodOptional<z.ZodNumber> {
@@ -143,13 +147,13 @@ export const StoreMemoriesInputSchema = z
 
 export const GetMemoryInputSchema = z
   .strictObject({
-    hash: HASH_SCHEMA,
+    hash: describeHash('SHA-256 hash'),
   })
   .describe('Get memory by hash');
 
 export const UpdateMemoryInputSchema = z
   .strictObject({
-    hash: HASH_SCHEMA,
+    hash: describeHash('SHA-256 hash'),
     content: CONTENT_SCHEMA,
     tags: TAGS_ARRAY_SCHEMA.optional(),
   })
@@ -157,7 +161,7 @@ export const UpdateMemoryInputSchema = z
 
 export const DeleteMemoryInputSchema = z
   .strictObject({
-    hash: HASH_SCHEMA,
+    hash: describeHash('SHA-256 hash'),
   })
   .describe('Delete memory by hash');
 
@@ -170,6 +174,12 @@ export const DeleteMemoriesInputSchema = z
       .describe('Hashes to delete (1-50)'),
   })
   .describe('Delete multiple memories');
+
+const RELATIONSHIP_ENDPOINT_FIELDS = {
+  from_hash: describeHash('Source hash'),
+  to_hash: describeHash('Target hash'),
+  relation_type: RELATION_TYPE_SCHEMA.describe('Relationship type'),
+};
 
 export const SearchMemoriesInputSchema = z
   .strictObject({
@@ -228,7 +238,7 @@ export const RetrieveContextInputSchema = z
 
 export const GetRelationshipsInputSchema = z
   .strictObject({
-    hash: HASH_SCHEMA,
+    hash: describeHash('SHA-256 hash'),
     direction: z
       .enum(['outgoing', 'incoming', 'both'])
       .optional()
@@ -239,17 +249,13 @@ export const GetRelationshipsInputSchema = z
 
 export const CreateRelationshipInputSchema = z
   .strictObject({
-    from_hash: HASH_SCHEMA.describe('Source hash'),
-    to_hash: HASH_SCHEMA.describe('Target hash'),
-    relation_type: RELATION_TYPE_SCHEMA.describe('Relationship type'),
+    ...RELATIONSHIP_ENDPOINT_FIELDS,
   })
   .describe('Create relationship');
 
 export const DeleteRelationshipInputSchema = z
   .strictObject({
-    from_hash: HASH_SCHEMA.describe('Source hash'),
-    to_hash: HASH_SCHEMA.describe('Target hash'),
-    relation_type: RELATION_TYPE_SCHEMA.describe('Relationship type'),
+    ...RELATIONSHIP_ENDPOINT_FIELDS,
   })
   .describe('Delete relationship');
 

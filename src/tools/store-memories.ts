@@ -3,14 +3,11 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
-import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
 import { computeMemoryHash } from '../lib/hash.js';
 import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
 import { INSERT_MEMORY_SQL } from '../lib/sql.js';
-import {
-  createErrorResponse,
-  createToolResponse,
-} from '../lib/tool-response.js';
+import { executeToolSafely, summarizeBatch } from '../lib/tool-execution.js';
+import { createToolResponse } from '../lib/tool-response.js';
 import type { BatchItemResult } from '../lib/types.js';
 import { StoreMemoriesInputSchema } from '../schemas/inputs.js';
 import { BatchResultSchema } from '../schemas/outputs.js';
@@ -36,8 +33,8 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
     StoreMemoriesInputSchema,
     BatchResultSchema,
     wrapToolHandler(
-      async (params: StoreMemoriesInput) => {
-        try {
+      async (params: StoreMemoriesInput) =>
+        executeToolSafely(async () => {
           const now = new Date().toISOString();
           const results = db.transaction(() => {
             const items: BatchItemResult[] = [];
@@ -65,27 +62,23 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
             }
             return items;
           });
-
-          let created = 0;
-          let succeeded = 0;
-          for (const item of results) {
-            if (item.ok) succeeded += 1;
-            if (item.created) created += 1;
-          }
-          const failed = results.length - succeeded;
+          const summary = summarizeBatch(
+            results,
+            (item) => item.created === true
+          );
 
           await logToolEvent(server, 'store_memories', {
             total: results.length,
-            created,
+            created: summary.matched,
           });
           await notifyCreatedResources(server, results);
 
-          return createToolResponse({ items: results, succeeded, failed });
-        } catch (err) {
-          rethrowMcpError(err);
-          return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
-        }
-      },
+          return createToolResponse({
+            items: results,
+            succeeded: summary.succeeded,
+            failed: summary.failed,
+          });
+        }),
       {
         progressMessage: (params: StoreMemoriesInput) =>
           `⊕ store_memories: ${params.items.length} items [batch]`,

@@ -79,6 +79,21 @@ interface ForeignKeyRow {
   on_update: string;
 }
 
+const RELATIONSHIP_EDGE_COLUMNS = new Set(['from_hash', 'to_hash']);
+
+function isMemoryRelationshipForeignKey(row: ForeignKeyRow): boolean {
+  return row.table === 'memories' && RELATIONSHIP_EDGE_COLUMNS.has(row.from);
+}
+
+function ensureRelationshipIndexes(db: DatabaseSync): void {
+  db.exec(
+    'CREATE INDEX IF NOT EXISTS idx_relationships_from ON relationships(from_hash)'
+  );
+  db.exec(
+    'CREATE INDEX IF NOT EXISTS idx_relationships_to ON relationships(to_hash)'
+  );
+}
+
 function runImmediateTransaction<T>(db: DatabaseSync, action: () => T): T {
   db.exec('BEGIN IMMEDIATE');
   try {
@@ -122,15 +137,8 @@ function needsRelationshipsCascadeUpdateMigration(db: DatabaseSync): boolean {
   const rows = db
     .prepare("PRAGMA foreign_key_list('relationships')")
     .all() as unknown as ForeignKeyRow[];
-  if (rows.length === 0) {
-    return false;
-  }
-
   for (const row of rows) {
-    const isMemoryEdge =
-      row.table === 'memories' &&
-      (row.from === 'from_hash' || row.from === 'to_hash');
-    if (!isMemoryEdge) {
+    if (!isMemoryRelationshipForeignKey(row)) {
       continue;
     }
 
@@ -152,12 +160,7 @@ function migrateRelationshipsCascadeUpdate(db: DatabaseSync): void {
       FROM relationships_old
     `);
     db.exec('DROP TABLE relationships_old');
-    db.exec(
-      'CREATE INDEX IF NOT EXISTS idx_relationships_from ON relationships(from_hash)'
-    );
-    db.exec(
-      'CREATE INDEX IF NOT EXISTS idx_relationships_to ON relationships(to_hash)'
-    );
+    ensureRelationshipIndexes(db);
   });
 }
 

@@ -28,6 +28,11 @@ interface ToolEntry {
   behavior: string;
 }
 
+interface SchemaMeta {
+  properties: Record<string, JsonSchemaObject>;
+  requiredFields: Set<string>;
+}
+
 function formatBehavior(annotations: ToolContract['annotations']): string {
   const hints: string[] = [];
   if (annotations.readOnlyHint === true) hints.push('read-only');
@@ -83,6 +88,33 @@ function formatParamConstraints(prop: JsonSchemaObject): string {
   return parts.length > 0 ? `; ${parts.join(', ')}` : '';
 }
 
+function getSchemaMeta(schema: z.ZodType): SchemaMeta {
+  const jsonSchema = extractJsonSchema(schema);
+  return {
+    properties: (jsonSchema['properties'] ?? {}) as Record<
+      string,
+      JsonSchemaObject
+    >,
+    requiredFields: new Set(
+      Array.isArray(jsonSchema['required'])
+        ? (jsonSchema['required'] as string[])
+        : []
+    ),
+  };
+}
+
+function getSortedSchemaProperties(
+  properties: Record<string, JsonSchemaObject>
+): [string, JsonSchemaObject][] {
+  return Object.entries(properties).sort(([a], [b]) => a.localeCompare(b));
+}
+
+function formatParamLines(meta: SchemaMeta): string[] {
+  return getSortedSchemaProperties(meta.properties).map(([pName, pSchema]) =>
+    formatParam(pName, pSchema, meta.requiredFields.has(pName))
+  );
+}
+
 function formatParam(
   name: string,
   prop: JsonSchemaObject,
@@ -122,22 +154,8 @@ export function getToolInfo(name: string): string | undefined {
   const contract = getToolContracts().find((c) => c.name === name);
   if (!contract) return undefined;
 
-  const inputSchema = extractJsonSchema(contract.inputSchema);
-  const properties = (inputSchema['properties'] ?? {}) as Record<
-    string,
-    JsonSchemaObject
-  >;
-  const requiredFields = new Set(
-    Array.isArray(inputSchema['required'])
-      ? (inputSchema['required'] as string[])
-      : []
-  );
-
-  const paramLines = Object.entries(properties)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([pName, pSchema]) =>
-      formatParam(pName, pSchema, requiredFields.has(pName))
-    );
+  const inputMeta = getSchemaMeta(contract.inputSchema);
+  const paramLines = formatParamLines(inputMeta);
 
   const behaviorLine = formatBehavior(contract.annotations);
   const outputShape = formatOutputShape(contract.outputSchema);

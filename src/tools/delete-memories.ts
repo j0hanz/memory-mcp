@@ -3,13 +3,10 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
-import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
 import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
 import { DELETE_MEMORY_SQL } from '../lib/sql.js';
-import {
-  createErrorResponse,
-  createToolResponse,
-} from '../lib/tool-response.js';
+import { executeToolSafely, summarizeBatch } from '../lib/tool-execution.js';
+import { createToolResponse } from '../lib/tool-response.js';
 import type { BatchItemResult } from '../lib/types.js';
 import { DeleteMemoriesInputSchema } from '../schemas/inputs.js';
 import { BatchResultSchema } from '../schemas/outputs.js';
@@ -35,8 +32,8 @@ export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
     DeleteMemoriesInputSchema,
     BatchResultSchema,
     wrapToolHandler(
-      async (params: DeleteMemoriesInput) => {
-        try {
+      async (params: DeleteMemoriesInput) =>
+        executeToolSafely(async () => {
           const results = db.transaction(() => {
             const items: BatchItemResult[] = [];
             const stmt = db.prepareOnce<unknown>(DELETE_MEMORY_SQL);
@@ -50,27 +47,23 @@ export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
             }
             return items;
           });
-
-          let deleted = 0;
-          let succeeded = 0;
-          for (const item of results) {
-            if (item.ok) succeeded += 1;
-            if (item.deleted) deleted += 1;
-          }
-          const failed = results.length - succeeded;
+          const summary = summarizeBatch(
+            results,
+            (item) => item.deleted === true
+          );
 
           await logToolEvent(server, 'delete_memories', {
             total: params.hashes.length,
-            deleted,
+            deleted: summary.matched,
           });
           await notifyDeletedResources(server, results);
 
-          return createToolResponse({ items: results, succeeded, failed });
-        } catch (err) {
-          rethrowMcpError(err);
-          return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
-        }
-      },
+          return createToolResponse({
+            items: results,
+            succeeded: summary.succeeded,
+            failed: summary.failed,
+          });
+        }),
       {
         progressMessage: (params: DeleteMemoriesInput) =>
           `⊖ delete_memories: ${params.hashes.length} hashes [batch]`,

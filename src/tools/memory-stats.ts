@@ -1,16 +1,13 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import type { TypedDb } from '../db/typed.js';
-import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
 import {
   MEMORY_AGGREGATE_SQL,
   RELATIONSHIP_COUNT_SQL,
   TYPE_COUNTS_SQL,
 } from '../lib/sql.js';
-import {
-  createErrorResponse,
-  createToolResponse,
-} from '../lib/tool-response.js';
+import { executeToolSafely } from '../lib/tool-execution.js';
+import { createToolResponse } from '../lib/tool-response.js';
 import type { TotalRow, TypeRow } from '../lib/types.js';
 import { MemoryStatsInputSchema } from '../schemas/inputs.js';
 import { StatsResultSchema } from '../schemas/outputs.js';
@@ -39,8 +36,8 @@ export function registerMemoryStats(server: McpServer, db: TypedDb): void {
     MemoryStatsInputSchema,
     StatsResultSchema,
     wrapToolHandler(
-      () => {
-        try {
+      () =>
+        executeToolSafely(() => {
           const aggregate = db
             .prepareOnce<MemoryAggregateRow>(MEMORY_AGGREGATE_SQL)
             .get();
@@ -63,11 +60,7 @@ export function registerMemoryStats(server: McpServer, db: TypedDb): void {
             },
             by_type: byType,
           });
-        } catch (err) {
-          rethrowMcpError(err);
-          return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
-        }
-      },
+        }),
       { progressMessage: () => '⊙ memory_stats: [aggregate]' }
     )
   );

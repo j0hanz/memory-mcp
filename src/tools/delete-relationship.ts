@@ -3,12 +3,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
-import {
-  E_NOT_FOUND,
-  E_UNKNOWN,
-  getErrorMessage,
-  rethrowMcpError,
-} from '../lib/errors.js';
+import { E_NOT_FOUND } from '../lib/errors.js';
+import { executeToolSafely } from '../lib/tool-execution.js';
 import {
   createErrorResponse,
   createToolResponse,
@@ -57,8 +53,8 @@ export function registerDeleteRelationship(
     DeleteRelationshipInputSchema,
     DeleteRelationshipResultSchema,
     wrapToolHandler(
-      (params: DeleteRelInput) => {
-        try {
+      (params: DeleteRelInput) =>
+        executeToolSafely(() => {
           if (!deleteRelationship(db, params)) {
             return createErrorResponse(
               E_NOT_FOUND,
@@ -67,11 +63,7 @@ export function registerDeleteRelationship(
           }
 
           return createToolResponse(DELETE_RELATIONSHIP_RESULT);
-        } catch (err) {
-          rethrowMcpError(err);
-          return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
-        }
-      },
+        }),
       {
         progressMessage: (params: DeleteRelInput) =>
           `⊖ delete_relationship: ${params.from_hash.slice(0, 8)}... -> ${params.to_hash.slice(0, 8)}... [${params.relation_type}]`,

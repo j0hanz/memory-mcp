@@ -52,6 +52,17 @@ import {
 
 type RecallInput = z.infer<typeof RecallInputSchema>;
 type ProgressNotifier = (hop: number, total: number) => void;
+type RankedSeed = Pick<MemoryRow, 'hash' | 'rank'>;
+
+interface RecallComputation {
+  memories: Memory[];
+  edges: RelationshipEdge[];
+  depthReached: number;
+  aborted: boolean;
+  nextCursor?: string;
+  seedCount: number;
+  visitedCount: number;
+}
 
 function throwIfAborted(signal?: AbortSignal): void {
   if (!signal?.aborted) {
@@ -252,6 +263,123 @@ function formatRecallCompletionMessage(
   return `⊙ recall: ${query} • ${memoriesCount} memories, ${edgesCount} edges${aborted ? ' [aborted]' : ''}`;
 }
 
+function decodeCursorForRecall(
+  cursor: string | undefined,
+  scope: string
+): ReturnType<typeof decodeSearchCursor> | undefined {
+  if (!cursor) {
+    return undefined;
+  }
+  return decodeSearchCursor(cursor, scope);
+}
+
+function buildSeedRelevanceMap(
+  seeds: readonly RankedSeed[]
+): Map<string, number> {
+  const seedRelevance = new Map<string, number>();
+  for (const seed of seeds) {
+    if (seed.rank != null) {
+      seedRelevance.set(seed.hash, -seed.rank);
+    }
+  }
+  return seedRelevance;
+}
+
+function toMemoriesWithRelevance(
+  rows: readonly MemoryRow[],
+  seedRelevance: ReadonlyMap<string, number>
+): Memory[] {
+  return rows.map((row) => {
+    const memory = parseMemoryRow(row);
+    const relevance = seedRelevance.get(memory.hash);
+    if (relevance != null) {
+      memory.relevance = relevance;
+    }
+    return memory;
+  });
+}
+
+function buildNextCursor(
+  hasMore: boolean,
+  pageSeeds: readonly RankedSeed[],
+  scope: string
+): string | undefined {
+  if (!hasMore || pageSeeds.length === 0) {
+    return undefined;
+  }
+
+  const lastSeed = pageSeeds[pageSeeds.length - 1];
+  if (!lastSeed) {
+    return undefined;
+  }
+
+  const rank = lastSeed.rank ?? 0;
+  return encodeSearchCursor(scope, rank, lastSeed.hash);
+}
+
+function createHopReporter(
+  extra: ProgressContext,
+  query: string,
+  completionCurrent: number
+): {
+  reporter: ReturnType<typeof progressWithMessage>;
+  onHop: ProgressNotifier;
+} {
+  const reporter = progressWithMessage(
+    createProgressReporter(extra),
+    ({ current, total }) =>
+      `⊙ recall: ${query} [hop ${current}/${Math.max((total ?? current) - 1, current)}]`
+  );
+
+  const onHop: ProgressNotifier = (hop: number): void => {
+    reporter({ current: hop + 1, total: completionCurrent });
+  };
+
+  return { reporter, onHop };
+}
+
+async function computeRecall(
+  db: TypedDb,
+  params: RecallInput,
+  scope: string,
+  signal: AbortSignal | undefined,
+  onHop: ProgressNotifier
+): Promise<RecallComputation> {
+  const decodedCursor = decodeCursorForRecall(params.cursor, scope);
+
+  const seedRows = loadRankedSearchRows(
+    db,
+    params.query,
+    params.limit,
+    decodedCursor,
+    toMemoryFilters(params)
+  );
+  const { page: pageSeeds, hasMore } = splitPage(seedRows, params.limit);
+
+  const traversal = await traverseGraph(
+    db,
+    pageSeeds,
+    params.depth,
+    signal,
+    onHop
+  );
+
+  const allHashes = Array.from(traversal.visited);
+  const seedRelevance = buildSeedRelevanceMap(pageSeeds);
+  const memoryRows = loadMemoriesByHashes(db, allHashes);
+  const nextCursor = buildNextCursor(hasMore, pageSeeds, scope);
+
+  return {
+    memories: toMemoriesWithRelevance(memoryRows, seedRelevance),
+    edges: traversal.edges,
+    depthReached: traversal.depthReached,
+    aborted: traversal.aborted,
+    ...(nextCursor ? { nextCursor } : {}),
+    seedCount: pageSeeds.length,
+    visitedCount: traversal.visited.size,
+  };
+}
+
 export function registerRecall(server: McpServer, db: TypedDb): void {
   registerToolWithContract(
     server,
@@ -259,7 +387,7 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
     RecallInputSchema,
     RecallResultSchema,
     async (params: RecallInput, extra: ProgressContext) => {
-      const { depth, limit, cursor } = params;
+      const { depth } = params;
       const filters = toMemoryFilters(params);
       const scope = buildSearchCursorScope(params.query, filters);
       const contextLabel = `⊙ recall: ${params.query} [depth ${depth}]`;
@@ -271,85 +399,42 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
         message: contextLabel,
       });
 
-      const hopReporter = progressWithMessage(
-        createProgressReporter(extra),
-        ({ current, total }) =>
-          `⊙ recall: ${params.query} [hop ${current}/${Math.max((total ?? current) - 1, current)}]`
+      const { reporter: hopReporter, onHop } = createHopReporter(
+        extra,
+        params.query,
+        completionCurrent
       );
-
-      const onHop: ProgressNotifier = (hop: number): void => {
-        hopReporter({ current: hop + 1, total: completionCurrent });
-      };
 
       let result: CallToolResult | undefined;
       let thrownError: McpError | undefined;
       try {
         throwIfAborted(extra.signal);
-        const decodedCursor = cursor
-          ? decodeSearchCursor(cursor, scope)
-          : undefined;
-
-        // Step 1: FTS seed search
-        const seedRows = loadRankedSearchRows(
+        const computation = await computeRecall(
           db,
-          params.query,
-          limit,
-          decodedCursor,
-          filters
-        );
-        throwIfAborted(extra.signal);
-        const { page: pageSeeds, hasMore } = splitPage(seedRows, limit);
-
-        // Step 2: BFS traversal up to `depth` hops
-        const traversal = await traverseGraph(
-          db,
-          pageSeeds,
-          depth,
+          params,
+          scope,
           extra.signal,
           onHop
         );
         throwIfAborted(extra.signal);
 
-        // Step 3: Load all discovered memory rows
-        const allHashes = Array.from(traversal.visited);
-        const seedRelevance = new Map<string, number>();
-        for (const seed of pageSeeds) {
-          if (seed.rank != null) seedRelevance.set(seed.hash, -seed.rank);
-        }
-        const memoryRows = loadMemoriesByHashes(db, allHashes);
-        const memories: Memory[] = memoryRows.map((row) => {
-          const memory = parseMemoryRow(row);
-          const rel = seedRelevance.get(memory.hash);
-          if (rel != null) {
-            memory.relevance = rel;
-          }
-          return memory;
-        });
-
-        let nextCursor: string | undefined;
-        if (hasMore && pageSeeds.length > 0) {
-          const lastSeed = pageSeeds[pageSeeds.length - 1];
-          if (lastSeed !== undefined) {
-            const rank = lastSeed.rank ?? 0;
-            nextCursor = encodeSearchCursor(scope, rank, lastSeed.hash);
-          }
-        }
-
         await logToolEvent(server, 'recall', {
           depth,
-          depth_reached: traversal.depthReached,
-          seed_count: pageSeeds.length,
-          visited_nodes: traversal.visited.size,
-          edge_count: traversal.edges.length,
-          aborted: traversal.aborted,
+          depth_reached: computation.depthReached,
+          seed_count: computation.seedCount,
+          visited_nodes: computation.visitedCount,
+          edge_count: computation.edges.length,
+          aborted: computation.aborted,
         });
 
         result = createToolResponse({
-          memories,
-          graph: traversal.edges,
-          depth_reached: traversal.depthReached,
-          ...(traversal.aborted ? { aborted: true } : {}),
-          ...(nextCursor ? { nextCursor } : {}),
+          memories: computation.memories,
+          graph: computation.edges,
+          depth_reached: computation.depthReached,
+          ...(computation.aborted ? { aborted: true } : {}),
+          ...(computation.nextCursor
+            ? { nextCursor: computation.nextCursor }
+            : {}),
         });
       } catch (err) {
         if (err instanceof Error && err.message === E_CANCELLED) {

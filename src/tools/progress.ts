@@ -50,6 +50,18 @@ type ToolHandler<TArgs> = (
 ) => Promise<CallToolResult> | CallToolResult;
 
 const DEFAULT_PROGRESS_INTERVAL_MS = 250;
+const TOOL_HANDLER_PROGRESS_TOTAL = 1;
+
+function hasProgressTransport(
+  extra: ProgressContext,
+  progressToken: ProgressToken | undefined
+): extra is ProgressContext & {
+  sendNotification: (notification: ProgressNotification) => Promise<void>;
+} {
+  return (
+    progressToken !== undefined && typeof extra.sendNotification === 'function'
+  );
+}
 
 function toProgressToken(value: unknown): ProgressToken | undefined {
   if (typeof value === 'string' || typeof value === 'number') {
@@ -77,6 +89,27 @@ function toNotificationParams(
   }
 
   return params;
+}
+
+function toProgressNotification(
+  progressToken: ProgressToken,
+  progress: ProgressUpdate
+): ProgressNotification {
+  return {
+    method: 'notifications/progress',
+    params: toNotificationParams(progressToken, progress),
+  };
+}
+
+function toProgressPayload(
+  progress: ProgressUpdate,
+  current: number
+): ProgressUpdate {
+  return {
+    current,
+    ...(progress.total !== undefined ? { total: progress.total } : {}),
+    ...(progress.message !== undefined ? { message: progress.message } : {}),
+  };
 }
 
 function getResultOutcome(
@@ -113,15 +146,14 @@ export async function notifyProgress(
     return;
   }
 
-  if (typeof extra.sendNotification !== 'function') {
+  if (!hasProgressTransport(extra, progressToken)) {
     return;
   }
 
   try {
-    await extra.sendNotification({
-      method: 'notifications/progress',
-      params: toNotificationParams(progressToken, progress),
-    });
+    await extra.sendNotification(
+      toProgressNotification(progressToken, progress)
+    );
   } catch {
     // best-effort progress
   }
@@ -159,13 +191,7 @@ export function createProgressReporter(
     isCompleted =
       progress.total !== undefined && monotonicCurrent >= progress.total;
 
-    const payload: ProgressUpdate = { current: monotonicCurrent };
-    if (progress.total !== undefined) {
-      payload.total = progress.total;
-    }
-    if (progress.message !== undefined) {
-      payload.message = progress.message;
-    }
+    const payload = toProgressPayload(progress, monotonicCurrent);
 
     notificationChain = notificationChain.then(() =>
       notifyProgress(extra, payload)
@@ -203,6 +229,19 @@ export function wrapToolHandler<TArgs>(
   handler: ToolHandler<TArgs>,
   options: WrappedHandlerOptions<TArgs>
 ): ToolHandler<TArgs> {
+  const notifyTerminalProgress = async (
+    extra: ProgressContext,
+    startMessage: string,
+    outcome: 'cancelled' | 'failed' | 'completed',
+    completionMessage?: string
+  ): Promise<void> => {
+    await notifyProgress(extra, {
+      current: TOOL_HANDLER_PROGRESS_TOTAL,
+      total: TOOL_HANDLER_PROGRESS_TOTAL,
+      message: completionMessage ?? `${startMessage} • ${outcome}`,
+    });
+  };
+
   return async (
     args: TArgs,
     extra: ProgressContext
@@ -210,7 +249,7 @@ export function wrapToolHandler<TArgs>(
     const startMessage = options.progressMessage(args);
     await notifyProgress(extra, {
       current: 0,
-      total: 1,
+      total: TOOL_HANDLER_PROGRESS_TOTAL,
       message: startMessage,
     });
 
@@ -220,11 +259,11 @@ export function wrapToolHandler<TArgs>(
     } catch (error) {
       const isCancelled =
         error instanceof Error && error.message === E_CANCELLED;
-      await notifyProgress(extra, {
-        current: 1,
-        total: 1,
-        message: `${startMessage} • ${isCancelled ? 'cancelled' : 'failed'}`,
-      });
+      await notifyTerminalProgress(
+        extra,
+        startMessage,
+        isCancelled ? 'cancelled' : 'failed'
+      );
       throw error;
     }
 
@@ -232,11 +271,12 @@ export function wrapToolHandler<TArgs>(
       options.completionMessage?.(args, result) ??
       defaultCompletionMessage(startMessage, result);
 
-    await notifyProgress(extra, {
-      current: 1,
-      total: 1,
-      message: completionMessage,
-    });
+    await notifyTerminalProgress(
+      extra,
+      startMessage,
+      'completed',
+      completionMessage
+    );
 
     return result;
   };

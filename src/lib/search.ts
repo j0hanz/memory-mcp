@@ -32,6 +32,11 @@ export interface FilterClauses {
   params: SQLInputValue[];
 }
 
+interface SearchPlan {
+  sql: string;
+  params: SQLInputValue[];
+}
+
 export type SearchCursorState =
   | {
       mode: 'offset';
@@ -75,25 +80,56 @@ export function buildAndWhereClause(clauses: readonly string[]): string {
   return ` AND ${clauses.join(' AND ')}`;
 }
 
+function buildBaseSearchWhere(whereExtra: string): string {
+  return `${BASE_RANKED_SEARCH_SQL}
+         WHERE memories_fts MATCH ?${whereExtra}`;
+}
+
 function buildRankedSearchSql(
   whereExtra: string,
   cursor: SearchCursorState | undefined
 ): string {
+  const whereSql = buildBaseSearchWhere(whereExtra);
   if (!cursor || cursor.mode === 'offset') {
-    return `${BASE_RANKED_SEARCH_SQL}
-         WHERE memories_fts MATCH ?${whereExtra}
+    return `${whereSql}
          ORDER BY memories_fts.rank, m.hash
          LIMIT ? OFFSET ?`;
   }
 
-  return `${BASE_RANKED_SEARCH_SQL}
-       WHERE memories_fts MATCH ?${whereExtra}
+  return `${whereSql}
          AND (
            memories_fts.rank > ?
            OR (memories_fts.rank = ? AND m.hash > ?)
          )
        ORDER BY memories_fts.rank, m.hash
        LIMIT ?`;
+}
+
+function buildRankedSearchParams(
+  ftsQuery: string,
+  filterParams: readonly SQLInputValue[],
+  limit: number,
+  cursor: SearchCursorState | undefined
+): SQLInputValue[] {
+  const baseParams = [ftsQuery, ...filterParams];
+  if (!cursor || cursor.mode === 'offset') {
+    const offset = cursor?.offset ?? 0;
+    return [...baseParams, limit + 1, offset];
+  }
+
+  return [...baseParams, cursor.rank, cursor.rank, cursor.hash, limit + 1];
+}
+
+function buildSearchPlan(
+  query: string,
+  limit: number,
+  cursor: SearchCursorState | undefined,
+  filters: MemoryFilters
+): SearchPlan {
+  const filter = buildFilterClauses(filters);
+  const sql = buildRankedSearchSql(buildAndWhereClause(filter.clauses), cursor);
+  const params = buildRankedSearchParams(query, filter.params, limit, cursor);
+  return { sql, params };
 }
 
 export function loadRankedSearchRows(
@@ -104,24 +140,8 @@ export function loadRankedSearchRows(
   filters: MemoryFilters
 ): MemoryRow[] {
   const ftsQuery = sanitizeFtsQuery(query);
-  const filter = buildFilterClauses(filters);
-  const whereExtra = buildAndWhereClause(filter.clauses);
-  const sql = buildRankedSearchSql(whereExtra, cursor);
-  const stmt = db.prepareOnce<MemoryRow>(sql);
-
-  if (!cursor || cursor.mode === 'offset') {
-    const offset = cursor?.offset ?? 0;
-    return stmt.all(ftsQuery, ...filter.params, limit + 1, offset);
-  }
-
-  return stmt.all(
-    ftsQuery,
-    ...filter.params,
-    cursor.rank,
-    cursor.rank,
-    cursor.hash,
-    limit + 1
-  );
+  const plan = buildSearchPlan(ftsQuery, limit, cursor, filters);
+  return db.prepareOnce<MemoryRow>(plan.sql).all(...plan.params);
 }
 
 export function toMemoryFilters(params: {
@@ -129,17 +149,13 @@ export function toMemoryFilters(params: {
   max_importance?: number | undefined;
   memory_type?: string | undefined;
 }): MemoryFilters {
-  const filters: MemoryFilters = {};
-
-  if (params.min_importance != null) {
-    filters.min_importance = params.min_importance;
-  }
-  if (params.max_importance != null) {
-    filters.max_importance = params.max_importance;
-  }
-  if (params.memory_type != null) {
-    filters.memory_type = params.memory_type;
-  }
-
-  return filters;
+  return {
+    ...(params.min_importance != null
+      ? { min_importance: params.min_importance }
+      : {}),
+    ...(params.max_importance != null
+      ? { max_importance: params.max_importance }
+      : {}),
+    ...(params.memory_type != null ? { memory_type: params.memory_type } : {}),
+  };
 }

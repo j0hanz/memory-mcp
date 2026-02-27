@@ -1,6 +1,11 @@
 import { getToolContracts } from '../lib/tool-contracts.js';
 import { getSharedConstraints } from './tool-info.js';
 
+interface TaggedSection {
+  tag: string;
+  content: string;
+}
+
 const PROMPTS_INVENTORY = ['- `get-help` — Full usage instructions.'];
 
 const RESOURCES_INVENTORY = [
@@ -73,42 +78,52 @@ function renderSharedConstraints(): string {
     .join('\n');
 }
 
-export function buildServerInstructions(): string {
+function renderTaggedSection(section: TaggedSection): string {
+  return [`<${section.tag}>`, section.content, `</${section.tag}>`].join('\n');
+}
+
+function buildTaggedSections(): TaggedSection[] {
   return [
-    '<role>',
-    'Memory MCP: Persistent memory storage, full-text retrieval, and relationship graph traversal.',
-    '</role>',
-    '',
-    '<capabilities>',
-    buildToolRouting(),
-    '</capabilities>',
-    '',
-    '<constraints>',
-    renderSharedConstraints(),
-    '</constraints>',
-    '',
-    '<error_codes>',
-    ERROR_CODES.join('\n'),
-    '</error_codes>',
-    '',
-    '<error_result_conventions>',
-    ERROR_RESULT_CONVENTIONS.join('\n'),
-    '</error_result_conventions>',
-    '',
-    '<data_model>',
-    DATA_MODEL,
-    '</data_model>',
-    '',
-    '<workflows>',
-    WORKFLOWS,
-    '</workflows>',
-    '',
-    '<prompts>',
-    PROMPTS_INVENTORY.join('\n'),
-    '</prompts>',
-    '',
-    '<resources>',
-    RESOURCES_INVENTORY.join('\n'),
-    '</resources>',
-  ].join('\n');
+    {
+      tag: 'role',
+      content:
+        'Memory MCP: Persistent memory storage, full-text retrieval, and relationship graph traversal.',
+    },
+    {
+      tag: 'capabilities',
+      content: buildToolRouting(),
+    },
+    {
+      tag: 'constraints',
+      content: renderSharedConstraints(),
+    },
+    {
+      tag: 'error_codes',
+      content: ERROR_CODES.join('\n'),
+    },
+    {
+      tag: 'error_result_conventions',
+      content: ERROR_RESULT_CONVENTIONS.join('\n'),
+    },
+    {
+      tag: 'data_model',
+      content: DATA_MODEL,
+    },
+    {
+      tag: 'workflows',
+      content: WORKFLOWS,
+    },
+    {
+      tag: 'prompts',
+      content: PROMPTS_INVENTORY.join('\n'),
+    },
+    {
+      tag: 'resources',
+      content: RESOURCES_INVENTORY.join('\n'),
+    },
+  ];
+}
+
+export function buildServerInstructions(): string {
+  return buildTaggedSections().map(renderTaggedSection).join('\n\n');
 }

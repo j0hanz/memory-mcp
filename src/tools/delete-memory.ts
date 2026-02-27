@@ -3,13 +3,10 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
-import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
 import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
 import { DELETE_MEMORY_SQL } from '../lib/sql.js';
-import {
-  createErrorResponse,
-  createToolResponse,
-} from '../lib/tool-response.js';
+import { executeToolSafely } from '../lib/tool-execution.js';
+import { createToolResponse } from '../lib/tool-response.js';
 import { DeleteMemoryInputSchema } from '../schemas/inputs.js';
 import { DeleteResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
@@ -28,8 +25,8 @@ export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
     DeleteMemoryInputSchema,
     DeleteResultSchema,
     wrapToolHandler(
-      async (params: DeleteInput) => {
-        try {
+      async (params: DeleteInput) =>
+        executeToolSafely(async () => {
           const deleted = deleteByHash(db, params.hash);
 
           if (deleted) {
@@ -38,11 +35,7 @@ export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
           }
 
           return createToolResponse({ deleted, hash: params.hash });
-        } catch (err) {
-          rethrowMcpError(err);
-          return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
-        }
-      },
+        }),
       {
         progressMessage: (params: DeleteInput) =>
           `⊖ delete_memory: ${params.hash.slice(0, 12)}... [single]`,

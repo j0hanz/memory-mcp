@@ -5,6 +5,12 @@ const NUMBER_SCHEMA = z.number();
 const BOOLEAN_SCHEMA = z.boolean();
 const STRING_ARRAY_SCHEMA = z.array(STRING_SCHEMA);
 
+const RELATIONSHIP_FIELDS = {
+  from_hash: STRING_SCHEMA.describe('Source hash'),
+  to_hash: STRING_SCHEMA.describe('Target hash'),
+  relation_type: STRING_SCHEMA.describe('Relationship type'),
+};
+
 export const ErrorResultSchema = z
   .strictObject({
     code: STRING_SCHEMA.describe('Error code'),
@@ -76,17 +82,13 @@ export const SearchResultSchema = z
 
 export const RelationshipEdgeSchema = z
   .strictObject({
-    from_hash: z.string().describe('Source hash'),
-    to_hash: z.string().describe('Target hash'),
-    relation_type: z.string().describe('Relationship type'),
+    ...RELATIONSHIP_FIELDS,
   })
   .describe('Relationship edge');
 
 export const RelationshipWithMemorySchema = z
   .strictObject({
-    from_hash: z.string().describe('Source hash'),
-    to_hash: z.string().describe('Target hash'),
-    relation_type: z.string().describe('Relationship type'),
+    ...RELATIONSHIP_FIELDS,
     created_at: z.string().describe('Created at'),
     linked_hash: z.string().describe('Linked memory hash'),
     linked_content: z.string().describe('Linked memory content'),

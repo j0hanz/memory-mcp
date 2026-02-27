@@ -3,13 +3,9 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
-import {
-  E_NOT_FOUND,
-  E_UNKNOWN,
-  getErrorMessage,
-  rethrowMcpError,
-} from '../lib/errors.js';
+import { E_NOT_FOUND } from '../lib/errors.js';
 import { SELECT_MEMORY_HASH_SQL } from '../lib/sql.js';
+import { executeToolSafely } from '../lib/tool-execution.js';
 import {
   createErrorResponse,
   createToolResponse,
@@ -104,8 +100,8 @@ export function registerGetRelationships(server: McpServer, db: TypedDb): void {
     GetRelationshipsInputSchema,
     RelationshipResultSchema,
     wrapToolHandler(
-      (params: GetRelInput) => {
-        try {
+      (params: GetRelInput) =>
+        executeToolSafely(() => {
           if (!memoryExists(db, params.hash)) {
             return createErrorResponse(
               E_NOT_FOUND,
@@ -122,11 +118,7 @@ export function registerGetRelationships(server: McpServer, db: TypedDb): void {
             relationships,
             count: relationships.length,
           });
-        } catch (err) {
-          rethrowMcpError(err);
-          return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
-        }
-      },
+        }),
       {
         progressMessage: (params: GetRelInput) =>
           `⊙ get_relationships: ${params.hash.slice(0, 12)}... [${params.direction}]`,

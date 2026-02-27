@@ -34,6 +34,12 @@ interface IconDescriptor {
   theme?: 'light' | 'dark';
 }
 
+interface ServerIdentity {
+  name: string;
+  version: string;
+  icons?: IconDescriptor[];
+}
+
 function getIconAssetCandidates(): URL[] {
   return [
     new URL(`../assets/${ICON_ASSET}`, import.meta.url),
@@ -90,21 +96,27 @@ function createIconDescriptors(): IconDescriptor[] | undefined {
   return [{ src, mimeType: ICON_MIME, sizes: ICON_SIZES }];
 }
 
-export function createServer(db: TypedDb): McpServer {
+function buildServerIdentity(): ServerIdentity {
   const { version } = loadPackageManifest();
   const icons = createIconDescriptors();
-  const instructions = loadInstructions();
-  const server = new McpServer(
-    {
-      name: SERVER_NAME,
-      version,
-      ...(icons ? { icons } : {}),
-    },
-    {
-      capabilities: SERVER_CAPABILITIES,
-      instructions,
-    }
-  );
+  return {
+    name: SERVER_NAME,
+    version,
+    ...(icons ? { icons } : {}),
+  };
+}
+
+function buildServerInstructions(): string {
+  return loadInstructions();
+}
+
+export function createServer(db: TypedDb): McpServer {
+  const identity = buildServerIdentity();
+  const instructions = buildServerInstructions();
+  const server = new McpServer(identity, {
+    capabilities: SERVER_CAPABILITIES,
+    instructions,
+  });
 
   registerAllTools(server, db);
   registerAllResources(server, db);

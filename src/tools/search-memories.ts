@@ -3,7 +3,6 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
-import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from '../lib/errors.js';
 import { splitPage } from '../lib/pagination.js';
 import {
   buildSearchCursorScope,
@@ -11,10 +10,8 @@ import {
   encodeSearchCursor,
 } from '../lib/search-cursor.js';
 import { loadRankedSearchRows, toMemoryFilters } from '../lib/search.js';
-import {
-  createErrorResponse,
-  createToolResponse,
-} from '../lib/tool-response.js';
+import { executeToolSafely } from '../lib/tool-execution.js';
+import { createToolResponse } from '../lib/tool-response.js';
 import { parseMemoryRow } from '../lib/types.js';
 import type { Memory } from '../lib/types.js';
 import { SearchMemoriesInputSchema } from '../schemas/inputs.js';
@@ -31,8 +28,8 @@ export function registerSearchMemories(server: McpServer, db: TypedDb): void {
     SearchMemoriesInputSchema,
     SearchResultSchema,
     wrapToolHandler(
-      (params: SearchInput) => {
-        try {
+      (params: SearchInput) =>
+        executeToolSafely(() => {
           const { limit, cursor } = params;
           const filters = toMemoryFilters(params);
           const scope = buildSearchCursorScope(params.query, filters);
@@ -63,11 +60,7 @@ export function registerSearchMemories(server: McpServer, db: TypedDb): void {
             total_returned: memories.length,
             ...(nextCursor ? { nextCursor } : {}),
           });
-        } catch (err) {
-          rethrowMcpError(err);
-          return createErrorResponse(E_UNKNOWN, getErrorMessage(err));
-        }
-      },
+        }),
       {
         progressMessage: (params: SearchInput) =>
           `⊙ search_memories: ${params.query} [limit ${params.limit}]`,

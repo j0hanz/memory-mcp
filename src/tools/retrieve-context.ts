@@ -135,6 +135,97 @@ function throwIfAborted(signal?: AbortSignal): void {
   throw new Error(E_CANCELLED);
 }
 
+function computeCandidateLimit(tokenBudget: number): number {
+  const estimatedCandidates = Math.ceil(
+    tokenBudget / ESTIMATED_TOKENS_PER_MEMORY
+  );
+  return Math.min(
+    Math.max(MIN_CANDIDATE_ROWS, estimatedCandidates),
+    MAX_CANDIDATE_ROWS
+  );
+}
+
+interface SelectionResult {
+  selected: Memory[];
+  estimatedTokens: number;
+  truncated: boolean;
+}
+
+function selectMemoriesWithinBudget(
+  rows: readonly MemoryRow[],
+  candidateCount: number,
+  tokenBudget: number,
+  completionCurrent: number,
+  signal: AbortSignal | undefined,
+  onProgress:
+    | ((progress: { current: number; total?: number }) => void)
+    | undefined
+): SelectionResult {
+  let estimatedTokens = 0;
+  let truncated = rows.length > candidateCount;
+  const selected: Memory[] = [];
+  let scanned = 0;
+
+  for (let i = 0; i < candidateCount; i += 1) {
+    throwIfAborted(signal);
+    const row = rows[i];
+    if (!row) {
+      break;
+    }
+
+    const memory = parseMemoryRow(row);
+    const tokens = estimateTokens(memory.content);
+    scanned += 1;
+
+    reportSelectionProgress(onProgress, scanned, completionCurrent, false);
+
+    if (estimatedTokens + tokens > tokenBudget) {
+      truncated = true;
+      break;
+    }
+
+    estimatedTokens += tokens;
+    selected.push(memory);
+  }
+
+  reportSelectionProgress(onProgress, scanned, completionCurrent, true);
+
+  return { selected, estimatedTokens, truncated };
+}
+
+interface RetrieveContextComputation {
+  selection: SelectionResult;
+  completionCurrent: number;
+}
+
+function computeRetrieveContextResult(
+  db: TypedDb,
+  params: RetrieveContextInput,
+  limit: number,
+  signal: AbortSignal | undefined,
+  onProgress:
+    | ((progress: { current: number; total?: number }) => void)
+    | undefined
+): RetrieveContextComputation {
+  const orderBy = ORDER_BY_MAP[params.strategy];
+  const rows = loadContextRows(db, params.query, orderBy, limit);
+  const rowCapExceeded = rows.length > limit;
+  const candidateCount = rowCapExceeded ? limit : rows.length;
+  const completionCurrent = candidateCount + 1;
+
+  return {
+    selection: selectMemoriesWithinBudget(
+      rows,
+      candidateCount,
+      params.token_budget,
+      completionCurrent,
+      signal,
+      onProgress
+    ),
+    completionCurrent,
+  };
+}
+
 export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
   registerToolWithContract(
     server,
@@ -147,14 +238,8 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
       const contextLabel = `⊙ retrieve_context: ${query} [${strategy}]`;
       let completionCurrent = 1;
 
-      // Heuristic: Load enough candidates to likely fill the budget, but cap to avoid massive queries
-      const estimatedCandidates = Math.ceil(
-        tokenBudget / ESTIMATED_TOKENS_PER_MEMORY
-      );
-      const limit = Math.min(
-        Math.max(MIN_CANDIDATE_ROWS, estimatedCandidates),
-        MAX_CANDIDATE_ROWS
-      );
+      // Heuristic: Load enough candidates to likely fill the budget, but cap to avoid massive queries.
+      const limit = computeCandidateLimit(tokenBudget);
 
       await notifyProgress(extra, {
         current: 0,
@@ -171,46 +256,20 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
       let thrownError: McpError | undefined;
       try {
         throwIfAborted(extra.signal);
-        const orderBy = ORDER_BY_MAP[strategy];
-        const rows = loadContextRows(db, query, orderBy, limit);
-        const rowCapExceeded = rows.length > limit;
-        const candidateCount = rowCapExceeded ? limit : rows.length;
-        completionCurrent = candidateCount + 1;
-
-        let estimatedTokens = 0;
-        let truncated = rowCapExceeded;
-        const selected: Memory[] = [];
-        let scanned = 0;
-
-        for (let i = 0; i < candidateCount; i += 1) {
-          throwIfAborted(extra.signal);
-          const row = rows[i];
-          if (row === undefined) {
-            break;
-          }
-          const mem = parseMemoryRow(row);
-          const tokens = estimateTokens(mem.content);
-          scanned += 1;
-          reportSelectionProgress(
-            loopProgress,
-            scanned,
-            completionCurrent,
-            false
+        const { selection, completionCurrent: nextCompletionCurrent } =
+          computeRetrieveContextResult(
+            db,
+            params,
+            limit,
+            extra.signal,
+            loopProgress
           );
-          if (estimatedTokens + tokens > tokenBudget) {
-            truncated = true;
-            break;
-          }
-          estimatedTokens += tokens;
-          selected.push(mem);
-        }
-
-        reportSelectionProgress(loopProgress, scanned, completionCurrent, true);
+        completionCurrent = nextCompletionCurrent;
 
         result = createToolResponse({
-          memories: selected,
-          estimated_tokens: estimatedTokens,
-          truncated,
+          memories: selection.selected,
+          estimated_tokens: selection.estimatedTokens,
+          truncated: selection.truncated,
         });
       } catch (err) {
         if (err instanceof Error && err.message === E_CANCELLED) {

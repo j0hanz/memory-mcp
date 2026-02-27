@@ -46,38 +46,57 @@ const CAPABILITIES = [
   { capability: 'logging', status: 'enabled' },
 ] as const;
 
+interface TableSection {
+  title: string;
+  header: string;
+  separator: string;
+  rows: string[];
+}
+
 function toEnvVarRow(v: (typeof ENV_VARS)[number]): string {
   return `| \`${v.name}\` | ${v.default} | ${v.range} | ${v.purpose} |`;
 }
 
-function toRangeRow(label: string, range: string): string {
-  return `| ${label} | ${range} |`;
+function toTwoColumnRow(label: string, value: string): string {
+  return `| ${label} | ${value} |`;
+}
+
+function renderTableSection(section: TableSection): string[] {
+  return [
+    `## ${section.title}`,
+    '',
+    section.header,
+    section.separator,
+    ...section.rows,
+    '',
+  ];
 }
 
 export function buildServerConfig(): string {
-  const envRows = ENV_VARS.map(toEnvVarRow);
-  const limitRows = DATA_LIMITS.map((l) => toRangeRow(l.dimension, l.range));
-  const capRows = CAPABILITIES.map((c) => toRangeRow(c.capability, c.status));
+  const sections: TableSection[] = [
+    {
+      title: 'Environment Variables',
+      header: '| Variable | Default | Range | Purpose |',
+      separator: '|----------|---------|-------|---------|',
+      rows: ENV_VARS.map(toEnvVarRow),
+    },
+    {
+      title: 'Capabilities',
+      header: '| Capability | Status |',
+      separator: '|------------|--------|',
+      rows: CAPABILITIES.map((c) => toTwoColumnRow(c.capability, c.status)),
+    },
+    {
+      title: 'Data Limits',
+      header: '| Dimension | Range |',
+      separator: '|-----------|-------|',
+      rows: DATA_LIMITS.map((l) => toTwoColumnRow(l.dimension, l.range)),
+    },
+  ];
 
   return [
     '# Server Configuration',
     '',
-    '## Environment Variables',
-    '',
-    '| Variable | Default | Range | Purpose |',
-    '|----------|---------|-------|---------|',
-    ...envRows,
-    '',
-    '## Capabilities',
-    '',
-    '| Capability | Status |',
-    '|------------|--------|',
-    ...capRows,
-    '',
-    '## Data Limits',
-    '',
-    '| Dimension | Range |',
-    '|-----------|-------|',
-    ...limitRows,
+    ...sections.flatMap(renderTableSection),
   ].join('\n');
 }
