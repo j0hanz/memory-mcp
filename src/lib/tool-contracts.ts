@@ -187,10 +187,14 @@ const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
   {
     name: 'delete_relationship',
     title: 'Delete Relationship',
-    description: 'Delete edge. Exact match required. Errors if missing.',
+    description:
+      'Delete edge. Exact match required. Idempotent (deleted: false if missing).',
     inputSchema: DeleteRelationshipInputSchema,
     outputSchema: DeleteRelationshipResultSchema,
-    annotations: DESTRUCTIVE_ANNOTATIONS,
+    annotations: combineAnnotations(
+      DESTRUCTIVE_ANNOTATIONS,
+      IDEMPOTENT_ANNOTATIONS
+    ),
   },
   {
     name: 'get_relationships',

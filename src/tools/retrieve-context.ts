@@ -57,13 +57,14 @@ function estimateTokens(content: string): number {
 function loadContextRows(
   db: TypedDb,
   query: string,
-  orderBy: string,
+  strategy: ContextStrategy,
   limit: number,
   filters: MemoryFilters
 ): MemoryRow[] {
   const ftsQuery = sanitizeFtsQuery(query);
   const filter = buildFilterClauses(filters);
   const whereExtra = buildAndWhereClause(filter.clauses);
+  const orderBy = ORDER_BY_MAP[strategy];
   return db
     .prepareOnce<MemoryRow>(
       `SELECT m.*, memories_fts.rank AS rank FROM memories m
@@ -199,9 +200,14 @@ function computeRetrieveContextResult(
     | ((progress: { current: number; total?: number }) => void)
     | undefined
 ): RetrieveContextComputation {
-  const orderBy = ORDER_BY_MAP[params.strategy];
   const filters = toMemoryFilters(params);
-  const rows = loadContextRows(db, params.query, orderBy, limit, filters);
+  const rows = loadContextRows(
+    db,
+    params.query,
+    params.strategy,
+    limit,
+    filters
+  );
   const rowCapExceeded = rows.length > limit;
   const candidateCount = rowCapExceeded ? limit : rows.length;
   const completionCurrent = candidateCount + 1;

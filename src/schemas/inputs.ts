@@ -17,7 +17,6 @@ const TAG_SCHEMA = z
 
 const TAGS_ARRAY_SCHEMA = z
   .array(TAG_SCHEMA)
-  .min(1, { error: 'At least one tag is required' })
   .max(100, { error: 'Maximum 100 tags allowed' })
   .describe('Memory tags');
 
