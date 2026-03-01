@@ -2,9 +2,19 @@ import { z } from 'zod/v4';
 
 export type JsonSchemaObject = Record<string, unknown>;
 
+const JsonSchemaPayloadSchema = z
+  .object({
+    properties: z
+      .record(z.string(), z.record(z.string(), z.unknown()))
+      .optional(),
+    required: z.array(z.string()).optional(),
+  })
+  .catchall(z.unknown());
+
 export function extractJsonSchema(schema: z.ZodType): JsonSchemaObject {
   try {
-    return z.toJSONSchema(schema) as JsonSchemaObject;
+    const raw = z.toJSONSchema(schema);
+    return raw as JsonSchemaObject;
   } catch {
     return {};
   }
@@ -17,15 +27,11 @@ export interface SchemaMeta {
 
 export function getSchemaMeta(schema: z.ZodType): SchemaMeta {
   const jsonSchema = extractJsonSchema(schema);
+  const parsed = JsonSchemaPayloadSchema.safeParse(jsonSchema);
+  const data = parsed.success ? parsed.data : {};
+
   return {
-    properties: (jsonSchema['properties'] ?? {}) as Record<
-      string,
-      JsonSchemaObject
-    >,
-    requiredFields: new Set(
-      Array.isArray(jsonSchema['required'])
-        ? (jsonSchema['required'] as string[])
-        : []
-    ),
+    properties: data.properties ?? {},
+    requiredFields: new Set(data.required ?? []),
   };
 }

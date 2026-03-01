@@ -1,4 +1,8 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type {
+  McpServer,
+  ToolCallback,
+} from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { AnySchema } from '@modelcontextprotocol/sdk/server/zod-compat.js';
 
 import { getToolContract } from '../lib/tool-contracts.js';
 
@@ -9,15 +13,16 @@ export function registerToolWithContract(
 ): void {
   const contract = getToolContract(toolName);
 
-  server.registerTool(
+  server.registerTool<AnySchema, AnySchema>(
     contract.name,
     {
       title: contract.title,
       description: contract.description,
-      inputSchema: contract.inputSchema,
-      outputSchema: contract.outputSchema,
+      inputSchema: contract.inputSchema as AnySchema,
+      outputSchema: contract.outputSchema as AnySchema,
       annotations: contract.annotations,
     },
-    handler as never
+    // The handler is validated at runtime and tested via contract verification
+    handler as ToolCallback<AnySchema>
   );
 }
