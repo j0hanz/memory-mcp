@@ -48,6 +48,12 @@ export type SearchCursorState =
       hash: string;
     };
 
+function isOffsetCursor(
+  cursor: SearchCursorState | undefined
+): cursor is Extract<SearchCursorState, { mode: 'offset' }> | undefined {
+  return cursor == null || cursor.mode === 'offset';
+}
+
 const FILTER_RULES: readonly {
   key: keyof MemoryFilters;
   clause: string;
@@ -90,7 +96,7 @@ function buildRankedSearchSql(
   cursor: SearchCursorState | undefined
 ): string {
   const whereSql = buildBaseSearchWhere(whereExtra);
-  if (!cursor || cursor.mode === 'offset') {
+  if (isOffsetCursor(cursor)) {
     return `${whereSql}
          ORDER BY memories_fts.rank, m.hash
          LIMIT ? OFFSET ?`;
@@ -105,19 +111,42 @@ function buildRankedSearchSql(
        LIMIT ?`;
 }
 
+function buildBaseSearchParams(
+  ftsQuery: string,
+  filterParams: readonly SQLInputValue[]
+): SQLInputValue[] {
+  return [ftsQuery, ...filterParams];
+}
+
+function buildOffsetParams(
+  baseParams: readonly SQLInputValue[],
+  limit: number,
+  offset: number
+): SQLInputValue[] {
+  return [...baseParams, limit + 1, offset];
+}
+
+function buildKeysetParams(
+  baseParams: readonly SQLInputValue[],
+  limit: number,
+  cursor: Extract<SearchCursorState, { mode: 'keyset' }>
+): SQLInputValue[] {
+  return [...baseParams, cursor.rank, cursor.rank, cursor.hash, limit + 1];
+}
+
 function buildRankedSearchParams(
   ftsQuery: string,
   filterParams: readonly SQLInputValue[],
   limit: number,
   cursor: SearchCursorState | undefined
 ): SQLInputValue[] {
-  const baseParams = [ftsQuery, ...filterParams];
-  if (!cursor || cursor.mode === 'offset') {
+  const baseParams = buildBaseSearchParams(ftsQuery, filterParams);
+  if (isOffsetCursor(cursor)) {
     const offset = cursor?.offset ?? 0;
-    return [...baseParams, limit + 1, offset];
+    return buildOffsetParams(baseParams, limit, offset);
   }
 
-  return [...baseParams, cursor.rank, cursor.rank, cursor.hash, limit + 1];
+  return buildKeysetParams(baseParams, limit, cursor);
 }
 
 function buildSearchPlan(
@@ -149,13 +178,19 @@ export function toMemoryFilters(params: {
   max_importance?: number | undefined;
   memory_type?: string | undefined;
 }): MemoryFilters {
-  return {
-    ...(params.min_importance != null
-      ? { min_importance: params.min_importance }
-      : {}),
-    ...(params.max_importance != null
-      ? { max_importance: params.max_importance }
-      : {}),
-    ...(params.memory_type != null ? { memory_type: params.memory_type } : {}),
+  const filters: MemoryFilters = {};
+  const addFilter = <K extends keyof MemoryFilters>(
+    key: K,
+    value: MemoryFilters[K] | undefined
+  ): void => {
+    if (value != null) {
+      filters[key] = value;
+    }
   };
+
+  addFilter('min_importance', params.min_importance);
+  addFilter('max_importance', params.max_importance);
+  addFilter('memory_type', params.memory_type);
+
+  return filters;
 }

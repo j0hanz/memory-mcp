@@ -15,6 +15,7 @@ import { GetMemoryInputSchema } from '../schemas/inputs.js';
 import { MemoryResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
+import { formatHashPreview } from './result.js';
 
 type GetInput = z.infer<typeof GetMemoryInputSchema>;
 
@@ -46,7 +47,7 @@ export function registerGetMemory(server: McpServer, db: TypedDb): void {
         }),
       {
         progressMessage: (params: GetInput) =>
-          `⊙ get_memory: ${params.hash.slice(0, 12)}... [single]`,
+          `⊙ get_memory: ${formatHashPreview(params.hash)} [single]`,
       }
     )
   );

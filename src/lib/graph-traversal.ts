@@ -1,6 +1,6 @@
 import process from 'node:process';
 
-import type { TypedDb } from '../db/typed.js';
+import type { TypedDb, TypedStatement } from '../db/typed.js';
 import { throwIfAborted } from './errors.js';
 import type { EdgeRow, MemoryRow, RelationshipEdge } from './types.js';
 
@@ -54,13 +54,21 @@ export interface TraverseGraphResult {
   aborted: boolean;
 }
 
-export async function traverseGraph(
-  db: TypedDb,
-  seeds: MemoryRow[],
-  depth: number,
-  signal?: AbortSignal,
-  onHop?: ProgressNotifier
-): Promise<TraverseGraphResult> {
+interface TraversalState {
+  visited: Set<string>;
+  frontier: string[];
+  edges: RelationshipEdge[];
+  seenEdges: Set<string>;
+  depthReached: number;
+  aborted: boolean;
+}
+
+interface RemainingBudget {
+  edges: number;
+  nodes: number;
+}
+
+function initializeTraversalState(seeds: readonly MemoryRow[]): TraversalState {
   const visited = new Set<string>();
   const frontier: string[] = [];
   for (const seed of seeds) {
@@ -68,90 +76,166 @@ export async function traverseGraph(
     frontier.push(seed.hash);
   }
 
-  const edges: RelationshipEdge[] = [];
-  const seenEdges = new Set<string>();
-  let depthReached = 0;
-  let aborted = false;
-  const edgeStmt = db.prepareOnce<EdgeRow>(EDGE_QUERY_SQL);
+  return {
+    visited,
+    frontier,
+    edges: [],
+    seenEdges: new Set<string>(),
+    depthReached: 0,
+    aborted: false,
+  };
+}
 
-  for (let hop = 0; hop < depth && frontier.length > 0; hop += 1) {
-    await yieldToEventLoop();
-    throwIfAborted(signal);
+function capFrontier(state: TraversalState): void {
+  if (state.frontier.length <= MAX_FRONTIER_SIZE) {
+    return;
+  }
 
-    depthReached = hop + 1;
-    onHop?.(hop, depth);
+  state.frontier.length = MAX_FRONTIER_SIZE;
+  state.aborted = true;
+}
 
-    if (frontier.length > MAX_FRONTIER_SIZE) {
-      frontier.length = MAX_FRONTIER_SIZE;
-      aborted = true;
+function getRemainingBudget(state: TraversalState): RemainingBudget {
+  return {
+    edges: MAX_EDGE_ROWS - state.edges.length,
+    nodes: MAX_VISITED_NODES - state.visited.size,
+  };
+}
+
+function hasExhaustedBudget(budget: RemainingBudget): boolean {
+  return budget.edges <= 0 || budget.nodes <= 0;
+}
+
+function loadEdgeRows(
+  edgeStmt: TypedStatement<EdgeRow>,
+  frontier: readonly string[],
+  edgeLimit: number
+): EdgeRow[] {
+  const frontierJson = JSON.stringify(frontier);
+  return edgeStmt.all(frontierJson, frontierJson, edgeLimit + 1);
+}
+
+function toRowsToProcessCount(
+  edgeRowsLength: number,
+  remainingEdgeBudget: number
+): number {
+  return edgeRowsLength > remainingEdgeBudget
+    ? remainingEdgeBudget
+    : edgeRowsLength;
+}
+
+function toEdgeKey(edge: EdgeRow): string {
+  return `${edge.from_hash}|${edge.to_hash}|${edge.relation_type}`;
+}
+
+function appendEdgeIfNew(state: TraversalState, edge: EdgeRow): void {
+  const edgeKey = toEdgeKey(edge);
+  if (state.seenEdges.has(edgeKey)) {
+    return;
+  }
+
+  state.seenEdges.add(edgeKey);
+  state.edges.push({
+    from_hash: edge.from_hash,
+    to_hash: edge.to_hash,
+    relation_type: edge.relation_type,
+  });
+}
+
+function createVisitedQueue(
+  state: TraversalState,
+  nextHashes: string[]
+): (hash: string) => void {
+  return (hash: string): void => {
+    if (state.visited.has(hash)) {
+      return;
     }
+    if (state.visited.size >= MAX_VISITED_NODES) {
+      state.aborted = true;
+      return;
+    }
+    state.visited.add(hash);
+    if (nextHashes.length < MAX_FRONTIER_SIZE) {
+      nextHashes.push(hash);
+      return;
+    }
+    state.aborted = true;
+  };
+}
 
-    const remainingEdgeBudget = MAX_EDGE_ROWS - edges.length;
-    const remainingNodeBudget = MAX_VISITED_NODES - visited.size;
-    if (remainingEdgeBudget <= 0 || remainingNodeBudget <= 0) {
-      aborted = true;
+function shouldStopEdgeProcessing(state: TraversalState): boolean {
+  return (
+    state.aborted &&
+    (state.edges.length >= MAX_EDGE_ROWS ||
+      state.visited.size >= MAX_VISITED_NODES)
+  );
+}
+
+function processEdgeRows(
+  state: TraversalState,
+  edgeRows: readonly EdgeRow[],
+  rowsToProcess: number
+): void {
+  const nextHashes: string[] = [];
+  const queueVisitedHash = createVisitedQueue(state, nextHashes);
+
+  for (let i = 0; i < rowsToProcess; i += 1) {
+    const edge = edgeRows[i];
+    if (!edge) {
       break;
     }
 
-    const frontierJson = JSON.stringify(frontier);
-    const edgeRows = edgeStmt.all(
-      frontierJson,
-      frontierJson,
-      remainingEdgeBudget + 1
-    );
-    const rowsToProcess =
-      edgeRows.length > remainingEdgeBudget
-        ? remainingEdgeBudget
-        : edgeRows.length;
-    if (edgeRows.length > remainingEdgeBudget) {
-      aborted = true;
+    appendEdgeIfNew(state, edge);
+    queueVisitedHash(edge.from_hash);
+    queueVisitedHash(edge.to_hash);
+
+    if (shouldStopEdgeProcessing(state)) {
+      break;
     }
-
-    const nextHashes: string[] = [];
-    const queueVisitedHash = (hash: string): void => {
-      if (visited.has(hash)) {
-        return;
-      }
-      if (visited.size >= MAX_VISITED_NODES) {
-        aborted = true;
-        return;
-      }
-      visited.add(hash);
-      if (nextHashes.length < MAX_FRONTIER_SIZE) {
-        nextHashes.push(hash);
-        return;
-      }
-      aborted = true;
-    };
-
-    for (let i = 0; i < rowsToProcess; i += 1) {
-      const edge = edgeRows[i];
-      if (edge === undefined) {
-        break;
-      }
-      const edgeKey = `${edge.from_hash}|${edge.to_hash}|${edge.relation_type}`;
-      if (!seenEdges.has(edgeKey)) {
-        seenEdges.add(edgeKey);
-        edges.push({
-          from_hash: edge.from_hash,
-          to_hash: edge.to_hash,
-          relation_type: edge.relation_type,
-        });
-      }
-
-      queueVisitedHash(edge.from_hash);
-      queueVisitedHash(edge.to_hash);
-
-      if (
-        aborted &&
-        (edges.length >= MAX_EDGE_ROWS || visited.size >= MAX_VISITED_NODES)
-      ) {
-        break;
-      }
-    }
-    frontier.length = 0;
-    frontier.push(...nextHashes);
   }
 
-  return { edges, visited, depthReached, aborted };
+  state.frontier.length = 0;
+  state.frontier.push(...nextHashes);
+}
+
+export async function traverseGraph(
+  db: TypedDb,
+  seeds: MemoryRow[],
+  depth: number,
+  signal?: AbortSignal,
+  onHop?: ProgressNotifier
+): Promise<TraverseGraphResult> {
+  const state = initializeTraversalState(seeds);
+  const edgeStmt = db.prepareOnce<EdgeRow>(EDGE_QUERY_SQL);
+
+  for (let hop = 0; hop < depth && state.frontier.length > 0; hop += 1) {
+    await yieldToEventLoop();
+    throwIfAborted(signal);
+
+    state.depthReached = hop + 1;
+    onHop?.(hop, depth);
+
+    capFrontier(state);
+
+    const budget = getRemainingBudget(state);
+    if (hasExhaustedBudget(budget)) {
+      state.aborted = true;
+      break;
+    }
+
+    const edgeRows = loadEdgeRows(edgeStmt, state.frontier, budget.edges);
+    const rowsToProcess = toRowsToProcessCount(edgeRows.length, budget.edges);
+    if (edgeRows.length > budget.edges) {
+      state.aborted = true;
+    }
+
+    processEdgeRows(state, edgeRows, rowsToProcess);
+  }
+
+  return {
+    edges: state.edges,
+    visited: state.visited,
+    depthReached: state.depthReached,
+    aborted: state.aborted,
+  };
 }

@@ -83,6 +83,21 @@ function describeHash(label: string): typeof HASH_SCHEMA {
   return HASH_SCHEMA.describe(label);
 }
 
+function createPrefaultIntField(config: {
+  min: number;
+  max: number;
+  prefault: number;
+  description: string;
+}): z.ZodPrefault<z.ZodOptional<z.ZodNumber>> {
+  return z
+    .int()
+    .min(config.min)
+    .max(config.max)
+    .optional()
+    .prefault(config.prefault)
+    .describe(config.description);
+}
+
 function describeImportanceFilter(
   description: string
 ): z.ZodOptional<z.ZodNumber> {
@@ -184,13 +199,12 @@ const RELATIONSHIP_ENDPOINT_FIELDS = {
 export const SearchMemoriesInputSchema = z
   .strictObject({
     query: SEARCH_QUERY_SCHEMA.describe('Search query'),
-    limit: z
-      .int()
-      .min(1)
-      .max(100)
-      .optional()
-      .prefault(20)
-      .describe('Max results (default 20)'),
+    limit: createPrefaultIntField({
+      min: 1,
+      max: 100,
+      prefault: 20,
+      description: 'Max results (default 20)',
+    }),
     cursor: CURSOR_SCHEMA.optional().describe(CURSOR_DESCRIPTION),
     ...SEARCH_FILTER_FIELDS,
   })
@@ -199,20 +213,18 @@ export const SearchMemoriesInputSchema = z
 export const RecallInputSchema = z
   .strictObject({
     query: SEARCH_QUERY_SCHEMA.describe('Search query'),
-    depth: z
-      .int()
-      .min(0)
-      .max(3)
-      .optional()
-      .prefault(1)
-      .describe('Relationship hops (0-3)'),
-    limit: z
-      .int()
-      .min(1)
-      .max(50)
-      .optional()
-      .prefault(10)
-      .describe('Max seed memories (default 10)'),
+    depth: createPrefaultIntField({
+      min: 0,
+      max: 3,
+      prefault: 1,
+      description: 'Relationship hops (0-3)',
+    }),
+    limit: createPrefaultIntField({
+      min: 1,
+      max: 50,
+      prefault: 10,
+      description: 'Max seed memories (default 10)',
+    }),
     cursor: CURSOR_SCHEMA.optional().describe(CURSOR_DESCRIPTION),
     ...RECALL_FILTER_FIELDS,
   })
@@ -221,13 +233,12 @@ export const RecallInputSchema = z
 export const RetrieveContextInputSchema = z
   .strictObject({
     query: SEARCH_QUERY_SCHEMA.describe('Search query'),
-    token_budget: z
-      .int()
-      .min(100)
-      .max(200000)
-      .optional()
-      .prefault(4000)
-      .describe('Max tokens (default 4000)'),
+    token_budget: createPrefaultIntField({
+      min: 100,
+      max: 200000,
+      prefault: 4000,
+      description: 'Max tokens (default 4000)',
+    }),
     strategy: z
       .enum(['importance', 'recency', 'relevance'])
       .optional()

@@ -14,6 +14,7 @@ import { CreateRelationshipInputSchema } from '../schemas/inputs.js';
 import { CreateRelationshipResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
+import { formatRelationshipPreview } from './result.js';
 
 type CreateRelInput = z.infer<typeof CreateRelationshipInputSchema>;
 const INSERT_RELATIONSHIP_SQL = `INSERT OR IGNORE INTO relationships (from_hash, to_hash, relation_type, created_at)
@@ -99,7 +100,7 @@ export function registerCreateRelationship(
         }),
       {
         progressMessage: (params: CreateRelInput) =>
-          `⊕ create_relationship: ${params.from_hash.slice(0, 8)}... -> ${params.to_hash.slice(0, 8)}... [${params.relation_type}]`,
+          `⊕ create_relationship: ${formatRelationshipPreview(params.from_hash, params.to_hash)} [${params.relation_type}]`,
       }
     )
   );

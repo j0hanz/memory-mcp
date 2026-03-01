@@ -13,13 +13,31 @@ import { loadRankedSearchRows, toMemoryFilters } from '../lib/search.js';
 import { executeToolSafely } from '../lib/tool-execution.js';
 import { createToolResponse } from '../lib/tool-response.js';
 import { parseMemoryRow } from '../lib/types.js';
-import type { Memory } from '../lib/types.js';
+import type { Memory, MemoryRow } from '../lib/types.js';
 import { SearchMemoriesInputSchema } from '../schemas/inputs.js';
 import { SearchResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
 
 type SearchInput = z.infer<typeof SearchMemoriesInputSchema>;
+
+function buildNextCursorFromRows(
+  scope: string,
+  hasMore: boolean,
+  pageRows: readonly MemoryRow[]
+): string | undefined {
+  if (!hasMore || pageRows.length === 0) {
+    return undefined;
+  }
+
+  const lastRow = pageRows[pageRows.length - 1];
+  if (!lastRow) {
+    return undefined;
+  }
+
+  const rank = lastRow.rank ?? 0;
+  return encodeSearchCursor(scope, rank, lastRow.hash);
+}
 
 export function registerSearchMemories(server: McpServer, db: TypedDb): void {
   registerToolWithContract(
@@ -46,14 +64,7 @@ export function registerSearchMemories(server: McpServer, db: TypedDb): void {
           const { page: pageRows, hasMore } = splitPage(rows, limit);
 
           const memories: Memory[] = pageRows.map(parseMemoryRow);
-          let nextCursor: string | undefined;
-          if (hasMore && pageRows.length > 0) {
-            const lastRow = pageRows[pageRows.length - 1];
-            if (lastRow !== undefined) {
-              const rank = lastRow.rank ?? 0;
-              nextCursor = encodeSearchCursor(scope, rank, lastRow.hash);
-            }
-          }
+          const nextCursor = buildNextCursorFromRows(scope, hasMore, pageRows);
 
           return createToolResponse({
             memories,

@@ -64,3 +64,15 @@ export function formatToolCompletionMessage(
   const successSuffix = getSuccessMessage(payload);
   return `⊙ ${toolName}: ${query} • ${successSuffix}`;
 }
+
+export function formatHashPreview(hash: string, length = 12): string {
+  return `${hash.slice(0, length)}...`;
+}
+
+export function formatRelationshipPreview(
+  fromHash: string,
+  toHash: string,
+  length = 8
+): string {
+  return `${formatHashPreview(fromHash, length)} -> ${formatHashPreview(toHash, length)}`;
+}

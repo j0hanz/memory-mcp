@@ -1,19 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import {
-  type CallToolResult,
-  McpError,
-} from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
-import {
-  E_CANCELLED,
-  E_UNKNOWN,
-  getErrorMessage,
-  rethrowMcpError,
-  throwIfAborted,
-} from '../lib/errors.js';
+import { throwIfAborted } from '../lib/errors.js';
 import {
   type ProgressNotifier,
   traverseGraph,
@@ -26,10 +17,7 @@ import {
   encodeSearchCursor,
 } from '../lib/search-cursor.js';
 import { loadRankedSearchRows, toMemoryFilters } from '../lib/search.js';
-import {
-  createErrorResponse,
-  createToolResponse,
-} from '../lib/tool-response.js';
+import { createToolResponse } from '../lib/tool-response.js';
 import { parseMemoryRow } from '../lib/types.js';
 import type { Memory, MemoryRow, RelationshipEdge } from '../lib/types.js';
 import { RecallInputSchema } from '../schemas/inputs.js';
@@ -39,6 +27,7 @@ import {
   notifyProgress,
   type ProgressContext,
   progressWithMessage,
+  runWithProgressCompletion,
 } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
 import {
@@ -161,6 +150,16 @@ function createHopReporter(
   return { reporter, onHop };
 }
 
+function toRecallResponse(computation: RecallComputation): CallToolResult {
+  return createToolResponse({
+    memories: computation.memories,
+    graph: computation.edges,
+    depth_reached: computation.depthReached,
+    ...(computation.aborted ? { aborted: true } : {}),
+    ...(computation.nextCursor ? { nextCursor: computation.nextCursor } : {}),
+  });
+}
+
 async function computeRecall(
   db: TypedDb,
   params: RecallInput,
@@ -228,64 +227,37 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
         completionCurrent
       );
 
-      let result: CallToolResult | undefined;
-      let thrownError: McpError | undefined;
-      try {
-        throwIfAborted(extra.signal);
-        const computation = await computeRecall(
-          db,
-          params,
-          scope,
-          extra.signal,
-          onHop
-        );
-        throwIfAborted(extra.signal);
+      return runWithProgressCompletion(
+        extra,
+        async () => {
+          throwIfAborted(extra.signal);
+          const computation = await computeRecall(
+            db,
+            params,
+            scope,
+            extra.signal,
+            onHop
+          );
+          throwIfAborted(extra.signal);
 
-        await logToolEvent(server, 'recall', {
-          depth,
-          depth_reached: computation.depthReached,
-          seed_count: computation.seedCount,
-          visited_nodes: computation.visitedCount,
-          edge_count: computation.edges.length,
-          aborted: computation.aborted,
-        });
+          await logToolEvent(server, 'recall', {
+            depth,
+            depth_reached: computation.depthReached,
+            seed_count: computation.seedCount,
+            visited_nodes: computation.visitedCount,
+            edge_count: computation.edges.length,
+            aborted: computation.aborted,
+          });
 
-        result = createToolResponse({
-          memories: computation.memories,
-          graph: computation.edges,
-          depth_reached: computation.depthReached,
-          ...(computation.aborted ? { aborted: true } : {}),
-          ...(computation.nextCursor
-            ? { nextCursor: computation.nextCursor }
-            : {}),
-        });
-      } catch (err) {
-        if (err instanceof Error && err.message === E_CANCELLED) {
-          result = createErrorResponse(E_CANCELLED, 'Request cancelled');
-        } else if (err instanceof McpError) {
-          thrownError = err;
-        } else {
-          rethrowMcpError(err);
-          result = createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+          return toRecallResponse(computation);
+        },
+        {
+          reporter: hopReporter,
+          completionCurrent,
+          completionMessage: (result) =>
+            formatRecallCompletionMessage(params.query, result),
         }
-      }
-
-      await hopReporter.flush();
-
-      const completionResult =
-        result ?? createErrorResponse(E_UNKNOWN, getErrorMessage(thrownError));
-
-      await notifyProgress(extra, {
-        current: completionCurrent,
-        total: completionCurrent,
-        message: formatRecallCompletionMessage(params.query, completionResult),
-      });
-
-      if (thrownError) {
-        throw thrownError;
-      }
-
-      return completionResult;
+      );
     }
   );
 }

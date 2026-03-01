@@ -80,8 +80,18 @@ function createToolContract(definition: ToolDefinition): ToolContract {
   };
 }
 
-export const TOOL_CONTRACTS: ToolContract[] = [
-  createToolContract({
+function combineAnnotations(
+  ...annotations: Partial<ToolAnnotations>[]
+): Partial<ToolAnnotations> {
+  const merged: Partial<ToolAnnotations> = {};
+  for (const annotation of annotations) {
+    Object.assign(merged, annotation);
+  }
+  return merged;
+}
+
+const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
+  {
     name: 'store_memory',
     title: 'Store Memory',
     description:
@@ -89,8 +99,8 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     inputSchema: StoreMemoryInputSchema,
     outputSchema: StoreResultSchema,
     annotations: IDEMPOTENT_ANNOTATIONS,
-  }),
-  createToolContract({
+  },
+  {
     name: 'store_memories',
     title: 'Store Memories (Batch)',
     description:
@@ -98,8 +108,8 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     inputSchema: StoreMemoriesInputSchema,
     outputSchema: BatchResultSchema,
     annotations: IDEMPOTENT_ANNOTATIONS,
-  }),
-  createToolContract({
+  },
+  {
     name: 'get_memory',
     title: 'Get Memory',
     description:
@@ -107,8 +117,8 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     inputSchema: GetMemoryInputSchema,
     outputSchema: MemoryResultSchema,
     annotations: READ_ONLY_ANNOTATIONS,
-  }),
-  createToolContract({
+  },
+  {
     name: 'search_memories',
     title: 'Search Memories',
     description:
@@ -116,8 +126,8 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     inputSchema: SearchMemoriesInputSchema,
     outputSchema: SearchResultSchema,
     annotations: READ_ONLY_ANNOTATIONS,
-  }),
-  createToolContract({
+  },
+  {
     name: 'retrieve_context',
     title: 'Retrieve Context',
     description:
@@ -125,8 +135,8 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     inputSchema: RetrieveContextInputSchema,
     outputSchema: RetrieveContextResultSchema,
     annotations: READ_ONLY_ANNOTATIONS,
-  }),
-  createToolContract({
+  },
+  {
     name: 'recall',
     title: 'Recall (BFS Graph Traversal)',
     description:
@@ -134,8 +144,8 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     inputSchema: RecallInputSchema,
     outputSchema: RecallResultSchema,
     annotations: READ_ONLY_ANNOTATIONS,
-  }),
-  createToolContract({
+  },
+  {
     name: 'update_memory',
     title: 'Update Memory',
     description:
@@ -143,20 +153,20 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     inputSchema: UpdateMemoryInputSchema,
     outputSchema: UpdateResultSchema,
     annotations: DESTRUCTIVE_ANNOTATIONS,
-  }),
-  createToolContract({
+  },
+  {
     name: 'delete_memory',
     title: 'Delete Memory',
     description:
       'Delete memory by hash. Cascade deletes relationships. Idempotent.',
     inputSchema: DeleteMemoryInputSchema,
     outputSchema: DeleteResultSchema,
-    annotations: {
-      ...DESTRUCTIVE_ANNOTATIONS,
-      ...IDEMPOTENT_ANNOTATIONS,
-    },
-  }),
-  createToolContract({
+    annotations: combineAnnotations(
+      DESTRUCTIVE_ANNOTATIONS,
+      IDEMPOTENT_ANNOTATIONS
+    ),
+  },
+  {
     name: 'delete_memories',
     title: 'Delete Memories (Batch)',
     description:
@@ -164,8 +174,8 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     inputSchema: DeleteMemoriesInputSchema,
     outputSchema: BatchResultSchema,
     annotations: DESTRUCTIVE_ANNOTATIONS,
-  }),
-  createToolContract({
+  },
+  {
     name: 'create_relationship',
     title: 'Create Relationship',
     description:
@@ -173,16 +183,16 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     inputSchema: CreateRelationshipInputSchema,
     outputSchema: CreateRelationshipResultSchema,
     annotations: IDEMPOTENT_ANNOTATIONS,
-  }),
-  createToolContract({
+  },
+  {
     name: 'delete_relationship',
     title: 'Delete Relationship',
     description: 'Delete edge. Exact match required. Errors if missing.',
     inputSchema: DeleteRelationshipInputSchema,
     outputSchema: DeleteRelationshipResultSchema,
     annotations: DESTRUCTIVE_ANNOTATIONS,
-  }),
-  createToolContract({
+  },
+  {
     name: 'get_relationships',
     title: 'Get Relationships',
     description:
@@ -190,16 +200,19 @@ export const TOOL_CONTRACTS: ToolContract[] = [
     inputSchema: GetRelationshipsInputSchema,
     outputSchema: RelationshipResultSchema,
     annotations: READ_ONLY_ANNOTATIONS,
-  }),
-  createToolContract({
+  },
+  {
     name: 'memory_stats',
     title: 'Memory Stats',
     description: 'Get global stats: counts, timestamps, importance.',
     inputSchema: MemoryStatsInputSchema,
     outputSchema: StatsResultSchema,
     annotations: READ_ONLY_ANNOTATIONS,
-  }),
+  },
 ];
+
+export const TOOL_CONTRACTS: ToolContract[] =
+  TOOL_DEFINITIONS.map(createToolContract);
 
 const TOOL_CONTRACTS_BY_NAME = new Map(
   TOOL_CONTRACTS.map((contract) => [contract.name, contract] as const)

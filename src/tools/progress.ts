@@ -2,8 +2,15 @@ import type {
   CallToolResult,
   ProgressNotification,
 } from '@modelcontextprotocol/sdk/types.js';
+import { McpError } from '@modelcontextprotocol/sdk/types.js';
 
-import { E_CANCELLED } from '../lib/errors.js';
+import {
+  E_CANCELLED,
+  E_UNKNOWN,
+  getErrorMessage,
+  rethrowMcpError,
+} from '../lib/errors.js';
+import { createErrorResponse } from '../lib/tool-response.js';
 import { getToolResultText } from './result.js';
 
 type ProgressToken = string | number;
@@ -42,6 +49,18 @@ export type ProgressReporter<
 interface WrappedHandlerOptions<TArgs> {
   completionMessage?: (args: TArgs, result: CallToolResult) => string;
   progressMessage: (args: TArgs) => string;
+}
+
+interface CompletionRunOptions {
+  reporter: Pick<ProgressReporter, 'flush'>;
+  completionCurrent: number | (() => number);
+  completionMessage: (result: CallToolResult) => string;
+}
+
+function resolveCompletionCurrent(
+  value: CompletionRunOptions['completionCurrent']
+): number {
+  return typeof value === 'function' ? value() : value;
 }
 
 type ToolHandler<TArgs> = (
@@ -280,4 +299,45 @@ export function wrapToolHandler<TArgs>(
 
     return result;
   };
+}
+
+export async function runWithProgressCompletion(
+  extra: ProgressContext,
+  run: () => CallToolResult | Promise<CallToolResult>,
+  options: CompletionRunOptions
+): Promise<CallToolResult> {
+  let result: CallToolResult | undefined;
+  let thrownError: McpError | undefined;
+
+  try {
+    result = await run();
+  } catch (error) {
+    if (error instanceof Error && error.message === E_CANCELLED) {
+      result = createErrorResponse(E_CANCELLED, 'Request cancelled');
+    } else if (error instanceof McpError) {
+      thrownError = error;
+    } else {
+      rethrowMcpError(error);
+      result = createErrorResponse(E_UNKNOWN, getErrorMessage(error));
+    }
+  }
+
+  await options.reporter.flush();
+
+  const completionResult =
+    result ?? createErrorResponse(E_UNKNOWN, getErrorMessage(thrownError));
+
+  const completionCurrent = resolveCompletionCurrent(options.completionCurrent);
+
+  await notifyProgress(extra, {
+    current: completionCurrent,
+    total: completionCurrent,
+    message: options.completionMessage(completionResult),
+  });
+
+  if (thrownError) {
+    throw thrownError;
+  }
+
+  return completionResult;
 }

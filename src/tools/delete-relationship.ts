@@ -13,6 +13,7 @@ import { DeleteRelationshipInputSchema } from '../schemas/inputs.js';
 import { DeleteRelationshipResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
+import { formatRelationshipPreview } from './result.js';
 
 type DeleteRelInput = z.infer<typeof DeleteRelationshipInputSchema>;
 
@@ -66,7 +67,7 @@ export function registerDeleteRelationship(
         }),
       {
         progressMessage: (params: DeleteRelInput) =>
-          `⊖ delete_relationship: ${params.from_hash.slice(0, 8)}... -> ${params.to_hash.slice(0, 8)}... [${params.relation_type}]`,
+          `⊖ delete_relationship: ${formatRelationshipPreview(params.from_hash, params.to_hash)} [${params.relation_type}]`,
       }
     )
   );

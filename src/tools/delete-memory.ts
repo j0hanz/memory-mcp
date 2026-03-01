@@ -11,6 +11,7 @@ import { DeleteMemoryInputSchema } from '../schemas/inputs.js';
 import { DeleteResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
+import { formatHashPreview } from './result.js';
 
 type DeleteInput = z.infer<typeof DeleteMemoryInputSchema>;
 
@@ -38,7 +39,7 @@ export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
         }),
       {
         progressMessage: (params: DeleteInput) =>
-          `⊖ delete_memory: ${params.hash.slice(0, 12)}... [single]`,
+          `⊖ delete_memory: ${formatHashPreview(params.hash)} [single]`,
       }
     )
   );

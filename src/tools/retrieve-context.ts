@@ -1,22 +1,12 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
-import {
-  E_CANCELLED,
-  E_UNKNOWN,
-  getErrorMessage,
-  rethrowMcpError,
-  throwIfAborted,
-} from '../lib/errors.js';
+import { throwIfAborted } from '../lib/errors.js';
 import { sanitizeFtsQuery } from '../lib/search.js';
-import {
-  createErrorResponse,
-  createToolResponse,
-} from '../lib/tool-response.js';
+import { createToolResponse } from '../lib/tool-response.js';
 import { parseMemoryRow } from '../lib/types.js';
 import type { Memory, MemoryRow } from '../lib/types.js';
 import { RetrieveContextInputSchema } from '../schemas/inputs.js';
@@ -26,6 +16,7 @@ import {
   notifyProgress,
   type ProgressContext,
   progressWithMessage,
+  runWithProgressCompletion,
 } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
 import {
@@ -180,6 +171,17 @@ interface RetrieveContextComputation {
   completionCurrent: number;
 }
 
+function toRetrieveContextResponse(
+  computation: RetrieveContextComputation
+): CallToolResult {
+  const { selection } = computation;
+  return createToolResponse({
+    memories: selection.selected,
+    estimated_tokens: selection.estimatedTokens,
+    truncated: selection.truncated,
+  });
+}
+
 function computeRetrieveContextResult(
   db: TypedDb,
   params: RetrieveContextInput,
@@ -234,52 +236,27 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
           `${contextLabel} [scan ${current}/${Math.max((total ?? current) - 1, current)}]`
       );
 
-      let result: CallToolResult | undefined;
-      let thrownError: McpError | undefined;
-      try {
-        throwIfAborted(extra.signal);
-        const { selection, completionCurrent: nextCompletionCurrent } =
-          computeRetrieveContextResult(
+      return runWithProgressCompletion(
+        extra,
+        () => {
+          throwIfAborted(extra.signal);
+          const computation = computeRetrieveContextResult(
             db,
             params,
             limit,
             extra.signal,
             loopProgress
           );
-        completionCurrent = nextCompletionCurrent;
-
-        result = createToolResponse({
-          memories: selection.selected,
-          estimated_tokens: selection.estimatedTokens,
-          truncated: selection.truncated,
-        });
-      } catch (err) {
-        if (err instanceof Error && err.message === E_CANCELLED) {
-          result = createErrorResponse(E_CANCELLED, 'Request cancelled');
-        } else if (err instanceof McpError) {
-          thrownError = err;
-        } else {
-          rethrowMcpError(err);
-          result = createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+          const { completionCurrent: nextCompletionCurrent } = computation;
+          completionCurrent = nextCompletionCurrent;
+          return toRetrieveContextResponse(computation);
+        },
+        {
+          reporter: loopProgress,
+          completionCurrent: () => completionCurrent,
+          completionMessage: (result) => formatCompletionMessage(query, result),
         }
-      }
-
-      await loopProgress.flush();
-
-      const completionResult =
-        result ?? createErrorResponse(E_UNKNOWN, getErrorMessage(thrownError));
-
-      await notifyProgress(extra, {
-        current: completionCurrent,
-        total: completionCurrent,
-        message: formatCompletionMessage(query, completionResult),
-      });
-
-      if (thrownError) {
-        throw thrownError;
-      }
-
-      return completionResult;
+      );
     }
   );
 }

@@ -11,6 +11,10 @@ const FTS5_CHECK_SQL =
 const FTS5_REQUIRED_MESSAGE =
   'SQLite FTS5 extension is not available. memory-mcp requires a SQLite build with FTS5 support.';
 const DEFENSIVE_PRAGMA_SQL = 'PRAGMA defensive = ON';
+const RELATIONSHIP_INDEX_SQL: readonly string[] = [
+  'CREATE INDEX IF NOT EXISTS idx_relationships_from ON relationships(from_hash)',
+  'CREATE INDEX IF NOT EXISTS idx_relationships_to ON relationships(to_hash)',
+];
 const RELATIONSHIPS_TABLE_SQL = `CREATE TABLE IF NOT EXISTS relationships (
     from_hash TEXT NOT NULL REFERENCES memories(hash) ON DELETE CASCADE ON UPDATE CASCADE,
     to_hash TEXT NOT NULL REFERENCES memories(hash) ON DELETE CASCADE ON UPDATE CASCADE,
@@ -62,11 +66,7 @@ const SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_memories_created
     ON memories(created_at DESC);
 
-  CREATE INDEX IF NOT EXISTS idx_relationships_from
-    ON relationships(from_hash);
-
-  CREATE INDEX IF NOT EXISTS idx_relationships_to
-    ON relationships(to_hash);
+  ${RELATIONSHIP_INDEX_SQL.join(';\n\n  ')};
 `;
 
 interface UserVersionRow {
@@ -86,12 +86,9 @@ function isMemoryRelationshipForeignKey(row: ForeignKeyRow): boolean {
 }
 
 function ensureRelationshipIndexes(db: DatabaseSync): void {
-  db.exec(
-    'CREATE INDEX IF NOT EXISTS idx_relationships_from ON relationships(from_hash)'
-  );
-  db.exec(
-    'CREATE INDEX IF NOT EXISTS idx_relationships_to ON relationships(to_hash)'
-  );
+  for (const statement of RELATIONSHIP_INDEX_SQL) {
+    db.exec(statement);
+  }
 }
 
 function runImmediateTransaction<T>(db: DatabaseSync, action: () => T): T {

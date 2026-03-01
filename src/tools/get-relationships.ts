@@ -16,6 +16,7 @@ import { GetRelationshipsInputSchema } from '../schemas/inputs.js';
 import { RelationshipResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
+import { formatHashPreview } from './result.js';
 
 type GetRelInput = z.infer<typeof GetRelationshipsInputSchema>;
 type RelationshipDirectionMode = GetRelInput['direction'];
@@ -121,7 +122,7 @@ export function registerGetRelationships(server: McpServer, db: TypedDb): void {
         }),
       {
         progressMessage: (params: GetRelInput) =>
-          `⊙ get_relationships: ${params.hash.slice(0, 12)}... [${params.direction}]`,
+          `⊙ get_relationships: ${formatHashPreview(params.hash)} [${params.direction}]`,
       }
     )
   );

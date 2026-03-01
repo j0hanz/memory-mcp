@@ -55,6 +55,8 @@ type StaticResourceSeed = Omit<StaticMarkdownResourceConfig, 'content'> & {
   contentKey: 'instructions' | 'toolCatalog' | 'workflows' | 'serverConfig';
 };
 
+type StaticContentKey = StaticResourceSeed['contentKey'];
+
 function createMarkdownContent(
   uri: string,
   text: string
@@ -199,6 +201,13 @@ const TOOL_CATALOG_CONTENT = buildToolCatalog();
 const WORKFLOW_GUIDE_CONTENT = buildWorkflowGuide();
 const SERVER_CONFIG_CONTENT = buildServerConfig();
 
+const STATIC_CONTENT_BY_KEY: Readonly<Record<StaticContentKey, string>> = {
+  instructions: INSTRUCTIONS_CONTENT,
+  toolCatalog: TOOL_CATALOG_CONTENT,
+  workflows: WORKFLOW_GUIDE_CONTENT,
+  serverConfig: SERVER_CONFIG_CONTENT,
+};
+
 const STATIC_RESOURCE_SEEDS: readonly StaticResourceSeed[] = [
   {
     name: 'instructions',
@@ -242,44 +251,23 @@ const STATIC_RESOURCE_SEEDS: readonly StaticResourceSeed[] = [
   },
 ] as const;
 
-function resolveStaticResourceContent(
-  contentKey: StaticResourceSeed['contentKey']
-): string {
-  switch (contentKey) {
-    case 'instructions':
-      return INSTRUCTIONS_CONTENT;
-    case 'toolCatalog':
-      return TOOL_CATALOG_CONTENT;
-    case 'workflows':
-      return WORKFLOW_GUIDE_CONTENT;
-    case 'serverConfig':
-      return SERVER_CONFIG_CONTENT;
-  }
-}
-
 function getStaticMarkdownResources(): StaticMarkdownResourceConfig[] {
   return STATIC_RESOURCE_SEEDS.map((seed) => ({
     ...seed,
-    content: resolveStaticResourceContent(seed.contentKey),
+    content: STATIC_CONTENT_BY_KEY[seed.contentKey],
   }));
 }
 
-// --- Registration ---
+function completeToolName(value: string): string[] {
+  return TOOL_NAMES.filter((toolName) => toolName.startsWith(value));
+}
 
-export function registerAllResources(server: McpServer, db: TypedDb): void {
-  for (const config of getStaticMarkdownResources()) {
-    registerStaticMarkdownResource(server, config);
-  }
-
-  // internal://tool-info/{toolName}
+function registerToolInfoResource(server: McpServer): void {
   server.registerResource(
     'tool-info',
     new ResourceTemplate(TOOL_INFO_URI_TEMPLATE, {
-      list: () => listToolInfoResources(),
-      complete: {
-        toolName: (value: string) =>
-          TOOL_NAMES.filter((n) => n.startsWith(value)),
-      },
+      list: listToolInfoResources,
+      complete: { toolName: completeToolName },
     }),
     {
       title: 'Tool Info',
@@ -295,14 +283,12 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
         'Missing toolName parameter'
       );
       const info = requireKnownToolInfo(toolName);
-
-      return {
-        contents: [createMarkdownContent(uri.href, info)],
-      };
+      return { contents: [createMarkdownContent(uri.href, info)] };
     }
   );
+}
 
-  // memory://memories/{hash}
+function registerMemoryResource(server: McpServer, db: TypedDb): void {
   const hashCompletion = createHashCompletionCallback(db);
 
   server.registerResource(
@@ -320,7 +306,6 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
     },
     (uri: URL, variables: Variables) => {
       const hash = requireValidMemoryHash(variables);
-
       const row = readMemoryByHash(db, hash);
 
       if (!row) {
@@ -332,4 +317,15 @@ export function registerAllResources(server: McpServer, db: TypedDb): void {
       };
     }
   );
+}
+
+// --- Registration ---
+
+export function registerAllResources(server: McpServer, db: TypedDb): void {
+  for (const config of getStaticMarkdownResources()) {
+    registerStaticMarkdownResource(server, config);
+  }
+
+  registerToolInfoResource(server);
+  registerMemoryResource(server, db);
 }

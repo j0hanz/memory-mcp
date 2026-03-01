@@ -20,6 +20,7 @@ import { UpdateMemoryInputSchema } from '../schemas/inputs.js';
 import { UpdateResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
+import { formatHashPreview } from './result.js';
 
 type UpdateInput = z.infer<typeof UpdateMemoryInputSchema>;
 
@@ -116,7 +117,7 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
         }),
       {
         progressMessage: (params: UpdateInput) =>
-          `⊜ update_memory: ${params.hash.slice(0, 12)}... [replace content]`,
+          `⊜ update_memory: ${formatHashPreview(params.hash)} [replace content]`,
       }
     )
   );
