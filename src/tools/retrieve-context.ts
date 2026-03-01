@@ -10,6 +10,7 @@ import {
   E_UNKNOWN,
   getErrorMessage,
   rethrowMcpError,
+  throwIfAborted,
 } from '../lib/errors.js';
 import { sanitizeFtsQuery } from '../lib/search.js';
 import {
@@ -29,9 +30,7 @@ import {
 import { registerToolWithContract } from './register-contract.js';
 import {
   countPayloadArrayItems,
-  getToolResultPayload,
-  getToolResultText,
-  isOkStructuredToolResult,
+  formatToolCompletionMessage,
 } from './result.js';
 
 type RetrieveContextInput = z.infer<typeof RetrieveContextInputSchema>;
@@ -98,41 +97,24 @@ function formatCompletionMessage(
   query: string,
   result: CallToolResult
 ): string {
-  const failedMessage = `⊙ retrieve_context: ${query} • failed`;
-  if (result.isError) {
-    const text = getToolResultText(result);
-    if (text.includes(E_CANCELLED)) {
-      return `⊙ retrieve_context: ${query} • cancelled`;
+  return formatToolCompletionMessage(
+    'retrieve_context',
+    query,
+    result,
+    (payload) => {
+      const memoriesCount = countPayloadMemories(payload);
+      const estimatedTokens =
+        'estimated_tokens' in payload &&
+        typeof payload.estimated_tokens === 'number'
+          ? payload.estimated_tokens
+          : 0;
+      const truncated =
+        'truncated' in payload && payload.truncated === true
+          ? ' [truncated]'
+          : '';
+      return `${memoriesCount} memories, ${estimatedTokens} tokens${truncated}`;
     }
-    return failedMessage;
-  }
-  if (!isOkStructuredToolResult(result)) {
-    return failedMessage;
-  }
-
-  const payload = getToolResultPayload(result);
-  if (!payload) {
-    return `⊙ retrieve_context: ${query} • completed`;
-  }
-
-  const memoriesCount = countPayloadMemories(payload);
-  const estimatedTokens =
-    'estimated_tokens' in payload &&
-    typeof payload.estimated_tokens === 'number'
-      ? payload.estimated_tokens
-      : 0;
-  const truncated =
-    'truncated' in payload && payload.truncated === true ? ' [truncated]' : '';
-
-  return `⊙ retrieve_context: ${query} • ${memoriesCount} memories, ${estimatedTokens} tokens${truncated}`;
-}
-
-function throwIfAborted(signal?: AbortSignal): void {
-  if (!signal?.aborted) {
-    return;
-  }
-
-  throw new Error(E_CANCELLED);
+  );
 }
 
 function computeCandidateLimit(tokenBudget: number): number {

@@ -1,5 +1,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
+import { E_CANCELLED } from '../lib/errors.js';
+
 export type ToolResultPayload = Record<string, unknown>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -33,4 +35,32 @@ export function countPayloadArrayItems(
 ): number {
   const value = payload[key];
   return Array.isArray(value) ? value.length : 0;
+}
+
+/** Standardize format of tool completion messages. */
+export function formatToolCompletionMessage(
+  toolName: string,
+  query: string,
+  result: CallToolResult,
+  getSuccessMessage: (payload: ToolResultPayload) => string
+): string {
+  const failedMessage = `⊙ ${toolName}: ${query} • failed`;
+  if (result.isError) {
+    const text = getToolResultText(result);
+    if (text.includes(E_CANCELLED)) {
+      return `⊙ ${toolName}: ${query} • cancelled`;
+    }
+    return failedMessage;
+  }
+  if (!isOkStructuredToolResult(result)) {
+    return failedMessage;
+  }
+
+  const payload = getToolResultPayload(result);
+  if (!payload) {
+    return `⊙ ${toolName}: ${query} • completed`;
+  }
+
+  const successSuffix = getSuccessMessage(payload);
+  return `⊙ ${toolName}: ${query} • ${successSuffix}`;
 }

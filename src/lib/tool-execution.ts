@@ -1,6 +1,12 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { McpError } from '@modelcontextprotocol/sdk/types.js';
 
-import { E_UNKNOWN, getErrorMessage, rethrowMcpError } from './errors.js';
+import {
+  E_CANCELLED,
+  E_UNKNOWN,
+  getErrorMessage,
+  rethrowMcpError,
+} from './errors.js';
 import { createErrorResponse } from './tool-response.js';
 
 interface BatchSummary {
@@ -45,4 +51,30 @@ export function summarizeBatch<T extends BatchItemLike>(
     failed: items.length - succeeded,
     matched,
   };
+}
+export async function executeLongRunningToolSafely(
+  work: () => Promise<CallToolResult> | CallToolResult,
+  onFinally?: () => Promise<void>
+): Promise<CallToolResult> {
+  let result: CallToolResult | undefined;
+  let thrownError: McpError | undefined;
+
+  try {
+    result = await work();
+  } catch (err) {
+    if (err instanceof Error && err.message === E_CANCELLED) {
+      result = createErrorResponse(E_CANCELLED, 'Request cancelled');
+    } else if (err instanceof McpError) {
+      thrownError = err;
+    } else {
+      rethrowMcpError(err);
+      result = createErrorResponse(E_UNKNOWN, getErrorMessage(err));
+    }
+  }
+
+  if (onFinally) {
+    await onFinally();
+  }
+
+  return result ?? createErrorResponse(E_UNKNOWN, getErrorMessage(thrownError));
 }

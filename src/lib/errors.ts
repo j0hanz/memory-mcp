@@ -21,3 +21,9 @@ export function isMcpError(err: unknown): err is McpError {
 export function rethrowMcpError(err: unknown): void {
   if (isMcpError(err)) throw err;
 }
+
+export function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new Error(E_CANCELLED);
+  }
+}
