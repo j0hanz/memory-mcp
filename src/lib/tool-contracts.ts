@@ -131,7 +131,7 @@ const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
     name: 'retrieve_context',
     title: 'Retrieve Context',
     description:
-      'FTS search within token budget. Sorts by relevance/importance/recency. Returns truncated: true if limit hit.',
+      'FTS search within token budget. Sorts by relevance/importance/recency. Supports importance and type filters. Returns truncated: true if limit hit.',
     inputSchema: RetrieveContextInputSchema,
     outputSchema: RetrieveContextResultSchema,
     annotations: READ_ONLY_ANNOTATIONS,
@@ -149,7 +149,7 @@ const TOOL_DEFINITIONS: readonly ToolDefinition[] = [
     name: 'update_memory',
     title: 'Update Memory',
     description:
-      'Update content/tags. Returns old+new hash. Cascade updates relationships.',
+      'Update content and/or tags (at least one required). Returns old+new hash. Cascade updates relationships.',
     inputSchema: UpdateMemoryInputSchema,
     outputSchema: UpdateResultSchema,
     annotations: DESTRUCTIVE_ANNOTATIONS,

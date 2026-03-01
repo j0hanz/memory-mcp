@@ -22,8 +22,15 @@ export function rethrowMcpError(err: unknown): void {
   if (isMcpError(err)) throw err;
 }
 
+export class CancelledError extends Error {
+  constructor() {
+    super(E_CANCELLED);
+    this.name = 'CancelledError';
+  }
+}
+
 export function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) {
-    throw new Error(E_CANCELLED);
+    throw new CancelledError();
   }
 }

@@ -5,12 +5,17 @@ import type { z } from 'zod/v4';
 
 import type { TypedDb } from '../db/typed.js';
 import { throwIfAborted } from '../lib/errors.js';
-import { sanitizeFtsQuery } from '../lib/search.js';
+import {
+  buildAndWhereClause,
+  buildFilterClauses,
+  type MemoryFilters,
+  sanitizeFtsQuery,
+  toMemoryFilters,
+} from '../lib/search.js';
 import { createToolResponse } from '../lib/tool-response.js';
 import { parseMemoryRow } from '../lib/types.js';
 import type { Memory, MemoryRow } from '../lib/types.js';
-import { RetrieveContextInputSchema } from '../schemas/inputs.js';
-import { RetrieveContextResultSchema } from '../schemas/outputs.js';
+import { type RetrieveContextInputSchema } from '../schemas/inputs.js';
 import {
   createProgressReporter,
   notifyProgress,
@@ -53,18 +58,21 @@ function loadContextRows(
   db: TypedDb,
   query: string,
   orderBy: string,
-  limit: number
+  limit: number,
+  filters: MemoryFilters
 ): MemoryRow[] {
   const ftsQuery = sanitizeFtsQuery(query);
+  const filter = buildFilterClauses(filters);
+  const whereExtra = buildAndWhereClause(filter.clauses);
   return db
     .prepareOnce<MemoryRow>(
       `SELECT m.*, memories_fts.rank AS rank FROM memories m
        JOIN memories_fts ON memories_fts.rowid = m.rowid
-       WHERE memories_fts MATCH ?
+       WHERE memories_fts MATCH ?${whereExtra}
        ORDER BY ${orderBy}
        LIMIT ?`
     )
-    .all(ftsQuery, limit + 1);
+    .all(ftsQuery, ...filter.params, limit + 1);
 }
 
 function reportSelectionProgress(
@@ -192,7 +200,8 @@ function computeRetrieveContextResult(
     | undefined
 ): RetrieveContextComputation {
   const orderBy = ORDER_BY_MAP[params.strategy];
-  const rows = loadContextRows(db, params.query, orderBy, limit);
+  const filters = toMemoryFilters(params);
+  const rows = loadContextRows(db, params.query, orderBy, limit, filters);
   const rowCapExceeded = rows.length > limit;
   const candidateCount = rowCapExceeded ? limit : rows.length;
   const completionCurrent = candidateCount + 1;
@@ -214,8 +223,6 @@ export function registerRetrieveContext(server: McpServer, db: TypedDb): void {
   registerToolWithContract(
     server,
     'retrieve_context',
-    RetrieveContextInputSchema,
-    RetrieveContextResultSchema,
     async (params: RetrieveContextInput, extra: ProgressContext) => {
       const { query, strategy } = params;
       const tokenBudget = params.token_budget;

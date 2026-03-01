@@ -16,8 +16,7 @@ import {
   createToolResponse,
 } from '../lib/tool-response.js';
 import { type MemoryRow, parseTags } from '../lib/types.js';
-import { UpdateMemoryInputSchema } from '../schemas/inputs.js';
-import { UpdateResultSchema } from '../schemas/outputs.js';
+import { type UpdateMemoryInputSchema } from '../schemas/inputs.js';
 import { wrapToolHandler } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
 import { formatHashPreview } from './result.js';
@@ -48,8 +47,6 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
   registerToolWithContract(
     server,
     'update_memory',
-    UpdateMemoryInputSchema,
-    UpdateResultSchema,
     wrapToolHandler(
       async (params: UpdateInput) =>
         executeToolSafely(async () => {
@@ -68,8 +65,9 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
               };
             }
 
+            const newContent = params.content ?? existing.content;
             const newTags = params.tags ?? parseTags(existing.tags);
-            const newHash = computeMemoryHash(params.content, newTags);
+            const newHash = computeMemoryHash(newContent, newTags);
 
             if (newHash !== params.hash) {
               const collision = db
@@ -87,7 +85,7 @@ export function registerUpdateMemory(server: McpServer, db: TypedDb): void {
             const now = new Date().toISOString();
             db.prepareOnce(UPDATE_MEMORY_SQL).run(
               newHash,
-              params.content,
+              newContent,
               JSON.stringify(newTags),
               now,
               params.hash

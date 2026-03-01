@@ -14,8 +14,7 @@ import { executeToolSafely } from '../lib/tool-execution.js';
 import { createToolResponse } from '../lib/tool-response.js';
 import { parseMemoryRow } from '../lib/types.js';
 import type { Memory, MemoryRow } from '../lib/types.js';
-import { SearchMemoriesInputSchema } from '../schemas/inputs.js';
-import { SearchResultSchema } from '../schemas/outputs.js';
+import { type SearchMemoriesInputSchema } from '../schemas/inputs.js';
 import { wrapToolHandler } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
 
@@ -43,8 +42,6 @@ export function registerSearchMemories(server: McpServer, db: TypedDb): void {
   registerToolWithContract(
     server,
     'search_memories',
-    SearchMemoriesInputSchema,
-    SearchResultSchema,
     wrapToolHandler(
       (params: SearchInput) =>
         executeToolSafely(() => {

@@ -2,6 +2,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import {
+  CancelledError,
   E_CANCELLED,
   E_UNKNOWN,
   getErrorMessage,
@@ -62,12 +63,11 @@ export async function executeLongRunningToolSafely(
   try {
     result = await work();
   } catch (err) {
-    if (err instanceof Error && err.message === E_CANCELLED) {
+    if (err instanceof CancelledError) {
       result = createErrorResponse(E_CANCELLED, 'Request cancelled');
     } else if (err instanceof McpError) {
       thrownError = err;
     } else {
-      rethrowMcpError(err);
       result = createErrorResponse(E_UNKNOWN, getErrorMessage(err));
     }
   }

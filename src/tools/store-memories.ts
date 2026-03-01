@@ -9,8 +9,7 @@ import { INSERT_MEMORY_SQL } from '../lib/sql.js';
 import { executeToolSafely, summarizeBatch } from '../lib/tool-execution.js';
 import { createToolResponse } from '../lib/tool-response.js';
 import type { BatchItemResult } from '../lib/types.js';
-import { StoreMemoriesInputSchema } from '../schemas/inputs.js';
-import { BatchResultSchema } from '../schemas/outputs.js';
+import { type StoreMemoriesInputSchema } from '../schemas/inputs.js';
 import { wrapToolHandler } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
 
@@ -30,8 +29,6 @@ export function registerStoreMemories(server: McpServer, db: TypedDb): void {
   registerToolWithContract(
     server,
     'store_memories',
-    StoreMemoriesInputSchema,
-    BatchResultSchema,
     wrapToolHandler(
       async (params: StoreMemoriesInput) =>
         executeToolSafely(async () => {

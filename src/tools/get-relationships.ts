@@ -12,8 +12,7 @@ import {
 } from '../lib/tool-response.js';
 import { parseTags } from '../lib/types.js';
 import type { RelationshipRow, RelationshipWithMemory } from '../lib/types.js';
-import { GetRelationshipsInputSchema } from '../schemas/inputs.js';
-import { RelationshipResultSchema } from '../schemas/outputs.js';
+import { type GetRelationshipsInputSchema } from '../schemas/inputs.js';
 import { wrapToolHandler } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
 import { formatHashPreview } from './result.js';
@@ -98,26 +97,28 @@ export function registerGetRelationships(server: McpServer, db: TypedDb): void {
   registerToolWithContract(
     server,
     'get_relationships',
-    GetRelationshipsInputSchema,
-    RelationshipResultSchema,
     wrapToolHandler(
       (params: GetRelInput) =>
         executeToolSafely(() => {
-          if (!memoryExists(db, params.hash)) {
-            return createErrorResponse(
-              E_NOT_FOUND,
-              `Memory not found: ${params.hash}`
+          // Transaction eliminates TOCTOU: memory cannot be deleted
+          // between the existence check and the relationship query.
+          return db.transaction(() => {
+            if (!memoryExists(db, params.hash)) {
+              return createErrorResponse(
+                E_NOT_FOUND,
+                `Memory not found: ${params.hash}`
+              );
+            }
+
+            const rows = loadRelationships(db, params.hash, params.direction);
+            const relationships: RelationshipWithMemory[] = rows.map(
+              toRelationshipWithMemory
             );
-          }
 
-          const rows = loadRelationships(db, params.hash, params.direction);
-          const relationships: RelationshipWithMemory[] = rows.map(
-            toRelationshipWithMemory
-          );
-
-          return createToolResponse({
-            relationships,
-            count: relationships.length,
+            return createToolResponse({
+              relationships,
+              count: relationships.length,
+            });
           });
         }),
       {

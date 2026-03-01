@@ -9,8 +9,6 @@ import {
 import { executeToolSafely } from '../lib/tool-execution.js';
 import { createToolResponse } from '../lib/tool-response.js';
 import type { TotalRow, TypeRow } from '../lib/types.js';
-import { MemoryStatsInputSchema } from '../schemas/inputs.js';
-import { StatsResultSchema } from '../schemas/outputs.js';
 import { wrapToolHandler } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
 
@@ -33,8 +31,6 @@ export function registerMemoryStats(server: McpServer, db: TypedDb): void {
   registerToolWithContract(
     server,
     'memory_stats',
-    MemoryStatsInputSchema,
-    StatsResultSchema,
     wrapToolHandler(
       () =>
         executeToolSafely(() => {

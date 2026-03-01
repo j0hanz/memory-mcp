@@ -11,8 +11,7 @@ import {
   createToolResponse,
 } from '../lib/tool-response.js';
 import { type MemoryRow, parseMemoryRow } from '../lib/types.js';
-import { GetMemoryInputSchema } from '../schemas/inputs.js';
-import { MemoryResultSchema } from '../schemas/outputs.js';
+import { type GetMemoryInputSchema } from '../schemas/inputs.js';
 import { wrapToolHandler } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
 import { formatHashPreview } from './result.js';
@@ -31,8 +30,6 @@ export function registerGetMemory(server: McpServer, db: TypedDb): void {
   registerToolWithContract(
     server,
     'get_memory',
-    GetMemoryInputSchema,
-    MemoryResultSchema,
     wrapToolHandler(
       (params: GetInput) =>
         executeToolSafely(() => {

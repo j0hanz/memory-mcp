@@ -20,8 +20,7 @@ import { loadRankedSearchRows, toMemoryFilters } from '../lib/search.js';
 import { createToolResponse } from '../lib/tool-response.js';
 import { parseMemoryRow } from '../lib/types.js';
 import type { Memory, MemoryRow, RelationshipEdge } from '../lib/types.js';
-import { RecallInputSchema } from '../schemas/inputs.js';
-import { RecallResultSchema } from '../schemas/outputs.js';
+import { type RecallInputSchema } from '../schemas/inputs.js';
 import {
   createProgressReporter,
   notifyProgress,
@@ -206,8 +205,6 @@ export function registerRecall(server: McpServer, db: TypedDb): void {
   registerToolWithContract(
     server,
     'recall',
-    RecallInputSchema,
-    RecallResultSchema,
     async (params: RecallInput, extra: ProgressContext) => {
       const { depth } = params;
       const filters = toMemoryFilters(params);

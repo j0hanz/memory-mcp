@@ -10,8 +10,7 @@ import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
-import { CreateRelationshipInputSchema } from '../schemas/inputs.js';
-import { CreateRelationshipResultSchema } from '../schemas/outputs.js';
+import { type CreateRelationshipInputSchema } from '../schemas/inputs.js';
 import { wrapToolHandler } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
 import { formatRelationshipPreview } from './result.js';
@@ -79,8 +78,6 @@ export function registerCreateRelationship(
   registerToolWithContract(
     server,
     'create_relationship',
-    CreateRelationshipInputSchema,
-    CreateRelationshipResultSchema,
     wrapToolHandler(
       async (params: CreateRelInput) =>
         executeToolSafely(async () => {

@@ -8,8 +8,7 @@ import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
 import { INSERT_MEMORY_SQL } from '../lib/sql.js';
 import { executeToolSafely } from '../lib/tool-execution.js';
 import { createToolResponse } from '../lib/tool-response.js';
-import { StoreMemoryInputSchema } from '../schemas/inputs.js';
-import { StoreResultSchema } from '../schemas/outputs.js';
+import { type StoreMemoryInputSchema } from '../schemas/inputs.js';
 import { wrapToolHandler } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
 
@@ -49,8 +48,6 @@ export function registerStoreMemory(server: McpServer, db: TypedDb): void {
   registerToolWithContract(
     server,
     'store_memory',
-    StoreMemoryInputSchema,
-    StoreResultSchema,
     wrapToolHandler(
       async (params: StoreInput) =>
         executeToolSafely(async () => {

@@ -2,7 +2,9 @@ import type { z } from 'zod/v4';
 
 import {
   extractJsonSchema,
+  getSchemaMeta,
   type JsonSchemaObject,
+  type SchemaMeta,
 } from '../lib/json-schema.js';
 import { getToolContracts, type ToolContract } from '../lib/tool-contracts.js';
 
@@ -26,11 +28,6 @@ interface ToolEntry {
   name: string;
   purpose: string;
   behavior: string;
-}
-
-interface SchemaMeta {
-  properties: Record<string, JsonSchemaObject>;
-  requiredFields: Set<string>;
 }
 
 function formatBehavior(annotations: ToolContract['annotations']): string {
@@ -86,21 +83,6 @@ function formatParamConstraints(prop: JsonSchemaObject): string {
   if (Array.isArray(prop['enum']))
     parts.push(`enum: ${(prop['enum'] as string[]).join(' | ')}`);
   return parts.length > 0 ? `; ${parts.join(', ')}` : '';
-}
-
-function getSchemaMeta(schema: z.ZodType): SchemaMeta {
-  const jsonSchema = extractJsonSchema(schema);
-  return {
-    properties: (jsonSchema['properties'] ?? {}) as Record<
-      string,
-      JsonSchemaObject
-    >,
-    requiredFields: new Set(
-      Array.isArray(jsonSchema['required'])
-        ? (jsonSchema['required'] as string[])
-        : []
-    ),
-  };
 }
 
 function getSortedSchemaProperties(

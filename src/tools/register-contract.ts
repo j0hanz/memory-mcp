@@ -1,14 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import type { z } from 'zod/v4';
-
 import { getToolContract } from '../lib/tool-contracts.js';
 
 export function registerToolWithContract(
   server: McpServer,
   toolName: string,
-  _inputSchema: z.ZodType,
-  _outputSchema: z.ZodType,
   handler: unknown
 ): void {
   const contract = getToolContract(toolName);

@@ -1,31 +1,8 @@
 import type { z } from 'zod/v4';
 
-import {
-  extractJsonSchema,
-  type JsonSchemaObject,
-} from '../lib/json-schema.js';
+import { getSchemaMeta } from '../lib/json-schema.js';
 import { getToolContracts } from '../lib/tool-contracts.js';
 import { buildCoreContextPack } from './tool-info.js';
-
-interface SchemaMeta {
-  properties: Record<string, JsonSchemaObject>;
-  requiredFields: Set<string>;
-}
-
-function getSchemaMeta(schema: z.ZodType): SchemaMeta {
-  const jsonSchema = extractJsonSchema(schema);
-  return {
-    properties: (jsonSchema['properties'] ?? {}) as Record<
-      string,
-      JsonSchemaObject
-    >,
-    requiredFields: new Set(
-      Array.isArray(jsonSchema['required'])
-        ? (jsonSchema['required'] as string[])
-        : []
-    ),
-  };
-}
 
 function extractOptionalParams(toolName: string, schema: z.ZodType): string[] {
   const { properties, requiredFields } = getSchemaMeta(schema);

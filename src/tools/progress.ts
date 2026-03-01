@@ -5,6 +5,7 @@ import type {
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import {
+  CancelledError,
   E_CANCELLED,
   E_UNKNOWN,
   getErrorMessage,
@@ -276,8 +277,7 @@ export function wrapToolHandler<TArgs>(
     try {
       result = await handler(args, extra);
     } catch (error) {
-      const isCancelled =
-        error instanceof Error && error.message === E_CANCELLED;
+      const isCancelled = error instanceof CancelledError;
       await notifyTerminalProgress(
         extra,
         startMessage,
@@ -312,7 +312,7 @@ export async function runWithProgressCompletion(
   try {
     result = await run();
   } catch (error) {
-    if (error instanceof Error && error.message === E_CANCELLED) {
+    if (error instanceof CancelledError) {
       result = createErrorResponse(E_CANCELLED, 'Request cancelled');
     } else if (error instanceof McpError) {
       thrownError = error;

@@ -7,8 +7,7 @@ import { logToolEvent, notifyMemoryResourceUpdated } from '../lib/mcp-utils.js';
 import { DELETE_MEMORY_SQL } from '../lib/sql.js';
 import { executeToolSafely } from '../lib/tool-execution.js';
 import { createToolResponse } from '../lib/tool-response.js';
-import { DeleteMemoryInputSchema } from '../schemas/inputs.js';
-import { DeleteResultSchema } from '../schemas/outputs.js';
+import { type DeleteMemoryInputSchema } from '../schemas/inputs.js';
 import { wrapToolHandler } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
 import { formatHashPreview } from './result.js';
@@ -23,8 +22,6 @@ export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
   registerToolWithContract(
     server,
     'delete_memory',
-    DeleteMemoryInputSchema,
-    DeleteResultSchema,
     wrapToolHandler(
       async (params: DeleteInput) =>
         executeToolSafely(async () => {
@@ -32,6 +29,8 @@ export function registerDeleteMemory(server: McpServer, db: TypedDb): void {
 
           if (deleted) {
             await logToolEvent(server, 'delete', { hash: params.hash });
+            // MCP spec (v2025-11-25) has no 'deleted' resource notification;
+            // 'updated' is the closest available signal to inform clients.
             await notifyMemoryResourceUpdated(server, params.hash);
           }
 

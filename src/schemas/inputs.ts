@@ -169,8 +169,11 @@ export const GetMemoryInputSchema = z
 export const UpdateMemoryInputSchema = z
   .strictObject({
     hash: describeHash('SHA-256 hash'),
-    content: CONTENT_SCHEMA,
+    content: CONTENT_SCHEMA.optional(),
     tags: TAGS_ARRAY_SCHEMA.optional(),
+  })
+  .refine((data) => data.content !== undefined || data.tags !== undefined, {
+    error: 'At least one of content or tags must be provided',
   })
   .describe('Update memory');
 
@@ -230,6 +233,12 @@ export const RecallInputSchema = z
   })
   .describe('Recall memories via graph traversal');
 
+const RETRIEVE_CONTEXT_FILTER_FIELDS = createSearchFilterFields({
+  min: 'Min importance filter',
+  max: 'Max importance filter',
+  type: 'Memory type filter',
+});
+
 export const RetrieveContextInputSchema = z
   .strictObject({
     query: SEARCH_QUERY_SCHEMA.describe('Search query'),
@@ -244,6 +253,7 @@ export const RetrieveContextInputSchema = z
       .optional()
       .prefault('relevance')
       .describe('Sort strategy'),
+    ...RETRIEVE_CONTEXT_FILTER_FIELDS,
   })
   .describe('Retrieve context within token budget');
 

@@ -9,8 +9,7 @@ import {
   createErrorResponse,
   createToolResponse,
 } from '../lib/tool-response.js';
-import { DeleteRelationshipInputSchema } from '../schemas/inputs.js';
-import { DeleteRelationshipResultSchema } from '../schemas/outputs.js';
+import { type DeleteRelationshipInputSchema } from '../schemas/inputs.js';
 import { wrapToolHandler } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
 import { formatRelationshipPreview } from './result.js';
@@ -51,8 +50,6 @@ export function registerDeleteRelationship(
   registerToolWithContract(
     server,
     'delete_relationship',
-    DeleteRelationshipInputSchema,
-    DeleteRelationshipResultSchema,
     wrapToolHandler(
       (params: DeleteRelInput) =>
         executeToolSafely(() => {

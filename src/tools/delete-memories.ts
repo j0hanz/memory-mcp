@@ -8,8 +8,7 @@ import { DELETE_MEMORY_SQL } from '../lib/sql.js';
 import { executeToolSafely, summarizeBatch } from '../lib/tool-execution.js';
 import { createToolResponse } from '../lib/tool-response.js';
 import type { BatchItemResult } from '../lib/types.js';
-import { DeleteMemoriesInputSchema } from '../schemas/inputs.js';
-import { BatchResultSchema } from '../schemas/outputs.js';
+import { type DeleteMemoriesInputSchema } from '../schemas/inputs.js';
 import { wrapToolHandler } from './progress.js';
 import { registerToolWithContract } from './register-contract.js';
 
@@ -19,6 +18,8 @@ async function notifyDeletedResources(
   server: McpServer,
   items: readonly BatchItemResult[]
 ): Promise<void> {
+  // MCP spec (v2025-11-25) has no 'deleted' resource notification;
+  // 'updated' is the closest available signal to inform clients.
   const notifications = items
     .filter((item) => item.deleted)
     .map((item) => notifyMemoryResourceUpdated(server, item.hash));
@@ -29,8 +30,6 @@ export function registerDeleteMemories(server: McpServer, db: TypedDb): void {
   registerToolWithContract(
     server,
     'delete_memories',
-    DeleteMemoriesInputSchema,
-    BatchResultSchema,
     wrapToolHandler(
       async (params: DeleteMemoriesInput) =>
         executeToolSafely(async () => {
